@@ -1,0 +1,4 @@
+/* Entry CSS file where Tailwind directives are imported. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
