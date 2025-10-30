@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ordonnance</title>
+    <style>
+      body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; }
+      .header { text-align: center; margin-bottom: 12px }
+      .section { margin-bottom: 8px }
+      .bold { font-weight: 700 }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h2>Ordonnance</h2>
+      <div>Générée le {{ generated_at.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+    </div>
+
+    <div class="section">
+      <div class="bold">Patient</div>
+      <div>{{ user.email if user.email else "-" }}</div>
+    </div>
+
+    <div class="section">
+      <div class="bold">Rendez-vous</div>
+      <div>Date: {{ appointment.date }}</div>
+      <div>Heure: {{ appointment.time }}</div>
+    </div>
+
+    <div class="section">
+      <div class="bold">Ordonnances / Médicaments</div>
+      <ul>
+        <li>Paracétamol 1 g si douleur, max 3 g/j</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <div class="bold">Notes</div>
+      <div>Considérations cliniques : adapter selon questionnaire (ex: anticoagulants, insuffisance rénale).</div>
+    </div>
+  </body>
+</html>

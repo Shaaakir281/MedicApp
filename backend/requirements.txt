@@ -9,3 +9,6 @@ python-jose==3.3.0
 pydantic==2.7.1
 
 email-validator>=2.1.0
+
+Jinja2==3.1.2
+WeasyPrint==59.0
