@@ -21,3 +21,7 @@ Thumbs.db
 
 # Alembic
 backend/migrations/__pycache__/
+
+# Generated PDFs
+backend/storage/
+*.pdf

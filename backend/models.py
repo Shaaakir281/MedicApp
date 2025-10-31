@@ -18,6 +18,8 @@ from sqlalchemy import (
     String,
     Time,
     JSON,
+    Boolean,
+    Float,
 )
 from sqlalchemy.orm import relationship
 
@@ -38,6 +40,28 @@ class AppointmentStatus(str, enum.Enum):
     validated = "validated"
 
 
+class AppointmentType(str, enum.Enum):
+    """Differentiate appointment categories (general, pre-consultation, act)."""
+
+    general = "general"
+    preconsultation = "preconsultation"
+    act = "act"
+
+
+class AppointmentMode(str, enum.Enum):
+    """Mode of the appointment."""
+
+    visio = "visio"
+    presentiel = "presentiel"
+
+
+class ProcedureType(str, enum.Enum):
+    """Supported procedure types."""
+
+    circumcision = "circumcision"
+    other = "autre"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -45,11 +69,20 @@ class User(Base):
     email: str = Column(String, unique=True, index=True, nullable=False)
     hashed_password: str = Column(String, nullable=False)
     role: UserRole = Column(Enum(UserRole), nullable=False)
+    email_verified: bool = Column(Boolean, nullable=False, default=False)
     created_at: datetime.datetime = Column(
         DateTime, default=datetime.datetime.utcnow, nullable=False
     )
 
     appointments = relationship("Appointment", back_populates="user", cascade="all,delete-orphan")
+    email_tokens = relationship(
+        "EmailVerificationToken", back_populates="user", cascade="all,delete-orphan"
+    )
+    procedure_cases = relationship(
+        "ProcedureCase",
+        back_populates="patient",
+        cascade="all,delete-orphan",
+    )
 
 
 class Appointment(Base):
@@ -62,6 +95,11 @@ class Appointment(Base):
     status: AppointmentStatus = Column(
         Enum(AppointmentStatus), default=AppointmentStatus.pending, nullable=False
     )
+    appointment_type: AppointmentType = Column(
+        Enum(AppointmentType), default=AppointmentType.general, nullable=False
+    )
+    mode: AppointmentMode | None = Column(Enum(AppointmentMode), nullable=True)
+    procedure_id: int | None = Column(Integer, ForeignKey("procedure_cases.id"), nullable=True)
     created_at: datetime.datetime = Column(
         DateTime, default=datetime.datetime.utcnow, nullable=False
     )
@@ -79,6 +117,22 @@ class Appointment(Base):
         uselist=False,
         cascade="all,delete-orphan",
     )
+    procedure_case = relationship("ProcedureCase", back_populates="appointments")
+
+
+class EmailVerificationToken(Base):
+    __tablename__ = "email_verification_tokens"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    user_id: int = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token: str = Column(String, unique=True, nullable=False, index=True)
+    expires_at: datetime.datetime = Column(DateTime, nullable=False)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+    consumed_at: datetime.datetime | None = Column(DateTime, nullable=True)
+
+    user = relationship("User", back_populates="email_tokens")
 
 
 class Questionnaire(Base):
@@ -109,3 +163,42 @@ class Prescription(Base):
     )
 
     appointment = relationship("Appointment", back_populates="prescription")
+
+
+class ProcedureCase(Base):
+    __tablename__ = "procedure_cases"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    patient_id: int = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    procedure_type: ProcedureType = Column(
+        Enum(ProcedureType), nullable=False, default=ProcedureType.circumcision
+    )
+    child_full_name: str = Column(String, nullable=False)
+    child_birthdate: datetime.date = Column(Date, nullable=False)
+    child_weight_kg: float | None = Column(Float, nullable=True)
+    parent1_name: str = Column(String, nullable=False)
+    parent1_email: str | None = Column(String, nullable=True)
+    parent2_name: str | None = Column(String, nullable=True)
+    parent2_email: str | None = Column(String, nullable=True)
+    parental_authority_ack: bool = Column(Boolean, nullable=False, default=False)
+    notes: str | None = Column(String, nullable=True)
+    checklist_pdf_path: str | None = Column(String, nullable=True)
+    consent_pdf_path: str | None = Column(String, nullable=True)
+    consent_download_token: str | None = Column(String, nullable=True, unique=True)
+    ordonnance_pdf_path: str | None = Column(String, nullable=True)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+    updated_at: datetime.datetime = Column(
+        DateTime,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+        nullable=False,
+    )
+
+    patient = relationship("User", back_populates="procedure_cases")
+    appointments = relationship(
+        "Appointment",
+        back_populates="procedure_case",
+        cascade="all,delete-orphan",
+    )

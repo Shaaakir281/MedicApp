@@ -1,80 +1,100 @@
 # MedicApp Monorepo
 
-## 📂 Structure
+Plateforme médico-administrative composée d’un backend FastAPI et d’un frontend React. Le Sprint en cours se concentre sur le parcours patient (création du dossier circoncision, prise de rendez-vous, génération et diffusion des consentements).
 
-* `frontend/` — React + Vite + Tailwind + DaisyUI (Sprint 0+ demo cliquable)
-* `backend/` — FastAPI + PostgreSQL + Alembic + JWT (Sprint 1)
+## Structure
 
-## ⚙️ Prérequis
+- `backend/` : FastAPI, PostgreSQL, Alembic, génération PDF via WeasyPrint.
+- `frontend/` : React + Vite + Tailwind + DaisyUI.
+- `setup_sprint2.ps1` : script d’automatisation (facultatif) pour installer les dépendances et lancer les services en local.
 
-* Node.js 18+
-* Python 3.11+
-* PostgreSQL (local ou via Docker)
+## Prérequis
 
-## 🚀 Lancer le frontend
+- Node.js 18+
+- Python 3.11+
+- Docker + Docker Compose (recommandé) ou un accès PostgreSQL local
 
-```bash
+## Lancement rapide avec Docker
+
+```powershell
+cd backend
+cp .env.example .env   # à faire une seule fois, ajuster si nécessaire
+docker compose up --build
+```
+
+Services disponibles :
+
+- API FastAPI : http://localhost:8000/docs
+- Adminer : http://localhost:8080 (login postgres/postgres, base `medscript`)
+
+Les migrations Alembic sont déjà appliquées dans l’image. Si une nouvelle révision est ajoutée : `docker compose exec backend alembic upgrade head`.
+
+## Lancement manuel (sans Docker)
+
+### Backend
+
+```powershell
+cd backend
+python -m venv .venv
+. .venv/Scripts/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+cp .env.example .env
+alembic upgrade head
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+WeasyPrint requiert des bibliothèques natives (Cairo, Pango, etc.). Sous Windows, utiliser la pile WSL ou Docker si l’installation échoue.
+
+### Frontend
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-➡️ Ouvrir l’URL affichée (souvent `http://localhost:5173`).
+Accès à l’UI : http://localhost:5173 (l’API doit être accessible sur `http://localhost:8000`). Une fois connecté, le parcours patient permet de :
 
-> ℹ️ **Windows + OneDrive** : si erreur `EPERM rmdir ... .vite\deps`, mettre OneDrive en pause, supprimer `node_modules/.vite`, relancer avec `--force`, ou déplacer le projet hors OneDrive (ex: `C:\Dev\MedicApp`).
+1. Sélectionner la procédure “circoncision” et remplir le dossier (enfant + parents).
+2. Générer les documents (checklist, consentement, ordonnance).
+3. Prendre rendez-vous de pré-consultation (visio ou présentiel) puis l’acte chirurgical.
+4. Télécharger ou recevoir par email le consentement (via l’endpoint `/procedures/send-consent-link`).
 
-## 🖥️ Lancer le backend
+## Variables d’environnement principales
 
-1. Créer `backend/.env` à partir de `.env.example` :
+`backend/.env` :
 
 ```
-DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/medscript
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/medscript
 JWT_SECRET_KEY=change_me
-ACCESS_TOKEN_EXPIRE_MINUTES=15
-REFRESH_TOKEN_EXPIRE_DAYS=30
+APP_BASE_URL=http://localhost:8000
+SMTP_HOST=...
+EMAIL_FROM=...
 ```
 
-2. Puis :
-
-```bash
-cd backend
-python -m venv .venv
-# Windows
-. .venv/Scripts/activate
-pip install -r requirements.txt
-alembic upgrade head
-uvicorn main:app --reload
-```
-
-➡️ Docs API : [http://localhost:8000/docs](http://localhost:8000/docs)
-
-## 🔗 Variables côté frontend
-
-Créer `frontend/.env.local` si besoin :
+`frontend/.env.local` (optionnel) :
 
 ```
-VITE_API_BASE=http://localhost:8000
+VITE_API_BASE_URL=http://localhost:8000
 ```
 
-Dans le code front, utiliser :
+## Génération des PDF
 
-```js
-const API = import.meta.env.VITE_API_BASE;
-fetch(`${API}/appointments/slots?date=2025-09-01`)
+Les fichiers sont produits dans `backend/storage/` (automatiquement recréé). Ils sont ignorés par Git. Pour tester la génération à la main :
+
+```powershell
+docker compose exec backend python -c "from services import pdf; from weasyprint import HTML; HTML(string='<h1>Test</h1>').write_pdf('/tmp/test.pdf'); print('OK')"
 ```
 
-## 🔒 Git et sécurité
+## Script d’installation (optionnel)
 
-* Ne **pas** committer `backend/.env` → garder `.env.example`.
-* `.gitignore` doit inclure :
+`setup_sprint2.ps1` automatise la création du virtualenv, l’installation des dépendances, le lancement de Docker Compose et d’uvicorn. Il n’est pas obligatoire, mais reste disponible pour accélérer la mise en route sur Windows.
 
-  * `node_modules/`, `dist/`, `.vite/`
-  * `.venv/`, `.env`, `.env.*`
-  * `__pycache__/`, `.vscode/`
+## Points de vigilance / TODO
 
-## 📑 Prochaines étapes
-
-* **Sprint 2** : génération PDF + règles métier (WeasyPrint/Jinja2)
-* **Sprint 3** : dashboard praticien + validation ordonnances
-* **Sprint 4** : notifications sécurisées + OTP patient
-* **Sprint 5** : monitoring + 2FA praticien + sécurité avancée
+- Parcours praticien à moderniser (Sprint suivant).
+- Sécurité : définir durée de rétention des PDF, suivi des téléchargements, éventuelle authentification forte.
+- Ajouter des tests d’intégration couvrant la génération des documents et la planification des rendez-vous.
+- Brancher un SMTP réel (les emails sont consignés dans les logs si aucune configuration n’est fournie).
+*** End Patch

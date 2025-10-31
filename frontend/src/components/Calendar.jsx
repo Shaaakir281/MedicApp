@@ -13,6 +13,10 @@ import React from 'react';
  *  - onSelectDate: (Date) => void
  */
 const Calendar = ({ currentMonth, selectedDate, onPrevMonth, onNextMonth, onSelectDate }) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const minMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
   const monthName = currentMonth.toLocaleString('fr-FR', { month: 'long' });
@@ -44,7 +48,13 @@ const Calendar = ({ currentMonth, selectedDate, onPrevMonth, onNextMonth, onSele
   return (
     <div className="border rounded-lg p-4 w-full max-w-md mx-auto">
       <div className="flex items-center justify-between mb-2">
-        <button className="btn btn-sm" onClick={onPrevMonth}>&lt;</button>
+        <button
+          className="btn btn-sm"
+          onClick={onPrevMonth}
+          disabled={currentMonth <= minMonth}
+        >
+          &lt;
+        </button>
         <div className="font-bold">
           {monthName.charAt(0).toUpperCase() + monthName.slice(1)} {year}
         </div>
@@ -61,20 +71,23 @@ const Calendar = ({ currentMonth, selectedDate, onPrevMonth, onNextMonth, onSele
         {dates.map((date, idx) => {
           const isSelected = isSameDay(date, selectedDate);
           const isToday = date && isSameDay(date, new Date());
+          const isPast = date && date < today;
           return (
             <button
               key={idx}
               className={`w-full aspect-square rounded-md flex items-center justify-center ${
                 date
-                  ? isSelected
+                  ? isPast
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : isSelected
                     ? 'bg-blue-500 text-white'
                     : isToday
                     ? 'bg-blue-100 text-blue-700'
                     : 'hover:bg-blue-50'
                   : 'bg-transparent'
               }`}
-              onClick={() => date && onSelectDate(date)}
-              disabled={!date}
+              onClick={() => date && !isPast && onSelectDate(date)}
+              disabled={!date || isPast}
             >
               {date ? date.getDate() : ''}
             </button>
