@@ -21,6 +21,8 @@ services:
     build: .
     env_file:
       - .env
+    environment:
+      PYTHONPATH: /app
     depends_on:
       - db
       - redis
