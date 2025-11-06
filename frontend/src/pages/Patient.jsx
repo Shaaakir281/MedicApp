@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Calendar from '../components/Calendar.jsx';
 import TimeSlots from '../components/TimeSlots.jsx';
 import Toast from '../components/Toast.jsx';
+import PasswordField from '../components/PasswordField.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   createAppointment,
@@ -444,23 +445,23 @@ const Patient = () => {
                 placeholder="Email"
                 required
               />
-              <input
-                type="password"
+              <PasswordField
+                label="Mot de passe"
                 name="password"
                 value={registerForm.password}
                 onChange={handleRegisterChange}
-                className="input input-bordered w-full"
                 placeholder="Mot de passe (min. 8 caracteres)"
                 required
+                autoComplete="new-password"
               />
-              <input
-                type="password"
+              <PasswordField
+                label="Confirmer le mot de passe"
                 name="password_confirm"
                 value={registerForm.password_confirm}
                 onChange={handleRegisterChange}
-                className="input input-bordered w-full"
                 placeholder="Confirmer le mot de passe"
                 required
+                autoComplete="new-password"
               />
               <button type="submit" className="btn btn-primary w-full" disabled={loading}>
                 {loading ? 'En cours...' : 'Inscription'}
@@ -485,14 +486,14 @@ const Patient = () => {
                 placeholder="Email"
                 required
               />
-              <input
-                type="password"
+              <PasswordField
+                label="Mot de passe"
                 name="password"
                 value={loginForm.password}
                 onChange={handleLoginChange}
-                className="input input-bordered w-full"
                 placeholder="Mot de passe"
                 required
+                autoComplete="current-password"
               />
               <button type="submit" className="btn btn-secondary w-full" disabled={loading}>
                 {loading ? 'Connexion...' : 'Connexion'}
@@ -716,3 +717,7 @@ const Patient = () => {
 };
 
 export default Patient;
+
+
+
+

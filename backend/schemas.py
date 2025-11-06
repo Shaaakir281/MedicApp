@@ -108,3 +108,54 @@ class ProcedureCase(ProcedureCaseBase):
     appointments: List[Appointment] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PractitionerPatientSummary(BaseModel):
+    id: int
+    email: EmailStr
+    child_full_name: str
+
+
+class PractitionerCaseStatus(BaseModel):
+    case_id: int
+    child_birthdate: date
+    parental_authority_ack: bool
+    has_checklist: bool
+    has_consent: bool
+    has_ordonnance: bool
+    has_preconsultation: bool
+    has_act_planned: bool
+    notes: Optional[str] = None
+    missing_items: List[str] = Field(default_factory=list)
+    needs_follow_up: bool
+
+
+class PractitionerAppointmentEntry(BaseModel):
+    appointment_id: int
+    date: date
+    time: time
+    appointment_type: str
+    status: str
+    mode: Optional[str] = None
+    patient: PractitionerPatientSummary
+    procedure: PractitionerCaseStatus
+
+
+class PractitionerAgendaDay(BaseModel):
+    date: date
+    appointments: List[PractitionerAppointmentEntry] = Field(default_factory=list)
+
+
+class PractitionerAgendaResponse(BaseModel):
+    start: date
+    end: date
+    days: List[PractitionerAgendaDay]
+
+
+class PractitionerStats(BaseModel):
+    date: date
+    total_appointments: int
+    bookings_created: int
+    new_patients: int
+    follow_ups_required: int
+    pending_consents: int

@@ -6,8 +6,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-import crud
+import models
 from database import get_db
+from services import auth_service
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -25,8 +26,8 @@ def get_current_user(
 
     token = credentials.credentials
     try:
-        claims = crud.decode_token(token)
-    except ValueError:
+        claims = auth_service.decode_token(token)
+    except auth_service.InvalidCredentialsError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token.",
@@ -39,7 +40,7 @@ def get_current_user(
             detail="Invalid authentication token payload.",
         )
 
-    user = crud.get_user_by_id(db, int(user_id))
+    user = auth_service.get_user_by_id(db, int(user_id))
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -51,4 +52,16 @@ def get_current_user(
             detail="Email address not verified.",
         )
 
+    return user
+
+
+def require_practitioner(
+    user: models.User = Depends(get_current_user),
+) -> models.User:
+    """Ensure the authenticated user has practitioner privileges."""
+    if user.role != models.UserRole.praticien:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acces reserve aux praticiens.",
+        )
     return user

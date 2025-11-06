@@ -1,6 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
-export async function apiRequest(path, { method = 'GET', token, body } = {}) {
+async function apiRequest(path, { method = 'GET', token, body } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) {
     headers.Authorization = `Bearer ${token}`;
@@ -13,18 +13,20 @@ export async function apiRequest(path, { method = 'GET', token, body } = {}) {
   });
 
   const isJson = response.headers.get('content-type')?.includes('application/json');
-  const data = isJson ? await response.json() : await response.text();
+  const payload = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const message = (data && data.detail) || response.statusText;
+    const message = (payload && payload.detail) || response.statusText;
     const error = new Error(message);
     error.status = response.status;
-    error.payload = data;
+    error.payload = payload;
     throw error;
   }
 
-  return data;
+  return payload;
 }
+
+export { apiRequest };
 
 export async function registerUser(payload) {
   return apiRequest('/auth/register', { method: 'POST', body: payload });
@@ -65,3 +67,15 @@ export async function sendConsentLink(token) {
   return apiRequest('/procedures/send-consent-link', { method: 'POST', token });
 }
 
+export async function fetchPractitionerAgenda({ start, end } = {}, token) {
+  const params = new URLSearchParams();
+  if (start) params.set('start', start);
+  if (end) params.set('end', end);
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest(`/practitioner/agenda${query}`, { token });
+}
+
+export async function fetchPractitionerStats(date, token) {
+  const query = date ? `?target_date=${date}` : '';
+  return apiRequest(`/practitioner/stats${query}`, { token });
+}

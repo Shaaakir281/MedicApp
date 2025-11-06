@@ -1,93 +1,83 @@
-# Backend FastAPI – Sprint 1
+# MedicApp Backend
 
-This repository contains the skeleton of a FastAPI backend for the MedicApp project. It provides the structure and boilerplate required for the first sprint: authentication, appointments and questionnaires. The code is intentionally minimal – you can extend it as you implement your domain logic.
+FastAPI backend for the MedicApp project. It currently exposes authentication, agenda and procedure features used by the web frontend.
 
 ## Requirements
 
-* Python 3.11 or higher
-* PostgreSQL (9.6+) for persistence
-* Redis (for future token blacklisting)
-* [Poetry](https://python-poetry.org/) or `pip` for dependency management
+- Python 3.11+
+- PostgreSQL 13+
+- Redis (optional, reserved for future background tasks)
+- `pip` or Poetry for dependency management
 
-## Installation
-
-Clone this repository and navigate into the `backend_fastapi_sprint1` directory. Install the dependencies in a virtual environment:
+## Setup
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+.venv\Scripts\activate    # PowerShell: .venv\Scripts\Activate.ps1
 pip install --upgrade pip
 pip install -r requirements.txt
-```
-
-Copy the `.env.example` file to `.env` and adjust the variables if necessary:
-
-```bash
 cp .env.example .env
 ```
 
-Run the initial database migrations:
+Apply the database migrations:
 
 ```bash
 alembic upgrade head
 ```
 
-Start the application in development mode:
+Start the development server:
 
 ```bash
 uvicorn main:app --reload
 ```
 
-Open Swagger UI at `http://localhost:8000/docs` to explore the API.
-
-## Docker Compose
-
-For a ready‑to‑use environment with PostgreSQL and Redis, use the provided Docker Compose file:
-
-```bash
-docker compose up --build
-```
-
-This will build the backend image, create a PostgreSQL database container and a Redis container, then expose the FastAPI app on port 8000. The default credentials and configuration are defined in the `.env.example` file.
+The interactive API documentation is available at http://localhost:8000/docs.
 
 ## Project structure
 
 ```
-backend_fastapi_sprint1/
-├── main.py                # FastAPI entrypoint and router setup
-├── database.py            # DB session/engine creation
-├── models.py              # SQLAlchemy ORM models
-├── schemas.py             # Pydantic models for request/response
-├── crud.py                # CRUD helper functions
-├── routes/                # API route definitions
-│   ├── __init__.py
-│   ├── auth.py            # login and token refresh endpoints
-│   ├── appointments.py    # appointment endpoints
-│   └── questionnaires.py  # questionnaire endpoints
-├── migrations/            # Alembic revision scripts (empty by default)
-├── tests/                 # Placeholder for test files
-├── alembic.ini            # Alembic configuration file
-├── .env.example           # Example environment configuration
-├── docker-compose.yml     # Docker Compose definitions
-├── Dockerfile             # Backend image build instructions
-└── requirements.txt       # Python dependencies
+backend/
++-- core/                  # Cross-cutting helpers (security, JWT, password hashing)
+�   +-- security.py
++-- repositories/          # Data access helpers
+�   +-- __init__.py
+�   +-- email_verification_repository.py
+�   +-- user_repository.py
++-- services/              # Domain services (email, PDF, auth orchestration)
+�   +-- auth_service.py
+�   +-- email.py
+�   +-- pdf.py
++-- routes/                # API routers
+�   +-- __init__.py
+�   +-- appointments.py
+�   +-- auth.py
+�   +-- questionnaires.py
++-- dependencies/          # FastAPI dependencies
++-- scripts/               # Utility scripts (seed data, maintenance)
++-- storage/               # Generated assets (eg. consent PDFs)
++-- templates/             # Jinja templates for PDF rendering
++-- crud.py                # Legacy helpers (appointments, procedures)
++-- database.py            # SQLAlchemy engine/session
++-- main.py                # FastAPI app factory
++-- models.py              # SQLAlchemy models
++-- schemas.py             # Pydantic schemas
++-- README.md
 ```
 
-### Authentication
+## Auth flow overview
 
-This skeleton implements a basic JWT authentication mechanism with access and refresh tokens. Tokens are signed using the secret key defined in your `.env` file. Access tokens expire quickly (15 minutes by default), while refresh tokens last longer (30 days by default). You can customise the expiry durations via environment variables.
+- `core.security` concentrates password hashing and JWT creation/validation.
+- `repositories.user_repository` and `repositories.email_verification_repository` isolate database access.
+- `services.auth_service` orchestrates login, registration, token refresh and email verification, providing typed errors for the HTTP layer.
+- The `/auth` routes now consume the service layer instead of the legacy `crud` functions, which simplifies future refactors and unit testing.
 
-### Database migrations
+## Scripts
 
-Alembic is configured to generate and apply migrations automatically based on your SQLAlchemy models. To create an initial migration, run:
+The `scripts/` directory contains helpers such as `seed_practitioner_demo.py`. Scripts now rely on `core.security.hash_password` for consistent hashing.
 
-```bash
-alembic revision --autogenerate -m "init"
-alembic upgrade head
-```
+## Development tips
 
-See `alembic.ini` for configuration details.
+- Run `python -m compileall backend` to perform a quick syntax check.
+- Configure formatting and linting (eg. `ruff`, `mypy`) to catch issues early; the repository is ready to host those configs.
+- Add tests under `tests/` using pytest. Fixtures can reuse `database.SessionLocal` with a dedicated test database.
 
----
-
-This skeleton is a starting point; you are free to add fields, refine the models and extend the CRUD logic as your application evolves.
