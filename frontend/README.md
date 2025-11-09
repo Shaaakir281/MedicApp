@@ -1,62 +1,44 @@
-# MedScript – Sprint 0+ Démo cliquable
+# MedScript Frontend
 
-Cette version enrichie du prototype **MedScript** poursuit le Sprint 0 en ajoutant un calendrier interactif et en améliorant l’interface praticien. Elle reste **sans backend** : aucune base de données ni API ; toutes les données sont simulées via des *fixtures* et stockées en **sessionStorage**.
+Interface React (Vite + Tailwind/DaisyUI) pour le parcours patient et le tableau de bord praticien de MedicApp. Elle consomme désormais les API FastAPI (auth, agenda, procédures) et intègre un minimum d'outillage qualité.
 
-## ✨ Nouvelles fonctionnalités
-
-- **Calendrier cliquable** côté patient : navigation entre le mois courant et le suivant, sélection d’un jour puis d’un créneau horaire (intervalle de 30 minutes). Les créneaux pré‑réservés (fixtures) sont grisés. Un seul créneau peut être sélectionné à la fois.
-- **Formulaire RDV** : nom, téléphone, e‑mail + questionnaire de cinq cases à cocher. Les données sont sauvegardées dans `sessionStorage` (`medscript_rdv_draft`).
-- **Confirmation factice** : après enregistrement, le créneau devient réservé pour la session (`medscript_reserved_session`).
-- **Dashboard praticien** inspiré de la maquette : métriques du jour, liste des patients (états urgent/pending/validated), actions rapides et activité récente. Prévisualisation PDF toujours disponible.
-
-## 🚀 Installation et lancement
-
-Assurez‑vous d’avoir Node.js ≥ 16 (de préférence Node 18 ou plus) :
+## Installation & scripts
 
 ```bash
-node -v
-# Si la version est < 18, utilisez nvm ou installez la LTS.
+# Prérequis : Node.js ≥ 18
+npm install          # installe les dépendances app + outils (ESLint, Prettier…)
+npm run dev          # lance Vite sur http://localhost:5173
 
-# Installation des dépendances
-npm install
-
-# Démarrage du serveur de développement
-npm run dev
+npm run lint         # ESLint (React/Hooks/a11y/Tailwind) sans avertissement
+npm run format       # Prettier pour src/**/*.{js,jsx,css}
 ```
 
-Vite ouvrira l’application, généralement sur `http://localhost:5173`.
+## Architecture
 
-## 🧭 Structure de l’application
+- `src/App.jsx` : routes principales (Home, Patient, Praticien).
+- `src/main.jsx` : bootstrap + `AuthProvider` + `QueryClientProvider`.
+- `src/context/AuthContext.jsx` : gestion du token, login/register/logout.
+- `src/lib/api.js` : client fetch + helpers métiers.
+- `src/lib/queryClient.js` : configuration TanStack Query (cache, retry).
+- `src/lib/forms/` : schémas Zod + valeurs par défaut pour React Hook Form (ex. `patientProcedureSchema.js`).
+- `src/components/ui/` : primitives réutilisables (`Button`, `Card`, `InputField`, `SectionHeading`) alignées sur Tailwind/DaisyUI.
+- `src/pages/Patient.jsx` / `Praticien.jsx` : pages métiers (à découper prochainement en sous-composants + hooks spécifiques).
 
-- `src/pages/`
-  - **Home.jsx** : accueil avec choix entre patient et praticien.
-  - **Patient.jsx** : calendrier, créneaux horaires, formulaire et récapitulatif factice.
-  - **Praticien.jsx** : tableau de bord reprenant la maquette HTML fournie (métriques, patients du jour, actions rapides, activité récente).
-- `src/components/`
-  - **Calendar.jsx** : sélecteur de mois et grille de jours.
-  - **TimeSlots.jsx** : génération des créneaux de 30 minutes avec état (réservé/disponible/sélectionné).
-  - **Modal.jsx** : composant générique pour les fenêtres modales.
-  - **Toast.jsx** : affiche un message de confirmation.
-  - **PdfPreview.jsx** : iframe pour afficher un PDF embarqué en base64.
-- `src/lib/`
-  - **fixtures.js** : expose des fonctions renvoyant les données fictives (créneaux pré‑réservés, patients du jour, métriques du dashboard).
-  - **storage.js** : fonctions utilitaires pour lire/écrire dans `sessionStorage`.
+## Tooling qualité
 
-## ➕ Ajout de pages ou composants
+- **ESLint** (`.eslintrc.cjs`) avec plugins React, Hooks, JSX a11y, Tailwind, Prettier.
+- **Prettier** (`.prettierrc.json`) pour garder un style homogène.
+- **React Query** (`@tanstack/react-query`) pour la gestion des requêtes réseau et du cache.
+- **React Hook Form + Zod** : déjà présents pour préparer la refonte formulaire (le binding arrivera dans la prochaine itération).
 
-1. Créez votre fichier dans `src/pages` ou `src/components` selon le cas.
-2. Pour une page, importez‑la dans `src/App.jsx` et ajoutez une entrée dans le `<Routes>`.
-3. Adaptez la navigation en ajoutant un lien dans la barre de navigation.
+## Tests manuels recommandés (en attendant RTL)
 
-## 📄 Configuration
+1. `/patient` : flux login + chargement des informations de procédure + sélection d’un créneau (vérifier les messages d’erreur).
+2. `/praticien` : connexion avec le compte seedé (`praticien.demo1@demo.medicapp` / `password`), rafraîchissement agenda + stats.
+3. Vérifier dans la console navigateur qu’aucune erreur réseau n’apparaît (CORS et tokens expirés gérés par le QueryClient).
 
-- **postcss.config.js** et **tailwind.config.js** sont au format CommonJS (`module.exports`) pour éviter les avertissements Node.
-- **Vite** est utilisé comme serveur de développement et bundler (`vite.config.js`).
+## Prochaines étapes UI
 
-## 🧪 Tests manuels recommandés
-
-1. Sur `/patient`, naviguez entre les mois et sélectionnez un jour, puis choisissez un créneau disponible. Vérifiez que les créneaux pré‑réservés sont grisés.
-2. Remplissez le formulaire (nom, téléphone, e‑mail) et cochez les cinq cases. Cliquez sur **Enregistrer** : un toast confirme la sauvegarde et le créneau sélectionné disparaît des créneaux disponibles (uniquement pour votre session).
-3. Sur `/praticien`, vérifiez les métriques, la liste des patients avec différents états et testez l’ouverture de la prévisualisation PDF via les boutons **Ordonnance**.
-
-Bon développement !
+- Déporter la gestion des formulaires Patient vers React Hook Form + Zod et découper la page en composants indépendants.
+- Ajouter React Testing Library + MSW pour couvrir les formulaires et interactions critiques.
+- Étendre la bibliothèque `components/ui` (Alert, Loader, Modal) et centraliser les toasts/notifications.

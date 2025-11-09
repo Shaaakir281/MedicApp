@@ -9,17 +9,19 @@ the API from another origin.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from core.config import get_settings
 from routes import all_routers
 
 
 def create_application() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(title="MedicApp Backend", version="0.1.0")
+    settings = get_settings()
 
-    # Enable permissive CORS for development.  Adjust in production.
+    allow_origins = settings.cors_allow_origins or ["http://localhost:3000"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allow_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

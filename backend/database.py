@@ -5,23 +5,20 @@ This module sets up the SQLAlchemy engine and session factory based on the
 class used by the ORM models.
 """
 
-import os
 from typing import Generator
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.orm import declarative_base
-from dotenv import load_dotenv
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Load environment variables from .env if present
-load_dotenv()
+from core.config import get_settings
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
+settings = get_settings()
+
+if not settings.database_url:
     raise RuntimeError("DATABASE_URL must be set in the environment or .env file")
 
 # Use the future flag for SQLAlchemy 2.0 style behaviour
-engine = create_engine(DATABASE_URL, future=True)
+engine = create_engine(settings.database_url, future=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
 
 # Declarative base for models

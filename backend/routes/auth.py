@@ -6,7 +6,6 @@ and e-mail verification.
 
 from __future__ import annotations
 
-import os
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -16,6 +15,7 @@ from sqlalchemy.orm import Session
 import schemas
 import models
 from database import get_db
+from core.config import get_settings
 from services import auth_service
 from services.email import send_verification_email
 
@@ -48,9 +48,7 @@ class RegisterRequest(BaseModel):
 
 
 def _build_verification_link(token: str) -> str:
-    base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
-    if base_url.endswith("/"):
-        base_url = base_url[:-1]
+    base_url = get_settings().app_base_url.rstrip("/")
     query = urlencode({"token": token})
     return f"{base_url}/auth/verify-email?{query}"
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from datetime import date as date_cls
 from pathlib import Path
 from typing import Any, Dict
@@ -15,6 +14,7 @@ import crud
 import schemas
 from database import get_db
 from dependencies.auth import get_current_user
+from core.config import get_settings
 from services import pdf as pdf_service
 from services import email as email_service
 
@@ -61,10 +61,8 @@ def _serialize_case(case) -> schemas.ProcedureCase:
     ]
     download_url = None
     if case.consent_download_token and case.consent_pdf_path:
-        base_url = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip("/")
-        download_url = (
-            f"{base_url}/procedures/{case.consent_download_token}/consent.pdf"
-        )
+        base_url = get_settings().app_base_url.rstrip("/")
+        download_url = f"{base_url}/procedures/{case.consent_download_token}/consent.pdf"
 
     return schemas.ProcedureCase(
         id=case.id,
@@ -153,7 +151,7 @@ def send_consent_link(
             detail="Aucune adresse e-mail valide n'est associee au dossier.",
         )
 
-    base_url = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip("/")
+    base_url = get_settings().app_base_url.rstrip("/")
     download_url = f"{base_url}/procedures/{case.consent_download_token}/consent.pdf"
 
     for recipient in recipients:

@@ -19,6 +19,14 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
+Install the optional developer tooling (ruff, mypy) if you plan to run quality checks locally:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Then edit `.env` to set a strong `JWT_SECRET_KEY` (minimum 32 characters, e.g. `openssl rand -hex 32`) and restrict `BACKEND_CORS_ORIGINS` to the trusted front-end origins.
+
 Apply the database migrations:
 
 ```bash
@@ -33,39 +41,52 @@ uvicorn main:app --reload
 
 The interactive API documentation is available at http://localhost:8000/docs.
 
+## Quality tooling
+
+Static analysis lives in `pyproject.toml`.
+
+- `ruff check .` linting (pycodestyle/pyflakes/isort/pyupgrade/bugbear) with import sorting.
+- `ruff format .` applies the formatter consistently with the linting rules.
+- `mypy .` runs optional type-checking (missing imports are ignored for now, strict optional enabled).
+- `pytest` executes the backend test suite (unit + integration). A temporary SQLite database is spun up thanks to the fixtures in `tests/conftest.py`.
+
+A future GitHub Actions workflow can simply run the two commands above plus the test suite to gate pull requests.
+
 ## Project structure
 
 ```
 backend/
-+-- core/                  # Cross-cutting helpers (security, JWT, password hashing)
-¦   +-- security.py
-+-- repositories/          # Data access helpers
-¦   +-- __init__.py
-¦   +-- email_verification_repository.py
-¦   +-- user_repository.py
-+-- services/              # Domain services (email, PDF, auth orchestration)
-¦   +-- auth_service.py
-¦   +-- email.py
-¦   +-- pdf.py
-+-- routes/                # API routers
-¦   +-- __init__.py
-¦   +-- appointments.py
-¦   +-- auth.py
-¦   +-- questionnaires.py
-+-- dependencies/          # FastAPI dependencies
-+-- scripts/               # Utility scripts (seed data, maintenance)
-+-- storage/               # Generated assets (eg. consent PDFs)
-+-- templates/             # Jinja templates for PDF rendering
-+-- crud.py                # Legacy helpers (appointments, procedures)
-+-- database.py            # SQLAlchemy engine/session
-+-- main.py                # FastAPI app factory
-+-- models.py              # SQLAlchemy models
-+-- schemas.py             # Pydantic schemas
-+-- README.md
+  core/               # Cross-cutting helpers (configuration, security)
+    config.py
+    security.py
+  repositories/       # Data access helpers
+    __init__.py
+    email_verification_repository.py
+    user_repository.py
+  services/           # Domain services (email, PDF, auth orchestration)
+    auth_service.py
+    email.py
+    pdf.py
+  routes/             # API routers
+    __init__.py
+    appointments.py
+    auth.py
+    questionnaires.py
+  dependencies/       # FastAPI dependencies
+  scripts/            # Utility scripts (seed data, maintenance)
+  storage/            # Generated assets (e.g. consent PDFs)
+  templates/          # Jinja templates for PDF rendering
+  crud.py             # Legacy helpers (appointments, procedures)
+  database.py         # SQLAlchemy engine/session
+  main.py             # FastAPI app factory
+  models.py           # SQLAlchemy models
+  schemas.py          # Pydantic schemas
+  README.md
 ```
 
 ## Auth flow overview
 
+- `core.config.Settings` centralises environment secrets, validates JWT secret strength and exposes CORS/SMTP configuration.
 - `core.security` concentrates password hashing and JWT creation/validation.
 - `repositories.user_repository` and `repositories.email_verification_repository` isolate database access.
 - `services.auth_service` orchestrates login, registration, token refresh and email verification, providing typed errors for the HTTP layer.
@@ -73,11 +94,12 @@ backend/
 
 ## Scripts
 
-The `scripts/` directory contains helpers such as `seed_practitioner_demo.py`. Scripts now rely on `core.security.hash_password` for consistent hashing.
+The `scripts/` directory contains helpers such as `seed_practitioner_demo.py`. Scripts rely on `core.security.hash_password` for consistent hashing.
 
 ## Development tips
 
 - Run `python -m compileall backend` to perform a quick syntax check.
-- Configure formatting and linting (eg. `ruff`, `mypy`) to catch issues early; the repository is ready to host those configs.
+- Execute `ruff check .` (and optionally `ruff format .`) before committing to keep style consistent.
+- Use `mypy .` to catch typing regressions as services/repositories grow.
+- Run `pytest` locally before opening a pull request to ensure authentication flows (unit + API routes) keep working.
 - Add tests under `tests/` using pytest. Fixtures can reuse `database.SessionLocal` with a dedicated test database.
-

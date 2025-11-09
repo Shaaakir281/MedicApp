@@ -1,0 +1,48 @@
+[project]
+name = "medicapp-backend"
+version = "0.1.0"
+description = "MedicApp FastAPI backend (tooling configuration)."
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    ".venv",
+    "storage",
+    "templates",
+    "migrations",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "F",  # pyflakes
+    "B",  # flake8-bugbear
+    "I",  # isort
+    "UP", # pyupgrade
+]
+ignore = [
+    "E203",  # whitespace before ':', conflicts with black/ruff formatter
+    "E266",  # too many leading '#' for block comment
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+warn_return_any = true
+ignore_missing_imports = true
+strict_optional = true
+show_error_codes = true
+plugins = []
+
+[tool.mypy."tests.*"]
+ignore_errors = true

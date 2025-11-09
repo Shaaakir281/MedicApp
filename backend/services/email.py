@@ -3,23 +3,21 @@
 from __future__ import annotations
 
 import logging
-import os
 import smtplib
 import ssl
 from email.message import EmailMessage
 
+from core.config import SMTPSettings, get_settings
+
 logger = logging.getLogger(__name__)
 
 
-def _bool_env(name: str, default: bool = False) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.lower() in {"1", "true", "yes", "on"}
+def _smtp_settings() -> SMTPSettings:
+    return get_settings().smtp_settings()
 
 
-def _email_configured() -> bool:
-    return os.getenv("SMTP_HOST") and os.getenv("EMAIL_FROM")
+def _app_name() -> str:
+    return get_settings().app_name
 
 
 def send_email(subject: str, recipient: str, text_body: str, html_body: str | None = None) -> None:
@@ -28,25 +26,26 @@ def send_email(subject: str, recipient: str, text_body: str, html_body: str | No
     If SMTP is not configured, the email content is logged instead so that
     developers can still inspect the output in local environments.
     """
-    if not _email_configured():
+    smtp = _smtp_settings()
+    if not smtp.is_configured:
         logger.warning("SMTP configuration missing; email to %s was not sent.", recipient)
         logger.info("Subject: %s\nRecipient: %s\n\n%s", subject, recipient, text_body)
         return
 
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = os.environ["EMAIL_FROM"]
+    msg["From"] = smtp.sender
     msg["To"] = recipient
     msg.set_content(text_body)
     if html_body:
         msg.add_alternative(html_body, subtype="html")
 
-    host = os.environ["SMTP_HOST"]
-    port = int(os.getenv("SMTP_PORT", "587"))
-    username = os.getenv("SMTP_USERNAME")
-    password = os.getenv("SMTP_PASSWORD")
-    use_ssl = _bool_env("SMTP_USE_SSL", False)
-    use_tls = _bool_env("SMTP_USE_TLS", True)
+    host = smtp.host
+    port = smtp.port
+    username = smtp.username
+    password = smtp.password
+    use_ssl = smtp.use_ssl
+    use_tls = smtp.use_tls
 
     context = ssl.create_default_context()
 
@@ -70,7 +69,7 @@ def send_email(subject: str, recipient: str, text_body: str, html_body: str | No
 
 def send_verification_email(recipient: str, verification_link: str) -> None:
     """Send the verification e-mail after registration."""
-    app_name = os.getenv("APP_NAME", "MedicApp")
+    app_name = _app_name()
     subject = f"[{app_name}] Vérifiez votre adresse e-mail"
     text_body = (
         f"Bonjour,\n\n"
@@ -95,7 +94,7 @@ def send_appointment_confirmation_email(
     appointment_time: str,
 ) -> None:
     """Send a confirmation email after a patient books an appointment."""
-    app_name = os.getenv("APP_NAME", "MedicApp")
+    app_name = _app_name()
     subject = f"[{app_name}] Confirmation de votre rendez-vous"
     text_body = (
         f"Bonjour,\n\n"
@@ -118,7 +117,7 @@ def send_consent_download_email(
     download_url: str,
 ) -> None:
     """Send the consent download link for a procedure case."""
-    app_name = os.getenv("APP_NAME", "MedicApp")
+    app_name = _app_name()
     subject = f"[{app_name}] Lien de consentement pour {child_name}"
     text_body = (
         f"Bonjour,\n\n"
