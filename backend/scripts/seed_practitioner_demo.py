@@ -206,6 +206,21 @@ def create_act(
     )
 
 
+def mark_reminder_sent(
+    db: Session,
+    appointment: models.Appointment,
+    opened: bool = False,
+) -> None:
+    send_at = dt.datetime.combine(appointment.date, appointment.time) - dt.timedelta(days=7)
+    if send_at > dt.datetime.utcnow():
+        send_at = dt.datetime.utcnow() - dt.timedelta(hours=1)
+    appointment.reminder_sent_at = send_at
+    appointment.reminder_opened_at = send_at + dt.timedelta(hours=2) if opened else None
+    db.add(appointment)
+    db.commit()
+    db.refresh(appointment)
+
+
 def seed_for_day(
     db: Session,
     day: dt.date,
@@ -221,7 +236,7 @@ def seed_for_day(
         case = crud.create_procedure_case(db=db, patient_id=patient.id, case_data=payload)
 
         pre_time = PRECONSULT_TIMES[(day_index + slot) % len(PRECONSULT_TIMES)]
-        create_preconsultation(
+        pre_appt = create_preconsultation(
             db=db,
             patient=patient,
             case=case,
@@ -229,11 +244,13 @@ def seed_for_day(
             time_=pre_time,
             mode=profile.preconsult_mode,
         )
+        mark_reminder_sent(db, pre_appt, opened=(patient_idx % 2 == 0))
 
         if profile.act_offset_days is not None:
             acte_date = day + dt.timedelta(days=profile.act_offset_days)
             act_time = ACT_TIMES[(day_index + slot) % len(ACT_TIMES)]
-            create_act(db=db, patient=patient, case=case, date_=acte_date, time_=act_time)
+            act_appt = create_act(db=db, patient=patient, case=case, date_=acte_date, time_=act_time)
+            mark_reminder_sent(db, act_appt, opened=(patient_idx % 3 != 0))
 
         mark_case_flags(db, case, profile)
 

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import { loginUser, registerUser } from '../lib/api.js';
 
 const AuthContext = createContext(null);
@@ -11,7 +11,7 @@ export function AuthProvider({ children }) {
   });
   const [loading, setLoading] = useState(false);
 
-  const persist = (nextToken, nextUser) => {
+  const persist = useCallback((nextToken, nextUser) => {
     if (nextToken) {
       localStorage.setItem('authToken', nextToken);
     } else {
@@ -22,9 +22,9 @@ export function AuthProvider({ children }) {
     } else {
       localStorage.removeItem('authUser');
     }
-  };
+  }, []);
 
-  const handleLogin = async (credentials) => {
+  const handleLogin = useCallback(async (credentials) => {
     setLoading(true);
     try {
       const data = await loginUser(credentials);
@@ -37,9 +37,9 @@ export function AuthProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [persist]);
 
-  const handleRegister = async (payload) => {
+  const handleRegister = useCallback(async (payload) => {
     setLoading(true);
     try {
       const userData = await registerUser(payload);
@@ -47,13 +47,13 @@ export function AuthProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setToken(null);
     setUser(null);
     persist(null, null);
-  };
+  }, [persist]);
 
   const value = useMemo(
     () => ({
@@ -65,7 +65,7 @@ export function AuthProvider({ children }) {
       logout,
       isAuthenticated: Boolean(token),
     }),
-    [token, user, loading],
+    [token, user, loading, handleLogin, handleRegister, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

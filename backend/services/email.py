@@ -134,3 +134,62 @@ def send_consent_download_email(
     <p>L'equipe {app_name}</p>
     """
     send_email(subject, recipient, text_body, html_body=html_body)
+
+
+def send_prescription_email(recipient: str, download_url: str, appointment_type: str) -> None:
+    """Send an ordonnance download link to the patient."""
+    app_name = _app_name()
+    is_act = appointment_type == "act"
+    subject = f"[{app_name}] Ordonnance pour votre {'acte' if is_act else 'consultation'}"
+    reminder = (
+        "Merci de vérifier que le consentement signé des deux parents est prêt pour le jour de l'acte."
+        if is_act
+        else "Merci d'apporter l'ordonnance lors de votre rendez-vous."
+    )
+    text_body = (
+        f"Bonjour,\n\n"
+        f"Votre ordonnance est disponible au lien suivant :\n"
+        f"{download_url}\n\n"
+        f"{reminder}\n"
+        f"L'équipe {app_name}\n"
+    )
+    html_body = f"""
+    <p>Bonjour,</p>
+    <p>Votre ordonnance est disponible au lien suivant :</p>
+    <p><a href="{download_url}">{download_url}</a></p>
+    <p>{reminder}</p>
+    <p>L'équipe {app_name}</p>
+    """
+    send_email(subject, recipient, text_body, html_body=html_body)
+
+
+def send_appointment_reminder_email(
+    recipient: str,
+    appointment_date: str,
+    appointment_type: str,
+    reminder_link: str,
+) -> None:
+    """Send a reminder email ahead of the appointment."""
+    app_name = _app_name()
+    is_act = appointment_type == "act"
+    subject = f"[{app_name}] Rappel rendez-vous du {appointment_date}"
+    consent_line = (
+        "Merci de vérifier que le consentement signé des deux parents est prêt pour le jour de l'acte."
+        if is_act
+        else "Pensez à préparer vos documents et venir quelques minutes en avance."
+    )
+    text_body = (
+        f"Bonjour,\n\n"
+        f"Votre rendez-vous est prévu le {appointment_date}. {consent_line}\n"
+        f"Vous pouvez finaliser les informations manquantes ou consulter les consignes ici :\n{reminder_link}\n\n"
+        f"L'équipe {app_name}\n"
+    )
+    html_body = f"""
+    <p>Bonjour,</p>
+    <p>Votre rendez-vous est prévu le <strong>{appointment_date}</strong>.</p>
+    <p>{consent_line}</p>
+    <p>Complétez vos informations ou relisez les consignes en cliquant sur le lien ci-dessous :</p>
+    <p><a href="{reminder_link}">{reminder_link}</a></p>
+    <p>L'équipe {app_name}</p>
+    """
+    send_email(subject, recipient, text_body, html_body=html_body)

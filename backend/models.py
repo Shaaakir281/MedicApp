@@ -103,6 +103,9 @@ class Appointment(Base):
     created_at: datetime.datetime = Column(
         DateTime, default=datetime.datetime.utcnow, nullable=False
     )
+    reminder_sent_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    reminder_opened_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    reminder_token: str | None = Column(String(128), nullable=True, index=True)
 
     user = relationship("User", back_populates="appointments")
     questionnaire = relationship(
@@ -158,11 +161,74 @@ class Prescription(Base):
         Integer, ForeignKey("appointments.id"), nullable=False, unique=True
     )
     pdf_path: str | None = Column(String, nullable=True)
+    items: list[str] | None = Column(JSON, nullable=True)
+    instructions: str | None = Column(String, nullable=True)
+    sent_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    sent_via: str | None = Column(String(32), nullable=True)
+    download_count: int = Column(Integer, nullable=False, default=0)
+    last_download_at: datetime.datetime | None = Column(DateTime, nullable=True)
     created_at: datetime.datetime = Column(
         DateTime, default=datetime.datetime.utcnow, nullable=False
     )
 
     appointment = relationship("Appointment", back_populates="prescription")
+    versions = relationship(
+        "PrescriptionVersion",
+        back_populates="prescription",
+        cascade="all,delete-orphan",
+    )
+
+
+class PrescriptionVersion(Base):
+    __tablename__ = "prescription_versions"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    prescription_id: int = Column(
+        Integer,
+        ForeignKey("prescriptions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    appointment_id: int = Column(
+        Integer,
+        ForeignKey("appointments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    appointment_type: str = Column(String(32), nullable=False)
+    pdf_path: str = Column(String, nullable=False)
+    items: list[str] | None = Column(JSON, nullable=True)
+    instructions: str | None = Column(String, nullable=True)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+
+    prescription = relationship("Prescription", back_populates="versions")
+    appointment = relationship("Appointment")
+    downloads = relationship(
+        "PrescriptionDownloadLog",
+        back_populates="version",
+        cascade="all,delete-orphan",
+    )
+
+
+class PrescriptionDownloadLog(Base):
+    __tablename__ = "prescription_download_logs"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    version_id: int = Column(
+        Integer,
+        ForeignKey("prescription_versions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    actor: str = Column(String(32), nullable=False, default="unknown")
+    channel: str = Column(String(32), nullable=False, default="download")
+    downloaded_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+
+    version = relationship("PrescriptionVersion", back_populates="downloads")
 
 
 class ProcedureCase(Base):

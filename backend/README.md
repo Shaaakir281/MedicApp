@@ -33,6 +33,8 @@ Apply the database migrations:
 alembic upgrade head
 ```
 
+> ℹ️ Les nouvelles colonnes (suivi des ordonnances et rappels) nécessitent cette migration après chaque pull.
+
 Start the development server:
 
 ```bash
@@ -92,9 +94,16 @@ backend/
 - `services.auth_service` orchestrates login, registration, token refresh and email verification, providing typed errors for the HTTP layer.
 - The `/auth` routes now consume the service layer instead of the legacy `crud` functions, which simplifies future refactors and unit testing.
 
+## Prescription & reminder tracking
+
+- Les ordonnances générées via `/prescriptions/{appointment_id}` sont stockées dans `storage/ordonnances` et la base enregistre désormais l'envoi (`sent_at`, `sent_via`) ainsi que les téléchargements (compteur + date).
+- Les rendez-vous exposent des champs `reminder_sent_at` / `reminder_opened_at` qui serviront aux rappels J-7. Les routes praticien renvoient ces métadonnées pour affichage dans le dashboard.
+
 ## Scripts
 
 The `scripts/` directory contains helpers such as `seed_practitioner_demo.py`. Scripts rely on `core.security.hash_password` for consistent hashing.
+
+- `send_appointment_reminders.py` : envoie les rappels J-7 (configurable via `REMINDER_LOOKAHEAD_DAYS`). À exécuter quotidiennement via cron (`poetry run python scripts/send_appointment_reminders.py`).
 
 ## Development tips
 

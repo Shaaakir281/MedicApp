@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = Field(default=True, alias="SMTP_USE_TLS")
     smtp_use_ssl: bool = Field(default=False, alias="SMTP_USE_SSL")
     email_from: Optional[str] = Field(default=None, alias="EMAIL_FROM")
+    reminder_lookahead_days: int = Field(default=7, alias="REMINDER_LOOKAHEAD_DAYS", ge=1, le=30)
 
     @field_validator("jwt_secret_key")
     @classmethod

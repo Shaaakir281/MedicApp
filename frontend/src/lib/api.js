@@ -79,3 +79,53 @@ export async function fetchPractitionerStats(date, token) {
   const query = date ? `?target_date=${date}` : '';
   return apiRequest(`/practitioner/stats${query}`, { token });
 }
+
+export async function createPrescription(token, appointmentId) {
+  return apiRequest(`/prescriptions/${appointmentId}`, { method: 'POST', token });
+}
+
+export async function sendPrescriptionLink(token, appointmentId) {
+  return apiRequest(`/prescriptions/${appointmentId}/send-link`, { method: 'POST', token });
+}
+
+export async function updatePrescription(token, appointmentId, payload) {
+  return apiRequest(`/prescriptions/${appointmentId}`, { method: 'PUT', body: payload, token });
+}
+
+export async function fetchNewPatients({ days = 7 } = {}, token) {
+  const query = `?days=${days}`;
+  return apiRequest(`/practitioner/new-patients${query}`, { token });
+}
+
+export async function updatePatientCase(token, caseId, payload) {
+  return apiRequest(`/practitioner/patient/${caseId}`, {
+    method: 'PUT',
+    token,
+    body: payload,
+  });
+}
+
+export async function rescheduleAppointment(token, appointmentId, payload) {
+  return apiRequest(`/practitioner/appointments/${appointmentId}`, {
+    method: 'PATCH',
+    token,
+    body: payload,
+  });
+}
+
+export async function createPractitionerAppointment(token, payload) {
+  return apiRequest(`/practitioner/appointments`, {
+    method: 'POST',
+    token,
+    body: payload,
+  });
+}
+
+export async function fetchPrescriptionHistory(token, appointmentId) {
+  return apiRequest(`/prescriptions/${appointmentId}/history`, {
+    method: 'GET',
+    token,
+  });
+}
+
+export { API_BASE_URL };

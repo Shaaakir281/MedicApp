@@ -20,6 +20,7 @@ import schemas
 from database import get_db
 from dependencies.auth import get_current_user
 from services.email import send_appointment_confirmation_email
+from datetime import datetime
 
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
@@ -74,3 +75,21 @@ def create_appointment(
         logging.getLogger(__name__).exception("Failed to send confirmation email: %s", exc)
 
     return schemas.Appointment.from_orm(appointment)
+
+
+@router.get("/reminders/{token}", response_model=schemas.Message, status_code=status.HTTP_200_OK)
+def acknowledge_reminder(token: str, db: Session = Depends(get_db)) -> schemas.Message:
+    """Mark a reminder as opened by the patient."""
+    appointment = (
+        db.query(models.Appointment)
+        .filter(models.Appointment.reminder_token == token)
+        .first()
+    )
+    if appointment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rappel introuvable.")
+
+    appointment.reminder_opened_at = datetime.utcnow()
+    # keep token for trace, but could be nulled if desirable
+    db.add(appointment)
+    db.commit()
+    return schemas.Message(detail="Merci, votre rappel a été confirmé.")

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time as time_type
+import datetime as dt
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -39,7 +40,7 @@ class User(UserBase):
 
 class AppointmentBase(BaseModel):
     date: date
-    time: time
+    time: time_type
 
 
 class AppointmentCreate(AppointmentBase):
@@ -119,26 +120,62 @@ class PractitionerPatientSummary(BaseModel):
 class PractitionerCaseStatus(BaseModel):
     case_id: int
     child_birthdate: date
+    child_full_name: Optional[str] = None
+    child_weight_kg: Optional[float] = None
+    parent1_name: Optional[str] = None
+    parent1_email: Optional[EmailStr] = None
+    parent2_name: Optional[str] = None
+    parent2_email: Optional[EmailStr] = None
     parental_authority_ack: bool
     has_checklist: bool
     has_consent: bool
     has_ordonnance: bool
     has_preconsultation: bool
     has_act_planned: bool
+    next_act_date: Optional[date] = None
+    next_preconsultation_date: Optional[date] = None
     notes: Optional[str] = None
     missing_items: List[str] = Field(default_factory=list)
     needs_follow_up: bool
+    appointments_overview: List["PractitionerAppointmentSummary"] = Field(default_factory=list)
+    consent_download_url: Optional[str] = None
+
+
+class PractitionerAppointmentSummary(BaseModel):
+    appointment_id: int
+    appointment_type: str
+    date: date
+    time: time_type
+    status: str
+    mode: Optional[str] = None
+
+
+class PractitionerAppointmentCreate(BaseModel):
+    case_id: int
+    appointment_type: str
+    date: date
+    time: time_type
+    mode: Optional[str] = None
 
 
 class PractitionerAppointmentEntry(BaseModel):
     appointment_id: int
     date: date
-    time: time
+    time: time_type
     appointment_type: str
     status: str
     mode: Optional[str] = None
     patient: PractitionerPatientSummary
     procedure: PractitionerCaseStatus
+    reminder_sent_at: Optional[datetime] = None
+    reminder_opened_at: Optional[datetime] = None
+    prescription_sent_at: Optional[datetime] = None
+    prescription_last_download_at: Optional[datetime] = None
+    prescription_download_count: int = 0
+    prescription_items: Optional[List[str]] = None
+    prescription_instructions: Optional[str] = None
+    prescription_id: Optional[int] = None
+    prescription_url: Optional[str] = None
 
 
 class PractitionerAgendaDay(BaseModel):
@@ -157,5 +194,86 @@ class PractitionerStats(BaseModel):
     total_appointments: int
     bookings_created: int
     new_patients: int
+    new_patients_week: int
     follow_ups_required: int
     pending_consents: int
+
+
+class PractitionerNewPatient(BaseModel):
+    case_id: int
+    created_at: datetime
+    child_full_name: str
+    patient_email: EmailStr
+    next_preconsultation_date: Optional[date] = None
+    next_act_date: Optional[date] = None
+    procedure: PractitionerCaseStatus
+
+
+class PractitionerCaseUpdate(BaseModel):
+    child_full_name: Optional[str] = None
+    child_birthdate: Optional[date] = None
+    child_weight_kg: Optional[float] = Field(default=None, ge=0)
+    parent1_name: Optional[str] = None
+    parent1_email: Optional[EmailStr] = None
+    parent2_name: Optional[str] = None
+    parent2_email: Optional[EmailStr] = None
+    parental_authority_ack: Optional[bool] = None
+    notes: Optional[str] = None
+    procedure_type: Optional[str] = None
+
+
+class AppointmentRescheduleRequest(BaseModel):
+    date: Optional[dt.date] = None
+    time: Optional[time_type] = None
+    appointment_type: Optional[str] = None
+    mode: Optional[str] = None
+    status: Optional[str] = None
+
+
+class PrescriptionVersionEntry(BaseModel):
+    id: int
+    appointment_id: int
+    appointment_type: str
+    created_at: datetime
+    url: str
+    items: Optional[List[str]] = None
+    instructions: Optional[str] = None
+    downloads: List['PrescriptionDownloadEntry'] = Field(default_factory=list)
+
+
+class PrescriptionDownloadEntry(BaseModel):
+    id: int
+    actor: str
+    channel: str
+    downloaded_at: datetime
+
+
+class PractitionerCaseUpdate(BaseModel):
+    child_full_name: Optional[str] = None
+    child_birthdate: Optional[date] = None
+    child_weight_kg: Optional[float] = Field(default=None, ge=0)
+    parent1_name: Optional[str] = None
+    parent1_email: Optional[EmailStr] = None
+    parent2_name: Optional[str] = None
+    parent2_email: Optional[EmailStr] = None
+    parental_authority_ack: Optional[bool] = None
+    notes: Optional[str] = None
+    procedure_type: Optional[str] = None
+
+
+class AppointmentRescheduleRequest(BaseModel):
+    date: Optional[dt.date] = None
+    time: Optional[time_type] = None
+    appointment_type: Optional[str] = None
+    mode: Optional[str] = None
+    status: Optional[str] = None
+
+
+class PrescriptionVersionEntry(BaseModel):
+    id: int
+    appointment_id: int
+    appointment_type: str
+    created_at: datetime
+    url: str
+    items: Optional[List[str]] = None
+    instructions: Optional[str] = None
