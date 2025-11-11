@@ -23,7 +23,7 @@ DEFAULT_PASSWORD_HASH = (
     "$2b$12$F0iUOJ6Q0iog8EPb28u16uJNmZQ7M1pJ2B8MblU5ZLsBLAiNrLyZu"  # "password"
 )
 DEMO_DOMAIN = "demo.medicapp"
-START_DATE = dt.date(2026, 2, 3)
+DEFAULT_START_DATE = dt.date.today() + dt.timedelta(days=1)
 DEFAULT_DAYS = 23
 PATIENTS_PER_DAY = 3
 
@@ -272,7 +272,7 @@ def clear_demo_data(db: Session) -> None:
     db.commit()
 
 
-def generate_demo(db: Session, days: int, reset: bool) -> None:
+def generate_demo(db: Session, days: int, reset: bool, start_date: dt.date) -> None:
     if reset:
         clear_demo_data(db)
 
@@ -280,10 +280,10 @@ def generate_demo(db: Session, days: int, reset: bool) -> None:
 
     patient_counter = itertools.count(1)
     for offset in range(days):
-        day = START_DATE + dt.timedelta(days=offset)
+        day = start_date + dt.timedelta(days=offset)
         seed_for_day(db, day, offset, patient_counter)
 
-    print(f"[seed] Données praticien insérées pour {days} jours à partir du {START_DATE}.")
+    print(f"[seed] Données praticien insérées pour {days} jours à partir du {start_date}.")
     print(f"[seed] Connexion praticien : {practitioner_email(1)} / password")
 
 
@@ -300,12 +300,19 @@ def main() -> None:
         action="store_true",
         help="Supprimer les données de démonstration existantes avant insertion.",
     )
+    parser.add_argument(
+        "--start-date",
+        type=lambda value: dt.datetime.strptime(value, "%Y-%m-%d").date(),
+        help="Date de début (YYYY-MM-DD). Par défaut : aujourd'hui.",
+    )
     args = parser.parse_args()
+
+    start_date = args.start_date or DEFAULT_START_DATE
 
     models.Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        generate_demo(db, days=args.days, reset=args.reset)
+        generate_demo(db, days=args.days, reset=args.reset, start_date=start_date)
     finally:
         db.close()
 
