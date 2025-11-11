@@ -21,6 +21,7 @@ from services.pdf import generate_ordonnance_pdf, ORDONNANCES_DIR
 from services.email import send_prescription_email
 from core.config import get_settings
 from pydantic import BaseModel, Field
+from dependencies.auth import get_current_user, require_practitioner
 
 
 router = APIRouter(prefix="/prescriptions", tags=["prescriptions"])
@@ -92,13 +93,9 @@ def _append_version_entry(
     db.add(version)
 
 
-def _resolve_actor_channel(request: Request) -> tuple[str, str]:
-    actor = request.query_params.get("actor")
-    channel = request.query_params.get("channel")
-    if not actor:
-        actor = "practitioner" if request.headers.get("authorization") else "patient"
-    if not channel:
-        channel = "download"
+def _resolve_actor_channel(request: Request, default_actor: str = "patient") -> tuple[str, str]:
+    actor = request.query_params.get("actor") or default_actor
+    channel = request.query_params.get("channel") or "download"
     return actor, channel
 
 
@@ -148,7 +145,11 @@ def _ensure_prescription(db: Session, appointment: models.Appointment) -> models
 
 
 @router.post("/{appointment_id}")
-def create_prescription(appointment_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+def create_prescription(
+    appointment_id: int,
+    _: models.User = Depends(require_practitioner),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     # Verify appointment existence
     appt = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
     if not appt:
@@ -166,9 +167,21 @@ def create_prescription(appointment_id: int, db: Session = Depends(get_db)) -> D
 
 
 @router.get("/{prescription_id}")
-def get_prescription(prescription_id: int, request: Request, db: Session = Depends(get_db)) -> FileResponse:
+def get_prescription(
+    prescription_id: int,
+    request: Request,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> FileResponse:
     # Lookup prescription in DB to get the stored pdf_path
-    pres = db.query(models.Prescription).filter(models.Prescription.id == prescription_id).first()
+    pres = (
+        db.query(models.Prescription)
+        .options(
+            joinedload(models.Prescription.appointment).joinedload(models.Appointment.user)
+        )
+        .filter(models.Prescription.id == prescription_id)
+        .first()
+    )
     if not pres or not pres.pdf_path:
         raise HTTPException(status_code=404, detail="Prescription not found")
     # Build storage path relative to backend/ (two levels up from this file)
@@ -176,6 +189,11 @@ def get_prescription(prescription_id: int, request: Request, db: Session = Depen
     fpath = storage_path / pres.pdf_path
     if not fpath.exists():
         raise HTTPException(status_code=404, detail="Prescription file missing on disk")
+
+    appointment = pres.appointment
+    if current_user.role != models.UserRole.praticien:
+        if appointment is None or appointment.user_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès interdit à cette ordonnance.")
 
     try:
         pres.download_count = (pres.download_count or 0) + 1
@@ -187,7 +205,8 @@ def get_prescription(prescription_id: int, request: Request, db: Session = Depen
             .order_by(models.PrescriptionVersion.created_at.desc())
             .first()
         )
-        actor, channel = _resolve_actor_channel(request)
+        default_actor = getattr(current_user.role, "value", current_user.role)
+        actor, channel = _resolve_actor_channel(request, default_actor=default_actor)
         db.commit()
         _log_download(db, version, actor, channel)
         response = FileResponse(path=str(fpath), media_type="application/pdf", filename=fpath.name)
@@ -199,7 +218,11 @@ def get_prescription(prescription_id: int, request: Request, db: Session = Depen
 
 
 @router.get("/{appointment_id}/history", response_model=List[schemas.PrescriptionVersionEntry])
-def list_prescription_versions(appointment_id: int, db: Session = Depends(get_db)) -> List[schemas.PrescriptionVersionEntry]:
+def list_prescription_versions(
+    appointment_id: int,
+    _: models.User = Depends(require_practitioner),
+    db: Session = Depends(get_db),
+) -> List[schemas.PrescriptionVersionEntry]:
     appointment = (
         db.query(models.Appointment)
         .options(joinedload(models.Appointment.prescription))
@@ -245,10 +268,19 @@ def list_prescription_versions(appointment_id: int, db: Session = Depends(get_db
 
 
 @router.get("/versions/{version_id}")
-def get_prescription_version(version_id: int, request: Request, db: Session = Depends(get_db)) -> FileResponse:
+def get_prescription_version(
+    version_id: int,
+    request: Request,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> FileResponse:
     version = (
         db.query(models.PrescriptionVersion)
-        .options(joinedload(models.PrescriptionVersion.prescription))
+        .options(
+            joinedload(models.PrescriptionVersion.prescription)
+            .joinedload(models.Prescription.appointment)
+            .joinedload(models.Appointment.user)
+        )
         .filter(models.PrescriptionVersion.id == version_id)
         .first()
     )
@@ -261,11 +293,17 @@ def get_prescription_version(version_id: int, request: Request, db: Session = De
         raise HTTPException(status_code=404, detail="Prescription file missing on disk")
 
     parent = version.prescription
+    appointment = parent.appointment if parent else None
+    if current_user.role != models.UserRole.praticien:
+        if appointment is None or appointment.user_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès interdit à cette version d'ordonnance.")
+
     if parent:
         parent.download_count = (parent.download_count or 0) + 1
         parent.last_download_at = datetime.utcnow()
         db.add(parent)
-    actor, channel = _resolve_actor_channel(request)
+    default_actor = getattr(current_user.role, "value", current_user.role)
+    actor, channel = _resolve_actor_channel(request, default_actor=default_actor)
     db.commit()
     _log_download(db, version, actor, channel)
 
@@ -276,7 +314,11 @@ def get_prescription_version(version_id: int, request: Request, db: Session = De
 
 
 @router.post("/{appointment_id}/send-link", status_code=status.HTTP_202_ACCEPTED)
-def send_prescription_link(appointment_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+def send_prescription_link(
+    appointment_id: int,
+    _: models.User = Depends(require_practitioner),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
@@ -308,6 +350,7 @@ class PrescriptionUpdateRequest(BaseModel):
 def update_prescription(
     appointment_id: int,
     payload: PrescriptionUpdateRequest,
+    _: models.User = Depends(require_practitioner),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()

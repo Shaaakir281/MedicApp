@@ -42,7 +42,6 @@ def _compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCase
     has_ordonnance = bool(case.ordonnance_pdf_path)
 
     next_act_date = None
-    next_act_date = None
     if act_appointments:
         future_dates = [
             appt.date for appt in act_appointments if appt.date >= dt.date.today()

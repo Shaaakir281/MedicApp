@@ -25,7 +25,6 @@ import {
 } from './practitioner/components';
 import PdfPreviewModal from '../components/PdfPreviewModal.jsx';
 
-const DEFAULT_START = '2026-02-03';
 const VIEW_OPTIONS = [1, 7, 14, 23];
 const ACT_ITEMS = [
   'Bactigras 10x10 cm x 5',
@@ -50,9 +49,11 @@ const addDays = (isoDate, delta) => {
   return toISODate(base);
 };
 
+const getDefaultStartDate = () => toISODate(new Date());
+
 const Praticien = () => {
   const { isAuthenticated, login, logout, token, user, loading: authLoading } = useAuth();
-  const [startDate, setStartDate] = useState(DEFAULT_START);
+  const [startDate, setStartDate] = useState(() => getDefaultStartDate());
   const [viewLength, setViewLength] = useState(7);
   const queryClient = useQueryClient();
   const [error, setError] = useState(null);
@@ -284,10 +285,32 @@ const Praticien = () => {
 
   const handleUpdateCase = async (caseId, payload) => {
     if (!caseId || !payload || Object.keys(payload).length === 0) return;
+    const sanitizedPayload = { ...payload };
+    if (Object.prototype.hasOwnProperty.call(sanitizedPayload, 'child_full_name')) {
+      const trimmedName = sanitizedPayload.child_full_name?.trim?.() ?? '';
+      if (!trimmedName) {
+        setError("Le nom de l'enfant est obligatoire.");
+        return;
+      }
+      sanitizedPayload.child_full_name = trimmedName;
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(sanitizedPayload, 'child_birthdate') &&
+      !sanitizedPayload.child_birthdate
+    ) {
+      setError('La date de naissance est obligatoire.');
+      return;
+    }
+    const normalizedPayload = Object.fromEntries(
+      Object.entries(sanitizedPayload).filter(([, value]) => value !== undefined),
+    );
+    if (Object.keys(normalizedPayload).length === 0) {
+      return;
+    }
     setError(null);
     setSuccessMessage(null);
     try {
-      const updatedCase = await updateCaseMutation.mutateAsync({ caseId, payload });
+      const updatedCase = await updateCaseMutation.mutateAsync({ caseId, payload: normalizedPayload });
       setPatientDrawer((prev) => {
         if (!prev.appointment) {
           return prev;

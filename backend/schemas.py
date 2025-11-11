@@ -246,34 +246,3 @@ class PrescriptionDownloadEntry(BaseModel):
     actor: str
     channel: str
     downloaded_at: datetime
-
-
-class PractitionerCaseUpdate(BaseModel):
-    child_full_name: Optional[str] = None
-    child_birthdate: Optional[date] = None
-    child_weight_kg: Optional[float] = Field(default=None, ge=0)
-    parent1_name: Optional[str] = None
-    parent1_email: Optional[EmailStr] = None
-    parent2_name: Optional[str] = None
-    parent2_email: Optional[EmailStr] = None
-    parental_authority_ack: Optional[bool] = None
-    notes: Optional[str] = None
-    procedure_type: Optional[str] = None
-
-
-class AppointmentRescheduleRequest(BaseModel):
-    date: Optional[dt.date] = None
-    time: Optional[time_type] = None
-    appointment_type: Optional[str] = None
-    mode: Optional[str] = None
-    status: Optional[str] = None
-
-
-class PrescriptionVersionEntry(BaseModel):
-    id: int
-    appointment_id: int
-    appointment_type: str
-    created_at: datetime
-    url: str
-    items: Optional[List[str]] = None
-    instructions: Optional[str] = None

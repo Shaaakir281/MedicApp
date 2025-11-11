@@ -34,14 +34,23 @@ const buildScheduleForm = (appointment) => ({
 });
 
 const sanitizeCaseValues = (form) => {
-  const nullable = (value) => (value === '' ? null : value);
+  const nullable = (value) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed.length === 0 ? null : trimmed;
+    }
+    return value;
+  };
   let parsedWeight = null;
   if (form.child_weight_kg !== '' && form.child_weight_kg !== null && form.child_weight_kg !== undefined) {
     const asNumber = Number.parseFloat(form.child_weight_kg);
     parsedWeight = Number.isNaN(asNumber) ? null : asNumber;
   }
+  const trimmedChildName =
+    typeof form.child_full_name === 'string' ? form.child_full_name.trim() : form.child_full_name || '';
   return {
-    child_full_name: form.child_full_name || '',
+    child_full_name: trimmedChildName || '',
     child_birthdate: form.child_birthdate || null,
     child_weight_kg: parsedWeight,
     parent1_name: nullable(form.parent1_name),
