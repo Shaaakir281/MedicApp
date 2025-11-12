@@ -10,7 +10,7 @@ throughout the codebase.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     smtp_use_ssl: bool = Field(default=False, alias="SMTP_USE_SSL")
     email_from: Optional[str] = Field(default=None, alias="EMAIL_FROM")
     reminder_lookahead_days: int = Field(default=7, alias="REMINDER_LOOKAHEAD_DAYS", ge=1, le=30)
+    storage_backend: Literal["local", "azure"] = Field(default="local", alias="STORAGE_BACKEND")
+    storage_local_path: Optional[str] = Field(default=None, alias="STORAGE_LOCAL_PATH")
+    azure_blob_connection_string: Optional[str] = Field(default=None, alias="AZURE_BLOB_CONNECTION_STRING")
+    azure_blob_container: Optional[str] = Field(default=None, alias="AZURE_BLOB_CONTAINER")
 
     @field_validator("jwt_secret_key")
     @classmethod

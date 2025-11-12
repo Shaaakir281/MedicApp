@@ -15,6 +15,7 @@ import schemas
 from database import get_db
 from dependencies.auth import require_practitioner
 from core.config import get_settings
+from services import download_links
 
 router = APIRouter(prefix="/practitioner", tags=["practitioner"])
 settings = get_settings()
@@ -130,6 +131,14 @@ def _appointment_entry(
     case_status: schemas.PractitionerCaseStatus,
 ) -> schemas.PractitionerAppointmentEntry:
     prescription = appointment.prescription
+    prescription_url = None
+    if prescription:
+        token = download_links.create_prescription_download_token(
+            prescription.id,
+            actor="practitioner",
+            channel="dashboard",
+        )
+        prescription_url = f"/prescriptions/access/{token}"
     return schemas.PractitionerAppointmentEntry(
         appointment_id=appointment.id,
         date=appointment.date,
@@ -151,7 +160,7 @@ def _appointment_entry(
         prescription_items=prescription.items if prescription and prescription.items else None,
         prescription_instructions=prescription.instructions if prescription else None,
         prescription_id=prescription.id if prescription else None,
-        prescription_url=f"/prescriptions/{prescription.id}" if prescription else None,
+        prescription_url=prescription_url,
     )
 
 

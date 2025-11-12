@@ -5,20 +5,21 @@ GET /prescriptions/{prescription_id} -> return PDF file
 """
 from __future__ import annotations
 
-from pathlib import Path
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 
 import crud
 import models
 import schemas
 from database import get_db
-from services.pdf import generate_ordonnance_pdf, ORDONNANCES_DIR
+from services.pdf import generate_ordonnance_pdf, ORDONNANCE_CATEGORY
 from services.email import send_prescription_email
+from services.storage import StorageError, get_storage_backend
+from services import download_links
 from core.config import get_settings
 from pydantic import BaseModel, Field
 from dependencies.auth import get_current_user, require_practitioner
@@ -26,6 +27,24 @@ from dependencies.auth import get_current_user, require_practitioner
 
 router = APIRouter(prefix="/prescriptions", tags=["prescriptions"])
 settings = get_settings()
+
+
+def _build_prescription_access_path(*, prescription_id: int, actor: str, channel: str) -> str:
+    token = download_links.create_prescription_download_token(
+        prescription_id,
+        actor=actor,
+        channel=channel,
+    )
+    return f"/prescriptions/access/{token}"
+
+
+def _build_prescription_version_access_path(*, version_id: int, actor: str, channel: str) -> str:
+    token = download_links.create_prescription_version_download_token(
+        version_id,
+        actor=actor,
+        channel=channel,
+    )
+    return f"/prescriptions/versions/access/{token}"
 
 
 ACT_PRESCRIPTIONS: List[str] = [
@@ -116,6 +135,96 @@ def _log_download(
     db.commit()
 
 
+def _serve_prescription_file(
+    pres: models.Prescription,
+    *,
+    actor: str,
+    channel: str,
+    inline: bool,
+    request: Request,
+    db: Session,
+) -> Response:
+    storage = get_storage_backend()
+    filename = pres.pdf_path or f"prescription-{pres.id}.pdf"
+
+    pres.download_count = (pres.download_count or 0) + 1
+    pres.last_download_at = datetime.utcnow()
+    db.add(pres)
+    version = (
+        db.query(models.PrescriptionVersion)
+        .filter(models.PrescriptionVersion.prescription_id == pres.id)
+        .order_by(models.PrescriptionVersion.created_at.desc())
+        .first()
+    )
+    db.commit()
+    _log_download(db, version, actor, channel)
+
+    if storage.supports_presigned_urls:
+        try:
+            url = storage.generate_presigned_url(
+                ORDONNANCE_CATEGORY,
+                pres.pdf_path,
+                download_name=filename,
+                inline=inline,
+            )
+            return RedirectResponse(url, status_code=307)
+        except StorageError:
+            pass
+
+    try:
+        return storage.build_file_response(
+            ORDONNANCE_CATEGORY,
+            pres.pdf_path,
+            download_name=filename,
+            inline=inline,
+        )
+    except StorageError as exc:
+        raise HTTPException(status_code=404, detail="Prescription file missing on disk") from exc
+
+
+def _serve_prescription_version_file(
+    version: models.PrescriptionVersion,
+    *,
+    actor: str,
+    channel: str,
+    inline: bool,
+    request: Request,
+    db: Session,
+) -> Response:
+    storage = get_storage_backend()
+    filename = version.pdf_path or f"prescription-version-{version.id}.pdf"
+
+    parent = version.prescription
+    if parent:
+        parent.download_count = (parent.download_count or 0) + 1
+        parent.last_download_at = datetime.utcnow()
+        db.add(parent)
+    db.commit()
+    _log_download(db, version, actor, channel)
+
+    if storage.supports_presigned_urls:
+        try:
+            url = storage.generate_presigned_url(
+                ORDONNANCE_CATEGORY,
+                version.pdf_path,
+                download_name=filename,
+                inline=inline,
+            )
+            return RedirectResponse(url, status_code=307)
+        except StorageError:
+            pass
+
+    try:
+        return storage.build_file_response(
+            ORDONNANCE_CATEGORY,
+            version.pdf_path,
+            download_name=filename,
+            inline=inline,
+        )
+    except StorageError as exc:
+        raise HTTPException(status_code=404, detail="Prescription file missing on disk") from exc
+
+
 def _ensure_prescription(db: Session, appointment: models.Appointment) -> models.Prescription:
     if appointment.prescription:
         return appointment.prescription
@@ -159,7 +268,11 @@ def create_prescription(
     return {
         "id": pres.id,
         "appointment_id": pres.appointment_id,
-        "url": f"/prescriptions/{pres.id}",
+        "url": _build_prescription_access_path(
+            prescription_id=pres.id,
+            actor="practitioner",
+            channel="api",
+        ),
         "items": pres.items,
         "instructions": pres.instructions,
         "created_at": pres.created_at,
@@ -172,7 +285,7 @@ def get_prescription(
     request: Request,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     # Lookup prescription in DB to get the stored pdf_path
     pres = (
         db.query(models.Prescription)
@@ -184,37 +297,22 @@ def get_prescription(
     )
     if not pres or not pres.pdf_path:
         raise HTTPException(status_code=404, detail="Prescription not found")
-    # Build storage path relative to backend/ (two levels up from this file)
-    storage_path = Path(ORDONNANCES_DIR)
-    fpath = storage_path / pres.pdf_path
-    if not fpath.exists():
-        raise HTTPException(status_code=404, detail="Prescription file missing on disk")
-
     appointment = pres.appointment
     if current_user.role != models.UserRole.praticien:
         if appointment is None or appointment.user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès interdit à cette ordonnance.")
 
-    try:
-        pres.download_count = (pres.download_count or 0) + 1
-        pres.last_download_at = datetime.utcnow()
-        db.add(pres)
-        version = (
-            db.query(models.PrescriptionVersion)
-            .filter(models.PrescriptionVersion.prescription_id == pres.id)
-            .order_by(models.PrescriptionVersion.created_at.desc())
-            .first()
-        )
-        default_actor = getattr(current_user.role, "value", current_user.role)
-        actor, channel = _resolve_actor_channel(request, default_actor=default_actor)
-        db.commit()
-        _log_download(db, version, actor, channel)
-        response = FileResponse(path=str(fpath), media_type="application/pdf", filename=fpath.name)
-        if request.query_params.get("mode") == "inline":
-            response.headers["Content-Disposition"] = f"inline; filename={fpath.name}"
-        return response
-    except OSError as exc:
-        raise HTTPException(status_code=500, detail=f"Error reading prescription file: {exc}")
+    default_actor = getattr(current_user.role, "value", current_user.role)
+    actor, channel = _resolve_actor_channel(request, default_actor=default_actor)
+    inline = request.query_params.get("mode") == "inline"
+    return _serve_prescription_file(
+        pres,
+        actor=actor,
+        channel=channel,
+        inline=inline,
+        request=request,
+        db=db,
+    )
 
 
 @router.get("/{appointment_id}/history", response_model=List[schemas.PrescriptionVersionEntry])
@@ -260,7 +358,11 @@ def list_prescription_versions(
                 created_at=version.created_at,
                 items=version.items,
                 instructions=version.instructions,
-                url=f"/prescriptions/versions/{version.id}",
+                url=_build_prescription_version_access_path(
+                    version_id=version.id,
+                    actor="practitioner",
+                    channel="history",
+                ),
                 downloads=downloads,
             )
         )
@@ -273,7 +375,7 @@ def get_prescription_version(
     request: Request,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     version = (
         db.query(models.PrescriptionVersion)
         .options(
@@ -287,30 +389,99 @@ def get_prescription_version(
     if version is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prescription version not found")
 
-    storage_path = Path(ORDONNANCES_DIR)
-    fpath = storage_path / version.pdf_path
-    if not fpath.exists():
-        raise HTTPException(status_code=404, detail="Prescription file missing on disk")
-
     parent = version.prescription
     appointment = parent.appointment if parent else None
     if current_user.role != models.UserRole.praticien:
         if appointment is None or appointment.user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès interdit à cette version d'ordonnance.")
 
-    if parent:
-        parent.download_count = (parent.download_count or 0) + 1
-        parent.last_download_at = datetime.utcnow()
-        db.add(parent)
     default_actor = getattr(current_user.role, "value", current_user.role)
     actor, channel = _resolve_actor_channel(request, default_actor=default_actor)
-    db.commit()
-    _log_download(db, version, actor, channel)
+    inline = request.query_params.get("mode") == "inline"
+    return _serve_prescription_version_file(
+        version,
+        actor=actor,
+        channel=channel,
+        inline=inline,
+        request=request,
+        db=db,
+    )
 
-    response = FileResponse(path=str(fpath), media_type="application/pdf", filename=fpath.name)
-    if request.query_params.get("mode") == "inline":
-        response.headers["Content-Disposition"] = f"inline; filename={fpath.name}"
-    return response
+
+@router.get("/access/{download_token}")
+def download_prescription_with_token(
+    download_token: str,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    try:
+        prescription_id, actor_claim, channel_claim = download_links.resolve_prescription_download_token(download_token)
+    except download_links.InvalidDownloadTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Lien de téléchargement invalide ou expiré.",
+        )
+
+    pres = (
+        db.query(models.Prescription)
+        .options(joinedload(models.Prescription.appointment).joinedload(models.Appointment.user))
+        .filter(models.Prescription.id == prescription_id)
+        .first()
+    )
+    if not pres or not pres.pdf_path:
+        raise HTTPException(status_code=404, detail="Prescription not found")
+
+    actor = request.query_params.get("actor") or actor_claim or "anonymous"
+    channel = request.query_params.get("channel") or channel_claim or "download_link"
+    inline = request.query_params.get("mode") == "inline"
+    return _serve_prescription_file(
+        pres,
+        actor=actor,
+        channel=channel,
+        inline=inline,
+        request=request,
+        db=db,
+    )
+
+
+@router.get("/versions/access/{download_token}")
+def download_prescription_version_with_token(
+    download_token: str,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    try:
+        version_id, actor_claim, channel_claim = download_links.resolve_prescription_version_download_token(download_token)
+    except download_links.InvalidDownloadTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Lien de téléchargement invalide ou expiré.",
+        )
+
+    version = (
+        db.query(models.PrescriptionVersion)
+        .options(
+            joinedload(models.PrescriptionVersion.prescription)
+            .joinedload(models.Prescription.appointment)
+            .joinedload(models.Appointment.user)
+        )
+        .filter(models.PrescriptionVersion.id == version_id)
+        .first()
+    )
+    if version is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prescription version not found")
+
+    actor = request.query_params.get("actor") or actor_claim or "anonymous"
+    channel = request.query_params.get("channel") or channel_claim or "download_link"
+    inline = request.query_params.get("mode") == "inline"
+    return _serve_prescription_version_file(
+        version,
+        actor=actor,
+        channel=channel,
+        inline=inline,
+        request=request,
+        db=db,
+    )
 
 
 @router.post("/{appointment_id}/send-link", status_code=status.HTTP_202_ACCEPTED)
@@ -327,7 +498,15 @@ def send_prescription_link(
 
     prescription = _ensure_prescription(db, appointment)
     base_url = settings.app_base_url.rstrip("/")
-    download_url = f"{base_url}/prescriptions/{prescription.id}?actor=patient&channel=email_link"
+    access_path = _build_prescription_access_path(
+        prescription_id=prescription.id,
+        actor="patient",
+        channel="email_link",
+    )
+    download_url = f"{base_url}{access_path}?actor=patient&channel=email_link"
+    storage = get_storage_backend()
+    if not storage.exists(ORDONNANCE_CATEGORY, prescription.pdf_path):
+        raise HTTPException(status_code=404, detail="Prescription file missing on disk")
     try:
         send_prescription_email(appointment.user.email, download_url, appointment.appointment_type)
     except Exception as exc:  # noqa: BLE001
@@ -383,6 +562,10 @@ def update_prescription(
         "appointment_id": prescription.appointment_id,
         "items": prescription.items,
         "instructions": prescription.instructions,
-        "url": f"/prescriptions/{prescription.id}",
+        "url": _build_prescription_access_path(
+            prescription_id=prescription.id,
+            actor="practitioner",
+            channel="api",
+        ),
         "updated_at": prescription.created_at,
     }

@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 import crud
+import models
 import schemas
 from database import get_db
 from dependencies.auth import get_current_user

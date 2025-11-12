@@ -11,6 +11,8 @@ from typing import Dict, Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from services.storage import get_storage_backend
+
 try:
     # WeasyPrint is optional in tests/environments; import where available
     from weasyprint import HTML
@@ -43,10 +45,11 @@ except Exception:  # pragma: no cover - import error handled at runtime
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
-STORAGE_DIR = os.path.join(BASE_DIR, "storage", "prescriptions")
-CHECKLIST_DIR = os.path.join(BASE_DIR, "storage", "checklists")
-CONSENTS_DIR = os.path.join(BASE_DIR, "storage", "consents")
-ORDONNANCES_DIR = os.path.join(BASE_DIR, "storage", "ordonnances")
+
+PRESCRIPTIONS_CATEGORY = "prescriptions"
+CHECKLIST_CATEGORY = "checklists"
+CONSENT_CATEGORY = "consents"
+ORDONNANCE_CATEGORY = "ordonnances"
 
 
 def _env() -> Environment:
@@ -56,42 +59,35 @@ def _env() -> Environment:
     )
 
 
-def _render_to_pdf(template_name: str, storage_dir: str, context: Dict[str, Any]) -> str:
+def _render_to_pdf(template_name: str, category: str, context: Dict[str, Any]) -> str:
     if HTML is None:
         raise RuntimeError("WeasyPrint is not installed in this environment")
-
-    os.makedirs(storage_dir, exist_ok=True)
 
     env = _env()
     template = env.get_template(template_name)
     html = template.render(**context)
 
     filename = f"{uuid.uuid4()}.pdf"
-    out_path = os.path.join(storage_dir, filename)
-
-    # Write PDF
-    HTML(string=html).write_pdf(out_path)
-
-    # Return filename relative to the storage subdir
-    return filename
+    pdf_bytes = HTML(string=html).write_pdf()
+    storage = get_storage_backend()
+    return storage.save_pdf(category, filename, pdf_bytes)
 
 
 def generate_prescription_pdf(template_name: str, context: Dict[str, Any]) -> str:
-    """Render `template_name` with `context`, write PDF into storage and
-    return the relative filename."""
-    return _render_to_pdf(template_name, STORAGE_DIR, context)
+    """Render `template_name` with `context` and store the PDF."""
+    return _render_to_pdf(template_name, PRESCRIPTIONS_CATEGORY, context)
 
 
 def generate_checklist_pdf(context: Dict[str, Any]) -> str:
-    """Generate the checklist PDF and return stored filename."""
-    return _render_to_pdf("checklist.html", CHECKLIST_DIR, context)
+    """Generate the checklist PDF and return stored identifier."""
+    return _render_to_pdf("checklist.html", CHECKLIST_CATEGORY, context)
 
 
 def generate_consent_pdf(context: Dict[str, Any]) -> str:
     """Generate the parental consent PDF."""
-    return _render_to_pdf("consent.html", CONSENTS_DIR, context)
+    return _render_to_pdf("consent.html", CONSENT_CATEGORY, context)
 
 
 def generate_ordonnance_pdf(context: Dict[str, Any]) -> str:
     """Generate the ordonnance PDF for the intervention."""
-    return _render_to_pdf("ordonnance.html", ORDONNANCES_DIR, context)
+    return _render_to_pdf("ordonnance.html", ORDONNANCE_CATEGORY, context)

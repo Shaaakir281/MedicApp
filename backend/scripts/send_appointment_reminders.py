@@ -47,7 +47,7 @@ def main() -> int:
                 continue
 
             token = uuid.uuid4().hex
-            reminder_link = f"{settings.app_base_url.rstrip('/')}/reminders/{token}"
+            reminder_link = f"{settings.app_base_url.rstrip('/')}/appointments/reminders/{token}"
             send_appointment_reminder_email(
                 recipient=user.email,
                 appointment_date=appointment.date.strftime("%d/%m/%Y"),

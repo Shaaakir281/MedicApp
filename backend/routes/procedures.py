@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from datetime import date as date_cls
-from pathlib import Path
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 import crud
@@ -17,6 +16,7 @@ from dependencies.auth import get_current_user
 from core.config import get_settings
 from services import pdf as pdf_service
 from services import email as email_service
+from services.storage import StorageError, get_storage_backend
 
 
 router = APIRouter(prefix="/procedures", tags=["procedures"])
@@ -136,10 +136,21 @@ def send_consent_link(
             detail="Aucune procedure en cours.",
         )
 
-    if not case.consent_download_token:
+    if not case.consent_download_token or not case.consent_pdf_path:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Le consentement n'est pas encore disponible.",
+        )
+    if not case.consent_pdf_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Consentement introuvable.",
+        )
+    storage = get_storage_backend()
+    if not storage.exists(pdf_service.CONSENT_CATEGORY, case.consent_pdf_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Fichier de consentement introuvable.",
         )
 
     recipients = [
@@ -168,7 +179,7 @@ def send_consent_link(
 def download_consent_pdf(
     token: str,
     db: Session = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     case = crud.get_procedure_case_by_token(db, token)
     if case is None or not case.consent_pdf_path:
         raise HTTPException(
@@ -176,15 +187,31 @@ def download_consent_pdf(
             detail="Consentement introuvable.",
         )
 
-    file_path = Path(pdf_service.CONSENTS_DIR) / case.consent_pdf_path
-    if not file_path.exists():
+    storage = get_storage_backend()
+    filename = f"consentement-{case.child_full_name.replace(' ', '_')}.pdf"
+    if storage.supports_presigned_urls:
+        try:
+            url = storage.generate_presigned_url(
+                pdf_service.CONSENT_CATEGORY,
+                case.consent_pdf_path,
+                download_name=filename,
+                expires_in_seconds=600,
+                inline=False,
+            )
+            return RedirectResponse(url, status_code=307)
+        except StorageError:
+            # fallback to streaming below
+            pass
+
+    try:
+        return storage.build_file_response(
+            pdf_service.CONSENT_CATEGORY,
+            case.consent_pdf_path,
+            filename,
+            inline=False,
+        )
+    except StorageError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Fichier manquant sur le serveur.",
-        )
-
-    return FileResponse(
-        path=file_path,
-        media_type="application/pdf",
-        filename=f"consentement-{case.child_full_name.replace(' ', '_')}.pdf",
-    )
+        ) from exc
