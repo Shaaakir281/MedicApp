@@ -97,4 +97,117 @@ docker compose exec backend python -c "from services import pdf; from weasyprint
 - Sécurité : définir durée de rétention des PDF, suivi des téléchargements, éventuelle authentification forte.
 - Ajouter des tests d’intégration couvrant la génération des documents et la planification des rendez-vous.
 - Brancher un SMTP réel (les emails sont consignés dans les logs si aucune configuration n’est fournie).
+
+## Déploiement Azure (backend & frontend)
+
+### Provision des ressources principales
+
+```powershell
+az group create -n medicapp-rg -l westeurope
+
+az acr create `
+  -n medicappregistry `
+  -g medicapp-rg `
+  --sku Basic `
+  --admin-enabled true
+
+az appservice plan create `
+  -n medicapp-plan `
+  -g medicapp-rg `
+  --is-linux `
+  --sku B1
+
+az webapp create `
+  -n medicapp-backend-prod `
+  -g medicapp-rg `
+  -p medicapp-plan `
+  --deployment-container-image-name medicappregistry.azurecr.io/medicapp-backend:initial
+
+$PgPassword = "UnMotDePasseFort123!"
+az postgres flexible-server create `
+  -g medicapp-rg `
+  -n medicappdbprod `
+  -l westeurope `
+  --tier Burstable `
+  --sku-name Standard_B1ms `
+  --storage-size 32 `
+  --admin-user medicappadmin `
+  --admin-password $PgPassword `
+  --public-access 0.0.0.0-255.255.255.255
+
+az postgres flexible-server db create `
+  -g medicapp-rg `
+  -s medicappdbprod `
+  -d medscript
+
+az staticwebapp create `
+  -n medicapp-frontend `
+  -g medicapp-rg `
+  -s https://github.com/Shaaakir281/MedicApp `
+  -b main `
+  --app-location frontend `
+  --output-location dist `
+  --login-with-github
+```
+
+### App settings backend
+
+```
+APP_BASE_URL=https://medicapp-backend-prod.azurewebsites.net
+DATABASE_URL=postgresql+psycopg2://medicappadmin:***@medicappdbprod.postgres.database.azure.com/medscript?sslmode=require
+STORAGE_BACKEND=azure
+AZURE_BLOB_CONNECTION_STRING=DefaultEndpointsProtocol=...
+AZURE_BLOB_CONTAINER=medicapp-docs
+JWT_SECRET_KEY=***
+BACKEND_CORS_ORIGINS=https://gentle-moss-0fd896410.3.azurestaticapps.net
+SMTP_HOST=in-v3.mailjet.com
+SMTP_PORT=587
+SMTP_USERNAME=***
+SMTP_PASSWORD=***
+SMTP_USE_TLS=true
+SMTP_USE_SSL=false
+EMAIL_FROM=fathimetalsi@gmail.com
+DOCKER_REGISTRY_SERVER_URL=https://medicappregistry.azurecr.io
+DOCKER_REGISTRY_SERVER_USERNAME=medicappregistry
+DOCKER_REGISTRY_SERVER_PASSWORD=<az acr credential show ...>
+```
+
+Frontend (`medicapp-frontend`) :
+
+```
+VITE_API_BASE_URL=https://medicapp-backend-prod.azurewebsites.net
+```
+
+### Secrets GitHub Actions
+
+| Secret | Source |
+| --- | --- |
+| `AZURE_CREDENTIALS` | `az ad sp create-for-rbac --sdk-auth ...` |
+| `AZURE_WEBAPP_NAME` | `medicapp-backend-prod` |
+| `AZURE_REGISTRY_LOGIN_SERVER` | `medicappregistry.azurecr.io` |
+| `AZURE_REGISTRY_USERNAME` | `az acr credential show -n medicappregistry --query username -o tsv` |
+| `AZURE_REGISTRY_PASSWORD` | `az acr credential show -n medicappregistry --query 'passwords[0].value' -o tsv` |
+
+Le job `backend-ci-cd` exécute `pytest`, construit/publie l’image Docker puis déploie la Web App. La Static Web App dispose de son propre workflow généré lors de la commande `az staticwebapp create`.
+
+### Tests manuels (prod)
+
+```powershell
+# Healthcheck
+Invoke-WebRequest -Uri "https://medicapp-backend-prod.azurewebsites.net/" -Method Get
+
+# Login praticien
+$payload = @{
+  email    = "praticien.demo1@demo.medicapp"
+  password = "password"
+} | ConvertTo-Json
+
+curl.exe -X POST "https://medicapp-backend-prod.azurewebsites.net/auth/login" `
+  -H "Content-Type: application/json" `
+  -d $payload
+
+# Agenda (remplacer <TOKEN> par l'access_token obtenu)
+curl.exe "https://medicapp-backend-prod.azurewebsites.net/practitioner/agenda?start=2025-11-11&end=2025-11-16" `
+  -H "Authorization: Bearer <TOKEN>"
+```
 *** End Patch
