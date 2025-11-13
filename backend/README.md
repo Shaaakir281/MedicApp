@@ -2,6 +2,7 @@
 
 FastAPI backend for the MedicApp project. It currently exposes authentication, agenda and procedure features used by the web frontend.
 
+
 ## Requirements
 
 - Python 3.11+
@@ -186,3 +187,5 @@ az webapp deploy --name medicapp-backend --resource-group medicapp-rg \
 ```
 
 Pense a mettre a jour `APP_BASE_URL` dans `.env` et sur Azure pour reflechir l'URL publique de l'API (ex. `https://medicapp-backend.azurewebsites.net`).
+#   t r i g g e r   b u i l d   1 1 / 1 3 / 2 0 2 5   0 8 : 5 0 : 0 6  
+ 
