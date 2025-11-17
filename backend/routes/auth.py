@@ -16,8 +16,9 @@ import schemas
 import models
 from database import get_db
 from core.config import get_settings
+from core import password_policy
 from services import auth_service
-from services.email import send_verification_email
+from services.email import send_verification_email, send_password_reset_email
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -32,18 +33,36 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=1)
+    new_password: str = Field(min_length=password_policy.MIN_LENGTH)
+    new_password_confirm: str = Field(min_length=password_policy.MIN_LENGTH)
+
+    @model_validator(mode="after")
+    def passwords_match(cls, values: "ResetPasswordRequest") -> "ResetPasswordRequest":
+        if values.new_password != values.new_password_confirm:
+            raise ValueError("Passwords do not match")
+        password_policy.validate_password_strength(values.new_password)
+        return values
+
+
 class RegisterRequest(BaseModel):
     """Payload used when registering a new user."""
 
     email: EmailStr
-    password: str = Field(min_length=8)
-    password_confirm: str = Field(min_length=8)
+    password: str = Field(min_length=password_policy.MIN_LENGTH)
+    password_confirm: str = Field(min_length=password_policy.MIN_LENGTH)
     role: models.UserRole
 
     @model_validator(mode="after")
     def passwords_match(cls, values: "RegisterRequest") -> "RegisterRequest":
         if values.password != values.password_confirm:
             raise ValueError("Passwords do not match")
+        password_policy.validate_password_strength(values.password)
         return values
 
 
@@ -51,6 +70,12 @@ def _build_verification_link(token: str) -> str:
     base_url = get_settings().app_base_url.rstrip("/")
     query = urlencode({"token": token})
     return f"{base_url}/auth/verify-email?{query}"
+
+
+def _build_password_reset_link(token: str) -> str:
+    base_url = get_settings().app_base_url.rstrip("/")
+    query = urlencode({"token": token})
+    return f"{base_url}/auth/reset-password?{query}"
 
 
 @router.post("/login", response_model=schemas.Token)
@@ -63,7 +88,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> schemas.Token
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
-    if not user.email_verified:
+    if user.role == models.UserRole.patient and not user.email_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email address not verified",
@@ -101,9 +126,10 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> schemas
             detail="Email already registered",
         )
 
-    token = auth_service.create_email_verification_token(db, user)
-    verification_link = _build_verification_link(token.token)
-    send_verification_email(user.email, verification_link)
+    if user.role == models.UserRole.patient:
+        token = auth_service.create_email_verification_token(db, user)
+        verification_link = _build_verification_link(token.token)
+        send_verification_email(user.email, verification_link)
 
     return schemas.User.from_orm(user)
 
@@ -117,3 +143,24 @@ def verify_email(token: str = Query(..., description="Token received by email"),
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     return schemas.Message(detail="Adresse e-mail verifiee avec succes.")
+
+
+@router.post("/forgot-password", response_model=schemas.Message)
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)) -> schemas.Message:
+    """Send a password reset link if the account exists."""
+    user = auth_service.get_user_by_email(db, payload.email)
+    if user:
+        token = auth_service.create_password_reset_token(db, user)
+        reset_link = _build_password_reset_link(token.token)
+        send_password_reset_email(user.email, reset_link)
+    return schemas.Message(detail="If an account exists, a reset email has been sent.")
+
+
+@router.post("/reset-password", response_model=schemas.Message)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> schemas.Message:
+    """Reset the password using a valid reset token."""
+    try:
+        auth_service.reset_password_with_token(db, payload.token, payload.new_password)
+    except auth_service.InvalidPasswordResetTokenError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return schemas.Message(detail="Password updated successfully.")

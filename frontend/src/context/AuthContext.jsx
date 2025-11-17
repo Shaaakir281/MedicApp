@@ -1,71 +1,233 @@
-import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
-import { loginUser, registerUser } from '../lib/api.js';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  configureAuthSession,
+  loginUser,
+  refreshAccessToken as requestAccessTokenRefresh,
+  registerUser,
+} from '../lib/api.js';
+import { clearSecureItem, loadSecureItem, saveSecureItem } from '../lib/secureStorage.js';
+
+const STORAGE_KEY = 'auth.session';
 
 const AuthContext = createContext(null);
 
+const parseJwtPayload = (token) => {
+  if (!token) {
+    return null;
+  }
+  try {
+    const [, payload] = token.split('.');
+    return JSON.parse(atob(payload));
+  } catch (error) {
+    console.warn('Impossible de décoder le token JWT', error);
+    return null;
+  }
+};
+
+function initializeSession() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  return loadSecureItem(STORAGE_KEY);
+}
+
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem('authToken'));
-  const [user, setUser] = useState(() => {
-    const raw = localStorage.getItem('authUser');
-    return raw ? JSON.parse(raw) : null;
-  });
+  const [authState, setAuthState] = useState(() => initializeSession());
   const [loading, setLoading] = useState(false);
 
-  const persist = useCallback((nextToken, nextUser) => {
-    if (nextToken) {
-      localStorage.setItem('authToken', nextToken);
+  const refreshTimerRef = useRef(null);
+  const refreshPromiseRef = useRef(null);
+  const refreshCallbackRef = useRef(() => Promise.resolve(null));
+
+  const token = authState?.accessToken ?? null;
+  const refreshToken = authState?.refreshToken ?? null;
+  const user = authState?.user ?? null;
+  const expiresAt = authState?.expiresAt ?? null;
+
+  const persistState = useCallback((state) => {
+    if (state && state.refreshToken) {
+      saveSecureItem(STORAGE_KEY, state);
     } else {
-      localStorage.removeItem('authToken');
-    }
-    if (nextUser) {
-      localStorage.setItem('authUser', JSON.stringify(nextUser));
-    } else {
-      localStorage.removeItem('authUser');
+      clearSecureItem(STORAGE_KEY);
     }
   }, []);
 
-  const handleLogin = useCallback(async (credentials) => {
-    setLoading(true);
-    try {
-      const data = await loginUser(credentials);
-      const payload = JSON.parse(atob(data.access_token.split('.')[1]));
-      const currentUser = { id: Number(payload.sub), email: credentials.email };
-      setToken(data.access_token);
-      setUser(currentUser);
-      persist(data.access_token, currentUser);
-      return currentUser;
-    } finally {
-      setLoading(false);
+  const setAuthStateAndPersist = useCallback(
+    (updater) => {
+      let resolved = null;
+      setAuthState((prev) => {
+        const nextState = typeof updater === 'function' ? updater(prev) : updater;
+        resolved = nextState ?? null;
+        persistState(resolved);
+        return resolved;
+      });
+      return resolved;
+    },
+    [persistState],
+  );
+
+  const clearRefreshTimer = useCallback(() => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
     }
-  }, [persist]);
+  }, []);
+
+  const scheduleRefreshTimer = useCallback(
+    (targetExpiry) => {
+      clearRefreshTimer();
+      if (!targetExpiry || !refreshToken) {
+        return;
+      }
+      const now = Date.now();
+      const leadTime = 60_000;
+      const delay = Math.max(5_000, targetExpiry - now - leadTime);
+      refreshTimerRef.current = setTimeout(() => {
+        refreshCallbackRef.current()?.catch(() => {});
+      }, delay);
+    },
+    [clearRefreshTimer, refreshToken],
+  );
+
+  const buildSession = useCallback((accessToken, nextRefreshToken, fallbackUser) => {
+    if (!accessToken || !nextRefreshToken) {
+      return null;
+    }
+    const payload = parseJwtPayload(accessToken) || {};
+    const expiresOn = typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+    const normalizedUser =
+      fallbackUser ||
+      (payload.sub
+        ? {
+            id: Number(payload.sub),
+            email: payload.email || null,
+          }
+        : null);
+    return {
+      accessToken,
+      refreshToken: nextRefreshToken,
+      user: normalizedUser,
+      expiresAt: expiresOn,
+    };
+  }, []);
+
+  const updateSession = useCallback(
+    (updater) => {
+      const nextSession = setAuthStateAndPersist(updater);
+      if (!nextSession) {
+        clearRefreshTimer();
+      } else if (nextSession.expiresAt) {
+        scheduleRefreshTimer(nextSession.expiresAt);
+      }
+      return nextSession;
+    },
+    [setAuthStateAndPersist, clearRefreshTimer, scheduleRefreshTimer],
+  );
+
+  const logout = useCallback(() => {
+    refreshPromiseRef.current = null;
+    updateSession(null);
+  }, [updateSession]);
+
+  const refreshAccessToken = useCallback(async () => {
+    if (!refreshToken) {
+      throw new Error('Aucun refresh token disponible');
+    }
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current;
+    }
+    const operation = (async () => {
+      const data = await requestAccessTokenRefresh(refreshToken);
+      updateSession((prev) =>
+        buildSession(data.access_token, prev?.refreshToken || refreshToken, prev?.user || user),
+      );
+      return data.access_token;
+    })()
+      .catch((error) => {
+        logout();
+        throw error;
+      })
+      .finally(() => {
+        refreshPromiseRef.current = null;
+      });
+    refreshPromiseRef.current = operation;
+    return operation;
+  }, [buildSession, logout, refreshToken, updateSession, user]);
+
+  useEffect(() => {
+    refreshCallbackRef.current = () => refreshAccessToken();
+  }, [refreshAccessToken]);
+
+  useEffect(() => {
+    if (!token || !refreshToken) {
+      clearRefreshTimer();
+      return;
+    }
+    if (!expiresAt || expiresAt - Date.now() <= 45_000) {
+      refreshAccessToken().catch(() => {});
+      return;
+    }
+    scheduleRefreshTimer(expiresAt);
+  }, [token, refreshToken, expiresAt, scheduleRefreshTimer, refreshAccessToken, clearRefreshTimer]);
+
+  useEffect(() => {
+    configureAuthSession({
+      getAccessToken: () => token,
+      getRefreshToken: () => refreshToken,
+      refreshAccessToken,
+      handleAuthError: logout,
+    });
+  }, [logout, refreshAccessToken, refreshToken, token]);
+
+  const handleLogin = useCallback(
+    async (credentials) => {
+      setLoading(true);
+      try {
+        const data = await loginUser(credentials);
+        const payload = parseJwtPayload(data.access_token) || {};
+        const currentUser = {
+          id: payload.sub ? Number(payload.sub) : null,
+          email: payload.email || credentials.email,
+        };
+        updateSession(buildSession(data.access_token, data.refresh_token, currentUser));
+        return currentUser;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [buildSession, updateSession],
+  );
 
   const handleRegister = useCallback(async (payload) => {
     setLoading(true);
     try {
-      const userData = await registerUser(payload);
-      return userData;
+      return await registerUser(payload);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const logout = useCallback(() => {
-    setToken(null);
-    setUser(null);
-    persist(null, null);
-  }, [persist]);
-
   const value = useMemo(
     () => ({
       token,
+      refreshToken,
       user,
       loading,
       login: handleLogin,
       register: handleRegister,
       logout,
-      isAuthenticated: Boolean(token),
+      refresh: refreshAccessToken,
+      isAuthenticated: Boolean(token && user),
     }),
-    [token, user, loading, handleLogin, handleRegister, logout],
+    [token, refreshToken, user, loading, handleLogin, handleRegister, logout, refreshAccessToken],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

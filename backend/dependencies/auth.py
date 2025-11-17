@@ -46,10 +46,10 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found.",
         )
-    if not user.email_verified:
+    if user.role == models.UserRole.patient and not user.email_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email address not verified.",
+            detail="Email address not verified for patient account.",
         )
 
     return user

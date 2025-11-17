@@ -68,7 +68,7 @@ Accès à l’UI : http://localhost:5173 (l’API doit être accessible sur `htt
 ```
 DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/medscript
 JWT_SECRET_KEY=change_me
-APP_BASE_URL=http://localhost:8000
+APP_BASE_URL=http://localhost:5173
 SMTP_HOST=...
 EMAIL_FROM=...
 ```
@@ -93,6 +93,10 @@ docker compose exec backend python -c "from services import pdf; from weasyprint
 
 ## Points de vigilance / TODO
 
+- Auth / emails :
+  - APP_BASE_URL doit pointer sur l’URL du front (ex: http://localhost:5173) pour que les liens email (vérification, reset) ouvrent les pages React.
+  - Les mots de passe doivent respecter la règle 12+ caractères (maj/min/chiffre/spécial) ; jauge visuelle ajoutée côté front.
+  - Flots “mot de passe oublié” et “reset” côté front + emails Mailjet opérationnels.
 - Parcours praticien à moderniser (Sprint suivant).
 - Sécurité : définir durée de rétention des PDF, suivi des téléchargements, éventuelle authentification forte.
 - Ajouter des tests d’intégration couvrant la génération des documents et la planification des rendez-vous.

@@ -233,7 +233,7 @@ const Patient = () => {
       await registerUser({ ...payload, role: 'patient' });
       setRegisterFeedback({
         type: 'success',
-        message: 'Inscription réussie. Vérifiez votre e-mail pour valider votre compte.',
+        message: 'Inscription réussie. Un e-mail de validation a été envoyé, vérifiez vos spams.',
       });
       return true;
     } catch (err) {

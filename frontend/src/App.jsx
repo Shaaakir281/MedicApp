@@ -3,6 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import Home from './pages/Home.jsx';
 import Patient from './pages/Patient.jsx';
 import Praticien from './pages/Praticien.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
+import VerifyEmail from './pages/VerifyEmail.jsx';
 
 /**
  * Top‑level component defining the navigation bar and routes for the application.
@@ -33,6 +36,9 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/patient" element={<Patient />} />
             <Route path="/praticien" element={<Praticien />} />
+            <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />
+            <Route path="/auth/reset-password" element={<ResetPassword />} />
+            <Route path="/auth/verify-email" element={<VerifyEmail />} />
           </Routes>
         </main>
       </div>

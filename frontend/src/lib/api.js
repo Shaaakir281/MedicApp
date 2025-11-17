@@ -2,10 +2,30 @@ const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL && import.meta.env.VITE_API_BASE_URL.trim()) ||
   'https://medicapp-backend-prod.azurewebsites.net';
 
-async function apiRequest(path, { method = 'GET', token, body } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+let authSessionManager = null;
+
+export function configureAuthSession(manager) {
+  authSessionManager = manager;
+}
+
+async function apiRequest(path, options = {}) {
+  const {
+    method = 'GET',
+    token,
+    body,
+    headers: customHeaders,
+    retryOnAuth = true,
+    skipAuth = false,
+  } = options;
+
+  const headers = { 'Content-Type': 'application/json', ...(customHeaders || {}) };
+
+  let resolvedToken = token;
+  if (!resolvedToken && !skipAuth && authSessionManager?.getAccessToken) {
+    resolvedToken = authSessionManager.getAccessToken();
+  }
+  if (resolvedToken) {
+    headers.Authorization = `Bearer ${resolvedToken}`;
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -18,8 +38,29 @@ async function apiRequest(path, { method = 'GET', token, body } = {}) {
   const payload = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {
+    const shouldAttemptRefresh =
+      response.status === 401 &&
+      retryOnAuth &&
+      !skipAuth &&
+      Boolean(authSessionManager?.getRefreshToken?.());
+
+    if (shouldAttemptRefresh && authSessionManager?.refreshAccessToken) {
+      try {
+        const freshToken = await authSessionManager.refreshAccessToken();
+        if (freshToken && freshToken !== resolvedToken) {
+          return apiRequest(path, {
+            ...options,
+            token: freshToken,
+            retryOnAuth: false,
+          });
+        }
+      } catch (refreshError) {
+        authSessionManager?.handleAuthError?.(refreshError);
+      }
+    }
+
     const message = (payload && payload.detail) || response.statusText;
-    const error = new Error(message);
+    const error = new Error(message || 'Une erreur est survenue');
     error.status = response.status;
     error.payload = payload;
     throw error;
@@ -31,11 +72,20 @@ async function apiRequest(path, { method = 'GET', token, body } = {}) {
 export { apiRequest };
 
 export async function registerUser(payload) {
-  return apiRequest('/auth/register', { method: 'POST', body: payload });
+  return apiRequest('/auth/register', { method: 'POST', body: payload, skipAuth: true });
 }
 
 export async function loginUser(payload) {
-  return apiRequest('/auth/login', { method: 'POST', body: payload });
+  return apiRequest('/auth/login', { method: 'POST', body: payload, skipAuth: true });
+}
+
+export async function refreshAccessToken(refreshToken) {
+  return apiRequest('/auth/refresh', {
+    method: 'POST',
+    body: { refresh_token: refreshToken },
+    retryOnAuth: false,
+    skipAuth: true,
+  });
 }
 
 export async function fetchSlots(date) {
@@ -127,6 +177,29 @@ export async function fetchPrescriptionHistory(token, appointmentId) {
   return apiRequest(`/prescriptions/${appointmentId}/history`, {
     method: 'GET',
     token,
+  });
+}
+
+export async function requestPasswordReset(email) {
+  return apiRequest('/auth/forgot-password', {
+    method: 'POST',
+    body: { email },
+    skipAuth: true,
+  });
+}
+
+export async function resetPassword(payload) {
+  return apiRequest('/auth/reset-password', {
+    method: 'POST',
+    body: payload,
+    skipAuth: true,
+  });
+}
+
+export async function verifyEmailToken(token) {
+  return apiRequest(`/auth/verify-email?token=${encodeURIComponent(token)}`, {
+    method: 'GET',
+    skipAuth: true,
   });
 }
 

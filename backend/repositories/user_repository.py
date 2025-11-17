@@ -23,15 +23,15 @@ def create(
     email: str,
     hashed_password: str,
     role: models.UserRole,
+    email_verified: bool = False,
 ) -> models.User:
     user = models.User(
         email=email,
         hashed_password=hashed_password,
         role=role,
-        email_verified=False,
+        email_verified=email_verified,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
     return user
-

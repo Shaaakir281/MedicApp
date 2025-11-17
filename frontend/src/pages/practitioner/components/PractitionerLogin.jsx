@@ -54,6 +54,7 @@ export function PractitionerLogin({ onSubmit, loading, error }) {
           value={form.password}
           onChange={handleChange}
           autoComplete="current-password"
+          showVisibilityCheckbox
           required
         />
         <Button type="submit" className="w-full" disabled={loading}>

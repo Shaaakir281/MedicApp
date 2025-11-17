@@ -10,7 +10,12 @@ from sqlalchemy.orm import Session
 
 import models
 from core import security
-from repositories import email_verification_repository, user_repository
+from core import password_policy
+from repositories import (
+    email_verification_repository,
+    password_reset_repository,
+    user_repository,
+)
 
 
 class InvalidCredentialsError(ValueError):
@@ -27,6 +32,10 @@ class InvalidVerificationTokenError(ValueError):
 
 class InvalidRefreshTokenError(ValueError):
     """Raised when a refresh token is invalid or malformatted."""
+
+
+class InvalidPasswordResetTokenError(ValueError):
+    """Raised when a password reset token cannot be used."""
 
 
 @dataclass(frozen=True)
@@ -54,12 +63,15 @@ def register_user(
     if user_repository.get_by_email(db, email):
         raise EmailAlreadyRegisteredError("Email already registered")
 
+    password_policy.validate_password_strength(password)
     hashed_password = security.hash_password(password)
+    email_verified = role == models.UserRole.praticien
     user = user_repository.create(
         db,
         email=email,
         hashed_password=hashed_password,
         role=role,
+        email_verified=email_verified,
     )
     return user
 
@@ -94,6 +106,10 @@ def decode_token(token: str) -> dict:
 
 def get_user_by_id(db: Session, user_id: int) -> models.User | None:
     return user_repository.get_by_id(db, user_id)
+
+
+def get_user_by_email(db: Session, email: str) -> models.User | None:
+    return user_repository.get_by_email(db, email)
 
 
 def create_email_verification_token(
@@ -137,3 +153,40 @@ def verify_email_token(
     db.refresh(user)
     return user
 
+
+def create_password_reset_token(
+    db: Session,
+    user: models.User,
+    expires_in_minutes: int = 60,
+) -> models.PasswordResetToken:
+    password_reset_repository.invalidate_pending_tokens(db, user.id)
+    token_value = secrets.token_urlsafe(32)
+    expiry = datetime.utcnow() + timedelta(minutes=expires_in_minutes)
+    return password_reset_repository.create(
+        db,
+        user_id=user.id,
+        token_value=token_value,
+        expires_at=expiry,
+    )
+
+
+def reset_password_with_token(db: Session, token_value: str, new_password: str) -> models.User:
+    token = password_reset_repository.get_by_token(db, token_value)
+    if token is None:
+        raise InvalidPasswordResetTokenError("Invalid reset token")
+    if token.consumed_at is not None:
+        raise InvalidPasswordResetTokenError("Reset token already used")
+    if token.expires_at < datetime.utcnow():
+        raise InvalidPasswordResetTokenError("Reset token has expired")
+
+    password_policy.validate_password_strength(new_password)
+    token.consumed_at = datetime.utcnow()
+    user = token.user
+    user.hashed_password = security.hash_password(new_password)
+    user.email_verified = user.email_verified or user.role == models.UserRole.praticien
+
+    db.add(token)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user

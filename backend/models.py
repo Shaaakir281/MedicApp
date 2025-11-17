@@ -78,6 +78,9 @@ class User(Base):
     email_tokens = relationship(
         "EmailVerificationToken", back_populates="user", cascade="all,delete-orphan"
     )
+    password_reset_tokens = relationship(
+        "PasswordResetToken", back_populates="user", cascade="all,delete-orphan"
+    )
     procedure_cases = relationship(
         "ProcedureCase",
         back_populates="patient",
@@ -136,6 +139,21 @@ class EmailVerificationToken(Base):
     consumed_at: datetime.datetime | None = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="email_tokens")
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    user_id: int = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token: str = Column(String, unique=True, nullable=False, index=True)
+    expires_at: datetime.datetime = Column(DateTime, nullable=False)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+    consumed_at: datetime.datetime | None = Column(DateTime, nullable=True)
+
+    user = relationship("User", back_populates="password_reset_tokens")
 
 
 class Questionnaire(Base):

@@ -193,3 +193,25 @@ def send_appointment_reminder_email(
     <p>L'équipe {app_name}</p>
     """
     send_email(subject, recipient, text_body, html_body=html_body)
+
+
+def send_password_reset_email(recipient: str, reset_link: str) -> None:
+    """Send a password reset link with spam folder notice."""
+    app_name = _app_name()
+    subject = f"[{app_name}] Reinitialisation de votre mot de passe"
+    spam_hint = "Si vous ne voyez pas l'e-mail, pensez a verifier votre dossier spam."
+    text_body = (
+        f"Bonjour,\n\n"
+        f"Un lien de reinitialisation de mot de passe a ete genere pour votre compte {app_name} :\n"
+        f"{reset_link}\n\n"
+        f"Ce lien expire dans 60 minutes. {spam_hint}\n"
+        f"Si vous n'etes pas a l'origine de cette demande, ignorez simplement ce message.\n"
+    )
+    html_body = f"""
+    <p>Bonjour,</p>
+    <p>Un lien de r&eacute;initialisation de mot de passe a &eacute;t&eacute; g&eacute;n&eacute;r&eacute; pour votre compte <strong>{app_name}</strong> :</p>
+    <p><a href="{reset_link}">{reset_link}</a></p>
+    <p>Ce lien expire dans 60 minutes. {spam_hint}</p>
+    <p>Si vous n'&ecirc;tes pas &agrave; l'origine de cette demande, ignorez ce message.</p>
+    """
+    send_email(subject, recipient, text_body, html_body=html_body)
