@@ -53,7 +53,11 @@ export default function ResetPassword() {
     setLoading(true);
     setStatus(null);
     try {
-      await resetPassword({ token: values.token, new_password: values.new_password });
+      await resetPassword({
+        token: values.token,
+        new_password: values.new_password,
+        new_password_confirm: values.new_password_confirm,
+      });
       setStatus({ type: 'success', message: 'Mot de passe mis à jour. Vous pouvez vous reconnecter.' });
     } catch (error) {
       setStatus({ type: 'error', message: error.message || 'Réinitialisation impossible.' });
