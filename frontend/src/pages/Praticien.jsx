@@ -26,6 +26,7 @@ import {
 import PdfPreviewModal from '../components/PdfPreviewModal.jsx';
 
 const VIEW_OPTIONS = [1, 7, 14, 23];
+const AUTO_REFRESH_INTERVAL_MS = 60_000;
 const ACT_ITEMS = [
   'Bactigras 10x10 cm x 5',
   'Compresses stériles 5x5 cm x 10',
@@ -89,18 +90,24 @@ const Praticien = () => {
     queryKey: ['practitionerAgenda', startDate, endDate, refreshIndex],
     queryFn: () => fetchPractitionerAgenda({ start: startDate, end: endDate }, token),
     enabled: Boolean(token),
+    refetchInterval: token && viewMode === 'agenda' ? AUTO_REFRESH_INTERVAL_MS : false,
+    refetchIntervalInBackground: false,
   });
 
   const statsQuery = useQuery({
     queryKey: ['practitionerStats', startDate, refreshIndex],
     queryFn: () => fetchPractitionerStats(startDate, token),
     enabled: Boolean(token),
+    refetchInterval: token ? AUTO_REFRESH_INTERVAL_MS : false,
+    refetchIntervalInBackground: false,
   });
 
   const newPatientsQuery = useQuery({
     queryKey: ['practitionerNewPatients', viewMode, refreshIndex],
     queryFn: () => fetchNewPatients({ days: 7 }, token),
     enabled: Boolean(token && viewMode === 'patients'),
+    refetchInterval: token && viewMode === 'patients' ? AUTO_REFRESH_INTERVAL_MS : false,
+    refetchIntervalInBackground: false,
   });
 
   const downloadMutation = useMutation({

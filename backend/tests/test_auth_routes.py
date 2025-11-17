@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Any, Dict
 
 import pytest
-from fastapi.testclient import TestClient
+
+try:
+    from fastapi.testclient import TestClient
+except RuntimeError as exc:  # pragma: no cover - exercised when httpx is missing
+    pytest.skip(f"fastapi TestClient unavailable: {exc}", allow_module_level=True)
 from sqlalchemy.orm import Session
 
 import models
