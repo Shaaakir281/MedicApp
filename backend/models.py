@@ -178,6 +178,7 @@ class Prescription(Base):
     appointment_id: int = Column(
         Integer, ForeignKey("appointments.id"), nullable=False, unique=True
     )
+    reference: str = Column(String(64), nullable=False, unique=True, index=True)
     pdf_path: str | None = Column(String, nullable=True)
     items: list[str] | None = Column(JSON, nullable=True)
     instructions: str | None = Column(String, nullable=True)
@@ -185,13 +186,21 @@ class Prescription(Base):
     sent_via: str | None = Column(String(32), nullable=True)
     download_count: int = Column(Integer, nullable=False, default=0)
     last_download_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    signed_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    signed_by_id: int | None = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: datetime.datetime = Column(
         DateTime, default=datetime.datetime.utcnow, nullable=False
     )
 
     appointment = relationship("Appointment", back_populates="prescription")
+    signed_by = relationship("User", foreign_keys=[signed_by_id])
     versions = relationship(
         "PrescriptionVersion",
+        back_populates="prescription",
+        cascade="all,delete-orphan",
+    )
+    qr_codes = relationship(
+        "PrescriptionQRCode",
         back_populates="prescription",
         cascade="all,delete-orphan",
     )
@@ -213,6 +222,7 @@ class PrescriptionVersion(Base):
         nullable=False,
         index=True,
     )
+    reference: str = Column(String(64), nullable=False)
     appointment_type: str = Column(String(32), nullable=False)
     pdf_path: str = Column(String, nullable=False)
     items: list[str] | None = Column(JSON, nullable=True)
@@ -249,6 +259,62 @@ class PrescriptionDownloadLog(Base):
     version = relationship("PrescriptionVersion", back_populates="downloads")
 
 
+class PrescriptionQRCode(Base):
+    __tablename__ = "prescription_qr_codes"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    prescription_id: int = Column(
+        Integer,
+        ForeignKey("prescriptions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    version_id: int | None = Column(
+        Integer,
+        ForeignKey("prescription_versions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    reference: str = Column(String(64), nullable=False, index=True)
+    slug: str = Column(String(64), nullable=False, unique=True, index=True)
+    verification_url: str = Column(String(512), nullable=False)
+    qr_payload: dict | None = Column(JSON, nullable=True)
+    scan_count: int = Column(Integer, nullable=False, default=0)
+    last_scanned_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+    expires_at: datetime.datetime | None = Column(DateTime, nullable=True)
+
+    prescription = relationship("Prescription", back_populates="qr_codes")
+    version = relationship("PrescriptionVersion")
+    scans = relationship(
+        "PrescriptionQRScan",
+        back_populates="qr_code",
+        cascade="all,delete-orphan",
+    )
+
+
+class PrescriptionQRScan(Base):
+    __tablename__ = "prescription_qr_scans"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    qr_code_id: int = Column(
+        Integer,
+        ForeignKey("prescription_qr_codes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    ip_address: str | None = Column(String(64), nullable=True)
+    user_agent: str | None = Column(String(255), nullable=True)
+    channel: str = Column(String(32), nullable=False, default="qr")
+    actor: str | None = Column(String(32), nullable=True)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+
+    qr_code = relationship("PrescriptionQRCode", back_populates="scans")
+
+
 class ProcedureCase(Base):
     __tablename__ = "procedure_cases"
 
@@ -279,10 +345,49 @@ class ProcedureCase(Base):
         onupdate=datetime.datetime.utcnow,
         nullable=False,
     )
+    steps_acknowledged: bool = Column(Boolean, nullable=False, default=False)
+    dossier_completed: bool = Column(Boolean, nullable=False, default=False)
+    missing_fields: list[str] = Column(JSON, nullable=False, default=list)
 
     patient = relationship("User", back_populates="procedure_cases")
     appointments = relationship(
         "Appointment",
         back_populates="procedure_case",
         cascade="all,delete-orphan",
+    )
+
+
+class PharmacyContact(Base):
+    __tablename__ = "pharmacy_contacts"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    external_id: str | None = Column(String(64), unique=True, index=True, nullable=True)
+    ms_sante_address: str | None = Column(String(128), unique=True, nullable=True)
+    type: str | None = Column(String(32), nullable=True)
+    name: str = Column(String(255), nullable=False)
+    legal_name: str | None = Column(String(255), nullable=True)
+    address_line1: str = Column(String(255), nullable=False)
+    address_line2: str | None = Column(String(255), nullable=True)
+    postal_code: str = Column(String(16), nullable=False)
+    city: str = Column(String(128), nullable=False, index=True)
+    department_code: str | None = Column(String(8), nullable=True)
+    region: str | None = Column(String(64), nullable=True)
+    country: str = Column(String(64), nullable=False, default="France")
+    latitude: float | None = Column(Float, nullable=True)
+    longitude: float | None = Column(Float, nullable=True)
+    phone: str | None = Column(String(32), nullable=True)
+    email: str | None = Column(String(128), nullable=True)
+    website: str | None = Column(String(128), nullable=True)
+    source: str | None = Column(String(64), nullable=True)
+    extra_data: dict | None = Column(JSON, nullable=False, default=dict)
+    is_active: bool = Column(Boolean, nullable=False, default=True)
+    last_synced_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+    updated_at: datetime.datetime = Column(
+        DateTime,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+        nullable=False,
     )

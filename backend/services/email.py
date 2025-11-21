@@ -163,6 +163,37 @@ def send_prescription_email(recipient: str, download_url: str, appointment_type:
     send_email(subject, recipient, text_body, html_body=html_body)
 
 
+def send_prescription_signed_email(
+    recipient: str,
+    *,
+    portal_url: str,
+    download_url: str,
+    pharmacy_url: str,
+) -> None:
+    """Send the notification email issued right after the practitioner signs the ordonnance."""
+    app_name = _app_name()
+    subject = f"[{app_name}] Votre ordonnance signée est disponible"
+    text_body = (
+        "Bonjour,\n\n"
+        "Votre ordonnance vient d'être signée et archivée dans votre dossier patient.\n"
+        f"- Consulter / télécharger : {download_url}\n"
+        f"- Envoyer à votre pharmacie : {pharmacy_url}\n\n"
+        f"Vous pouvez également accéder à votre espace patient : {portal_url}\n\n"
+        f"L'équipe {app_name}\n"
+    )
+    html_body = f"""
+    <p>Bonjour,</p>
+    <p>Votre ordonnance vient d'être signée et archivée dans votre dossier patient.</p>
+    <ul>
+      <li><strong>Consulter / télécharger :</strong> <a href="{download_url}">{download_url}</a></li>
+      <li><strong>Envoyer à votre pharmacie :</strong> <a href="{pharmacy_url}">{pharmacy_url}</a></li>
+    </ul>
+    <p>Accédez à votre espace patient : <a href="{portal_url}">{portal_url}</a></p>
+    <p>L'équipe {app_name}</p>
+    """
+    send_email(subject, recipient, text_body, html_body=html_body)
+
+
 def send_appointment_reminder_email(
     recipient: str,
     appointment_date: str,

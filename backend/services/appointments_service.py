@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections import defaultdict
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
@@ -39,7 +39,20 @@ def compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCaseS
 
     has_checklist = bool(case.checklist_pdf_path)
     has_consent = bool(case.consent_pdf_path)
-    has_ordonnance = bool(case.ordonnance_pdf_path)
+
+    latest_signed_prescription: Optional[models.Prescription] = None
+    for appt in appointments:
+        prescription = getattr(appt, "prescription", None)
+        if prescription and prescription.signed_at:
+            if latest_signed_prescription is None:
+                latest_signed_prescription = prescription
+            else:
+                previous = latest_signed_prescription.signed_at or dt.datetime.min
+                current = prescription.signed_at or dt.datetime.min
+                if current > previous:
+                    latest_signed_prescription = prescription
+
+    has_ordonnance = latest_signed_prescription is not None
 
     next_act_date = None
     if act_appointments:
@@ -118,6 +131,12 @@ def compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCaseS
         needs_follow_up=needs_follow_up,
         appointments_overview=appointments_overview,
         consent_download_url=consent_download_url,
+        ordonnance_signed_at=(
+            latest_signed_prescription.signed_at if latest_signed_prescription else None
+        ),
+        latest_prescription_id=(
+            latest_signed_prescription.id if latest_signed_prescription else None
+        ),
     )
 
 
@@ -161,6 +180,7 @@ def build_appointment_entry(
         prescription_instructions=prescription.instructions if prescription else None,
         prescription_id=prescription.id if prescription else None,
         prescription_url=prescription_url,
+        prescription_signed_at=prescription.signed_at if prescription else None,
     )
 
 
@@ -181,7 +201,10 @@ def get_agenda(
         db.query(models.Appointment)
         .options(
             joinedload(models.Appointment.user),
-            joinedload(models.Appointment.procedure_case).joinedload(models.ProcedureCase.appointments),
+            joinedload(models.Appointment.prescription),
+            joinedload(models.Appointment.procedure_case)
+            .joinedload(models.ProcedureCase.appointments)
+            .joinedload(models.Appointment.prescription),
         )
         .filter(
             models.Appointment.date >= start_date,

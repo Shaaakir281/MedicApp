@@ -13,13 +13,16 @@ import datetime
 import secrets
 from typing import Optional, Dict, Any
 
+import sqlalchemy as sa
 from sqlalchemy.orm import Session, joinedload
 
 import models
+import schemas
+from core.config import get_settings
+from services.ordonnances import build_ordonnance_context
 from services.pdf import (
     generate_checklist_pdf,
     generate_consent_pdf,
-    generate_ordonnance_pdf,
 )
 
 
@@ -128,6 +131,31 @@ def create_appointment(
         if appointment_type == models.AppointmentType.act:
             if models.AppointmentType.preconsultation not in existing_types:
                 raise ValueError("Planifiez d'abord la consultation pre-operatoire")
+            pre_appt = next(
+                (
+                    appt
+                    for appt in procedure_case.appointments
+                    if appt.appointment_type == models.AppointmentType.preconsultation
+                ),
+                None,
+            )
+            if pre_appt:
+                earliest_act_date = pre_appt.date + datetime.timedelta(days=14)
+                if date < earliest_act_date:
+                    raise ValueError(
+                        f"Acte disponible a partir du {earliest_act_date.isoformat()} (14 jours apres la pre-consultation)."
+                    )
+        elif appointment_type == models.AppointmentType.preconsultation:
+            act_appointments = [
+                appt for appt in procedure_case.appointments if appt.appointment_type == models.AppointmentType.act
+            ]
+            if act_appointments:
+                latest_allowed = min(appt.date for appt in act_appointments) - datetime.timedelta(days=14)
+                if date > latest_allowed:
+                    raise ValueError(
+                        f"La pre-consultation doit avoir lieu au plus tard le {latest_allowed.isoformat()} "
+                        "afin de respecter le delai de 14 jours avant l'acte."
+                    )
 
     appointment = models.Appointment(
         user_id=user_id,
@@ -192,11 +220,32 @@ def get_procedure_case_by_token(
 def get_active_procedure_case(db: Session, patient_id: int) -> Optional[models.ProcedureCase]:
     return (
         db.query(models.ProcedureCase)
-        .options(joinedload(models.ProcedureCase.appointments))
+        .options(
+            joinedload(models.ProcedureCase.appointments).joinedload(models.Appointment.prescription)
+        )
         .filter(models.ProcedureCase.patient_id == patient_id)
         .order_by(models.ProcedureCase.created_at.desc())
         .first()
     )
+
+
+def _recompute_case_flags(case: models.ProcedureCase) -> None:
+    missing = []
+    if not case.child_full_name:
+        missing.append("child_full_name")
+    if not case.child_birthdate:
+        missing.append("child_birthdate")
+    if not case.parent1_name:
+        missing.append("parent1_name")
+    if not case.parent1_email:
+        missing.append("parent1_email")
+    if not case.parental_authority_ack:
+        missing.append("parental_authority_ack")
+    if not case.parent2_name or not case.parent2_email:
+        missing.append("parent2_contact")
+    case.missing_fields = missing
+    required_fields = [case.child_full_name, case.child_birthdate, case.parent1_name, case.parent1_email]
+    case.dossier_completed = all(required_fields) and bool(case.parental_authority_ack)
 
 
 def _build_checklist_context(case: models.ProcedureCase) -> Dict[str, Any]:
@@ -265,26 +314,23 @@ def _build_ordonnance_context(case: models.ProcedureCase) -> Dict[str, Any]:
         None,
     )
 
-    prescriptions = [
-        "Antiseptique chirurgical (flacon)",
-        "Pansements steriles adaptes - quantite a definir",
-        "Compresses steriles - quantite a definir",
-        "Gants steriles usage unique - 1 boite",
-        "Creme cicatrisante (tube 30 g)",
-        "Antalgique pediatrique (paracetamol suspension) - dosage selon poids",
-        "Serum physiologique 0.9 pourcent - flacon",
-        "Autres consommables (vaseline, coton, etc.)",
-    ]
-
-    return {
-        "praticien_nom": "",
-        "date_ordonnance": datetime.date.today().strftime("%d/%m/%Y"),
-        "enfant_nom": case.child_full_name,
-        "enfant_ddn": case.child_birthdate.strftime("%d/%m/%Y"),
-        "enfant_poids": case.child_weight_kg or "",
-        "date_intervention": act_appointment.date.strftime("%d/%m/%Y") if act_appointment else "",
-        "prescriptions": prescriptions,
-    }
+    settings = get_settings()
+    reference = f"ORD-{case.id:05d}-{datetime.date.today():%m%y}"
+    verification_url = (
+        f"{settings.app_base_url.rstrip('/')}/patients/cases/{case.id}/ordonnance/{reference}"
+    )
+    context = build_ordonnance_context(
+        patient_name=case.child_full_name,
+        patient_birthdate=case.child_birthdate,
+        patient_weight=case.child_weight_kg,
+        intervention_date=act_appointment.date if act_appointment else None,
+        appointment_type="act",
+        reference=reference,
+        verification_url=verification_url,
+        guardian_name=case.parent1_name,
+        guardian_email=case.parent1_email,
+    )
+    return context
 
 
 def _ensure_consent_pdf(case: models.ProcedureCase) -> None:
@@ -293,9 +339,6 @@ def _ensure_consent_pdf(case: models.ProcedureCase) -> None:
             _build_checklist_context(case)
         )
         case.consent_pdf_path = generate_consent_pdf(_build_consent_context(case))
-        case.ordonnance_pdf_path = generate_ordonnance_pdf(
-            _build_ordonnance_context(case)
-        )
         if not case.consent_download_token:
             case.consent_download_token = secrets.token_urlsafe(24)
     except Exception:
@@ -322,11 +365,13 @@ def create_procedure_case(
         notes=case_data.notes,
         consent_download_token=secrets.token_urlsafe(24),
     )
+    _recompute_case_flags(procedure)
     db.add(procedure)
     db.commit()
     db.refresh(procedure)
 
     _ensure_consent_pdf(procedure)
+    _recompute_case_flags(procedure)
     db.add(procedure)
     db.commit()
     db.refresh(procedure)
@@ -349,14 +394,83 @@ def update_procedure_case(
     procedure.parent2_email = case_data.parent2_email
     procedure.parental_authority_ack = case_data.parental_authority_ack
     procedure.notes = case_data.notes
+    _recompute_case_flags(procedure)
     db.add(procedure)
     db.commit()
     db.refresh(procedure)
 
     _ensure_consent_pdf(procedure)
+    _recompute_case_flags(procedure)
     db.add(procedure)
     db.commit()
     db.refresh(procedure)
 
     return procedure
+
+
+def upsert_pharmacy_contact(
+    db: Session,
+    payload: schemas.PharmacyContactCreate,
+) -> models.PharmacyContact:
+    """Insert or update a pharmacy contact entry from the national directory."""
+    data = payload.model_dump(exclude_unset=True)
+    external_id = data.get("external_id")
+    ms_sante_address = data.get("ms_sante_address")
+
+    query = db.query(models.PharmacyContact)
+    entry = None
+    if external_id:
+        entry = query.filter(models.PharmacyContact.external_id == external_id).first()
+    if entry is None and ms_sante_address:
+        entry = query.filter(models.PharmacyContact.ms_sante_address == ms_sante_address).first()
+    if entry is None:
+        entry = (
+            query.filter(
+                sa.func.lower(models.PharmacyContact.name) == data["name"].lower(),
+                models.PharmacyContact.postal_code == data["postal_code"],
+            )
+            .order_by(models.PharmacyContact.id.asc())
+            .first()
+        )
+
+    if entry:
+        for field, value in data.items():
+            if value is not None:
+                setattr(entry, field, value)
+    else:
+        entry = models.PharmacyContact(**data)
+        db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+def search_pharmacies(
+    db: Session,
+    *,
+    query: str,
+    city: str | None = None,
+    limit: int = 10,
+    offset: int = 0,
+) -> tuple[list[models.PharmacyContact], int]:
+    normalized = f"%{query.lower()}%"
+    stmt = db.query(models.PharmacyContact).filter(models.PharmacyContact.is_active.is_(True))
+    stmt = stmt.filter(
+        sa.or_(
+            sa.func.lower(models.PharmacyContact.name).like(normalized),
+            sa.func.lower(models.PharmacyContact.city).like(normalized),
+            sa.func.lower(models.PharmacyContact.postal_code).like(normalized),
+            sa.func.lower(models.PharmacyContact.ms_sante_address).like(normalized),
+        )
+    )
+    if city:
+        stmt = stmt.filter(sa.func.lower(models.PharmacyContact.city) == city.lower())
+    total = stmt.count()
+    entries = (
+        stmt.order_by(models.PharmacyContact.name.asc())
+        .offset(max(0, offset))
+        .limit(min(limit, 50))
+        .all()
+    )
+    return entries, total
 

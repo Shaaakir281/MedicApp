@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Simple calendar component showing a month view. It allows navigation between
  * months and selection of a date. The consumer controls the current month and
- * selected date via props.
+ * selected date via props, with an optional minDate to disable earlier days.
  *
  * Props:
  *  - currentMonth: Date object representing the first day of the current month
@@ -11,10 +11,13 @@ import React from 'react';
  *  - onPrevMonth: () => void
  *  - onNextMonth: () => void
  *  - onSelectDate: (Date) => void
+ *  - minDate?: Date
  */
-const Calendar = ({ currentMonth, selectedDate, onPrevMonth, onNextMonth, onSelectDate }) => {
+const Calendar = ({ currentMonth, selectedDate, onPrevMonth, onNextMonth, onSelectDate, minDate }) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const effectiveMin = minDate ? new Date(minDate) : today;
+  effectiveMin.setHours(0, 0, 0, 0);
   const minMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
   const year = currentMonth.getFullYear();
@@ -71,7 +74,7 @@ const Calendar = ({ currentMonth, selectedDate, onPrevMonth, onNextMonth, onSele
         {dates.map((date, idx) => {
           const isSelected = isSameDay(date, selectedDate);
           const isToday = date && isSameDay(date, new Date());
-          const isPast = date && date < today;
+          const isPast = date && date < effectiveMin;
           return (
             <button
               key={idx}

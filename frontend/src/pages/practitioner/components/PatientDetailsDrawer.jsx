@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import Modal from '../../../components/Modal.jsx';
 import { SectionHeading } from '../../../components/ui';
 import { API_BASE_URL, fetchSlots } from '../../../lib/api.js';
@@ -9,7 +9,7 @@ const toInputDate = (value) => (value ? new Date(value).toISOString().split('T')
 const truncateTime = (value) => (value ? value.slice(0, 5) : '');
 const labelForAppointmentType = (value) => {
   if (value === 'act') return 'Acte';
-  if (value === 'preconsultation') return 'Pré-consultation';
+  if (value === 'preconsultation') return 'Pre-consultation';
   return 'Autre';
 };
 
@@ -110,6 +110,11 @@ export function PatientDetailsDrawer({
   onReschedule,
   onCreateAppointment,
   onPreview,
+  onSign,
+  onSend,
+  previewingId,
+  signingId,
+  sendingId,
   updatingCase = false,
   updatingAppointment = false,
   creatingAppointment = false,
@@ -128,7 +133,6 @@ export function PatientDetailsDrawer({
     return `${base}${actorChannel}${inlineParam}`;
   };
   const prescriptionUrl = buildAbsoluteUrl(appointment.prescription_url, false, 'download');
-  const prescriptionPreviewUrl = buildAbsoluteUrl(appointment.prescription_url, true, 'preview');
 
   const [isEditingCase, setIsEditingCase] = useState(false);
   const [caseForm, setCaseForm] = useState(buildCaseForm(procedure, patient));
@@ -180,7 +184,7 @@ export function PatientDetailsDrawer({
       })
       .catch((error) => {
         if (cancelled) return;
-        setSlotsError(error?.message || "Impossible de charger les créneaux.");
+        setSlotsError(error?.message || "Impossible de charger les creneaux.");
         setAvailableSlots([]);
       })
       .finally(() => {
@@ -337,7 +341,7 @@ export function PatientDetailsDrawer({
               className="btn btn-outline btn-sm"
               onClick={() => setIsEditingCase((prev) => !prev)}
             >
-              {isEditingCase ? 'Fermer le mode édition' : 'Modifier le dossier'}
+              {isEditingCase ? 'Fermer le mode edition' : 'Modifier le dossier'}
             </button>
             <button
               type="button"
@@ -385,7 +389,7 @@ export function PatientDetailsDrawer({
                 />
               </label>
               <label className="form-control">
-                <span className="label-text">Autorité parentale confirmée</span>
+                <span className="label-text">Autorite parentale confirmee</span>
                 <input
                   type="checkbox"
                   name="parental_authority_ack"
@@ -495,13 +499,13 @@ export function PatientDetailsDrawer({
                   onChange={handleScheduleInputChange}
                 >
                   <option value="act">Acte</option>
-                  <option value="preconsultation">Pré-consultation</option>
+                  <option value="preconsultation">Pre-consultation</option>
                   <option value="general">Autre</option>
                 </select>
                 <span className="text-xs text-slate-500">
                   {appointmentSummariesByType[scheduleForm.appointment_type]
                     ? 'Rendez-vous existant : vous pouvez le replanifier.'
-                    : 'Aucun rendez-vous de ce type. Sélectionnez une date pour le planifier.'}
+                    : 'Aucun rendez-vous de ce type. Selectionnez une date pour le planifier.'}
                 </span>
               </label>
               <label className="form-control">
@@ -513,12 +517,12 @@ export function PatientDetailsDrawer({
                   onChange={handleScheduleInputChange}
                   disabled={scheduleForm.appointment_type === 'act'}
                 >
-                  <option value="">Non précisé</option>
-                  <option value="presentiel">Présentiel</option>
+                  <option value="">Non precise</option>
+                  <option value="presentiel">Presentiel</option>
                   <option value="visio">Visio</option>
                 </select>
                 {scheduleForm.appointment_type === 'act' && (
-                  <span className="text-xs text-slate-500 mt-1">Un acte se déroule toujours en présentiel.</span>
+                  <span className="text-xs text-slate-500 mt-1">Un acte se deroule toujours en presentiel.</span>
                 )}
               </label>
               <label className="form-control">
@@ -530,14 +534,14 @@ export function PatientDetailsDrawer({
                   onChange={handleScheduleInputChange}
                 >
                   <option value="pending">En attente</option>
-                  <option value="validated">Confirmé</option>
+                  <option value="validated">Confirme</option>
                 </select>
               </label>
             </div>
             <div className="space-y-2">
-              <span className="label-text font-medium">Créneaux disponibles</span>
+              <span className="label-text font-medium">Creneaux disponibles</span>
               {slotsLoading ? (
-                <p className="text-sm text-slate-500">Chargement des créneaux...</p>
+                <p className="text-sm text-slate-500">Chargement des creneaux...</p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {HOURLY_SLOTS.map((slot) => {
@@ -564,7 +568,7 @@ export function PatientDetailsDrawer({
               {slotsError && <p className="text-xs text-red-600">{slotsError}</p>}
               {!slotsLoading && !slotsError && !availableSlots.length && (
                 <p className="text-xs text-slate-500">
-                  Aucun créneau libre pour cette date. Veuillez sélectionner un autre jour.
+                  Aucun creneau libre pour cette date. Veuillez selectionner un autre jour.
                 </p>
               )}
             </div>
@@ -596,26 +600,26 @@ export function PatientDetailsDrawer({
           <div className="space-y-2">
             <h4 className="font-semibold text-slate-700">Statut dossier</h4>
             <ul className="list-disc list-inside text-sm text-slate-600 space-y-1">
-              <li>Autorité parentale : {procedure?.parental_authority_ack ? 'OK' : 'Manquante'}</li>
-              <li>Checklist : {procedure?.has_checklist ? 'OK' : 'À fournir'}</li>
-              <li>Consentement : {procedure?.has_consent ? 'OK' : 'À récupérer'}</li>
-              <li>Ordonnance : {procedure?.has_ordonnance ? 'OK' : 'Non générée'}</li>
+              <li>Autorite parentale : {procedure?.parental_authority_ack ? 'OK' : 'Manquante'}</li>
+              <li>Checklist : {procedure?.has_checklist ? 'OK' : 'A fournir'}</li>
+              <li>Consentement : {procedure?.has_consent ? 'OK' : 'A recuperer'}</li>
+              <li>Ordonnance : {procedure?.has_ordonnance ? 'OK' : 'Non generee'}</li>
               <li>
-                Pré-consultation :{' '}
+                Pre-consultation :{' '}
                 {procedure?.has_preconsultation
-                  ? `Planifiée le ${formatDate(procedure.next_preconsultation_date)}`
-                  : 'Non planifiée'}
+                  ? `Planifiee le ${formatDate(procedure.next_preconsultation_date)}`
+                  : 'Non planifiee'}
               </li>
               <li>
                 Acte :{' '}
                 {procedure?.has_act_planned
-                  ? `Planifié le ${formatDate(procedure.next_act_date)}`
-                  : 'Non planifié'}
+                  ? `Planifie le ${formatDate(procedure.next_act_date)}`
+                  : 'Non planifie'}
               </li>
             </ul>
           </div>
           <div className="space-y-2">
-            <h4 className="font-semibold text-slate-700">À surveiller</h4>
+            <h4 className="font-semibold text-slate-700">A surveiller</h4>
             {procedure?.missing_items?.length ? (
               <ul className="list-disc list-inside text-sm text-slate-600 space-y-1">
                 {procedure.missing_items.map((item) => (
@@ -623,7 +627,7 @@ export function PatientDetailsDrawer({
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-slate-500">Aucun élément manquant.</p>
+              <p className="text-sm text-slate-500">Aucun element manquant.</p>
             )}
           </div>
         </div>
@@ -636,7 +640,7 @@ export function PatientDetailsDrawer({
         <div className="grid gap-4 md:grid-cols-2">
           <div className="bg-slate-50 border rounded-xl p-4 text-sm text-slate-600 space-y-1">
             <strong>Rappel rendez-vous</strong>
-            <p>Envoyé : {formatDate(appointment.reminder_sent_at)}</p>
+            <p>Envoye : {formatDate(appointment.reminder_sent_at)}</p>
             <p>
               Ouvert :{' '}
               {appointment.reminder_opened_at
@@ -646,39 +650,56 @@ export function PatientDetailsDrawer({
           </div>
           <div className="bg-slate-50 border rounded-xl p-4 text-sm text-slate-600 space-y-1">
             <strong>Ordonnance</strong>
-            <p>Envoyée : {formatDate(appointment.prescription_sent_at)}</p>
             <p>
-              Dernier téléchargement :{' '}
+              Statut :{' '}
+              {appointment.prescription_signed_at
+                ? `Signee le ${formatDateTime(appointment.prescription_signed_at)}`
+                : 'Non signee'}
+            </p>
+            <p>Envoyee : {formatDate(appointment.prescription_sent_at)}</p>
+            <p>
+              Dernier telechargement :{' '}
               {appointment.prescription_last_download_at
                 ? new Date(appointment.prescription_last_download_at).toLocaleString('fr-FR')
                 : '--'}
             </p>
-            <p>Téléchargements : {appointment.prescription_download_count || 0}</p>
-            <div className="flex gap-2">
-              {prescriptionPreviewUrl ? (
-                <button
-                  type="button"
-                  className="btn btn-xs btn-outline"
-                  onClick={() =>
-                    onPreview?.({
-                      open: true,
-                      url: prescriptionPreviewUrl,
-                      title: 'Aperçu - Ordonnance',
-                    })
-                  }
-                >
-                  Prévisualiser
-                </button>
-              ) : (
-                <p className="text-xs text-slate-500 flex-1">Aucune ordonnance générée.</p>
-              )}
+            <p>Telechargements : {appointment.prescription_download_count || 0}</p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button
+                type="button"
+                className="btn btn-xs btn-outline"
+                onClick={() => onPreview?.(appointment)}
+                disabled={previewingId === appointment.appointment_id}
+              >
+                {previewingId === appointment.appointment_id ? 'Preparation...' : 'Previsualiser'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-xs btn-outline"
+                onClick={() => onSign?.(appointment)}
+                disabled={signingId === appointment.appointment_id || Boolean(appointment.prescription_signed_at)}
+              >
+                {appointment.prescription_signed_at
+                  ? 'Deja signee'
+                  : signingId === appointment.appointment_id
+                  ? 'Signature...'
+                  : 'Signer'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost"
+                onClick={() => onSend?.(appointment)}
+                disabled={sendingId === appointment.appointment_id || !appointment.prescription_signed_at}
+              >
+                {sendingId === appointment.appointment_id ? 'Envoi...' : 'Envoyer au patient'}
+              </button>
               {prescriptionUrl && (
                 <button
                   type="button"
                   className="btn btn-ghost btn-xs"
                   onClick={() => window.open(prescriptionUrl, '_blank', 'noopener')}
                 >
-                  Télécharger
+                  Telecharger
                 </button>
               )}
             </div>
@@ -692,7 +713,7 @@ export function PatientDetailsDrawer({
               )}
               {!historyLoading && !historyError && !prescriptionHistory.length && (
                 <p className="text-xs text-slate-500">
-                  Aucune version disponible pour l’instant.
+                  Aucune version disponible pour lâ€™instant.
                 </p>
               )}
               {!historyLoading && !historyError && prescriptionHistory.length > 0 && (
@@ -717,17 +738,16 @@ export function PatientDetailsDrawer({
                           <div className="flex gap-2">
                             <button
                               type="button"
-                            className="btn btn-outline btn-xs"
-                            onClick={() =>
-                                onPreview?.({
-                                  open: true,
+                              className="btn btn-outline btn-xs"
+                              onClick={() =>
+                                onPreview?.(appointment, {
                                   url: versionPreviewUrl,
-                                  title: `Aperçu - ${labelForAppointmentType(version.appointment_type)}`,
+                                  title: `Apercu - ${labelForAppointmentType(version.appointment_type)}`,
                                 })
                               }
                               disabled={!versionPreviewUrl}
                             >
-                              Prévisualiser
+                              Previsualiser
                             </button>
                             <button
                               type="button"
@@ -735,7 +755,7 @@ export function PatientDetailsDrawer({
                               onClick={() => window.open(versionDownloadUrl, '_blank', 'noopener')}
                               disabled={!versionDownloadUrl}
                             >
-                              Télécharger
+                              Telecharger
                             </button>
                           </div>
                         </div>
@@ -745,16 +765,16 @@ export function PatientDetailsDrawer({
                           </p>
                         ) : (
                           <p className="text-[11px] text-slate-500 italic">
-                            Aucun détail d’items enregistré.
+                            Aucun detail dâ€™items enregistre.
                           </p>
                         )}
                         {version.downloads?.length ? (
                           <div className="pt-1 border-t border-dashed border-slate-200 mt-2">
-                            <p className="text-[11px] font-semibold text-slate-600">Téléchargements</p>
+                            <p className="text-[11px] font-semibold text-slate-600">telechargements</p>
                             <ul className="text-[10px] text-slate-500 space-y-1">
                               {version.downloads.map((log) => (
                                 <li key={log.id}>
-                                  {formatDateTime(log.downloaded_at)} —{' '}
+                                  {formatDateTime(log.downloaded_at)} â€”{' '}
                                   {log.actor === 'patient' || log.actor === 'patient_link'
                                     ? 'Patient'
                                     : 'Praticien'}{' '}
@@ -764,7 +784,7 @@ export function PatientDetailsDrawer({
                             </ul>
                           </div>
                         ) : (
-                          <p className="text-[10px] text-slate-400">Aucun téléchargement enregistré.</p>
+                          <p className="text-[10px] text-slate-400">Aucun telechargement enregistre.</p>
                         )}
                       </div>
                     );

@@ -105,8 +105,14 @@ class ProcedureCase(ProcedureCaseBase):
     consent_pdf_path: Optional[str] = None
     consent_download_url: Optional[str] = None
     ordonnance_pdf_path: Optional[str] = None
+    ordonnance_download_url: Optional[str] = None
+    ordonnance_prescription_id: Optional[int] = None
+    ordonnance_signed_at: Optional[datetime] = None
     child_age_years: float
     appointments: List[Appointment] = Field(default_factory=list)
+    steps_acknowledged: bool
+    dossier_completed: bool
+    missing_fields: List[str] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -135,6 +141,8 @@ class PractitionerCaseStatus(BaseModel):
     next_act_date: Optional[date] = None
     next_preconsultation_date: Optional[date] = None
     notes: Optional[str] = None
+    ordonnance_signed_at: Optional[datetime] = None
+    latest_prescription_id: Optional[int] = None
     missing_items: List[str] = Field(default_factory=list)
     needs_follow_up: bool
     appointments_overview: List["PractitionerAppointmentSummary"] = Field(default_factory=list)
@@ -176,6 +184,7 @@ class PractitionerAppointmentEntry(BaseModel):
     prescription_instructions: Optional[str] = None
     prescription_id: Optional[int] = None
     prescription_url: Optional[str] = None
+    prescription_signed_at: Optional[datetime] = None
 
 
 class PractitionerAgendaDay(BaseModel):
@@ -246,3 +255,61 @@ class PrescriptionDownloadEntry(BaseModel):
     actor: str
     channel: str
     downloaded_at: datetime
+
+
+class PrescriptionSignatureResponse(BaseModel):
+    prescription_id: int
+    appointment_id: int
+    signed_at: datetime
+    preview_url: str
+    patient_download_url: Optional[str] = None
+
+
+class PrescriptionVerificationResponse(BaseModel):
+    reference: str
+    slug: str
+    verification_url: str
+    issued_at: Optional[str] = None
+    valid_until: Optional[str] = None
+    patient_name: Optional[str] = None
+    guardian_name: Optional[str] = None
+    appointment_date: Optional[date] = None
+    signed_at: Optional[datetime] = None
+    scan_count: int
+    last_scanned_at: Optional[datetime] = None
+
+
+class PharmacyContactBase(BaseModel):
+    name: str
+    address_line1: str
+    postal_code: str
+    city: str
+    address_line2: Optional[str] = None
+    department_code: Optional[str] = None
+    region: Optional[str] = None
+    country: str = "France"
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    website: Optional[str] = None
+    ms_sante_address: Optional[str] = None
+    type: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    source: Optional[str] = None
+
+
+class PharmacyContactCreate(PharmacyContactBase):
+    external_id: Optional[str] = None
+
+
+class PharmacyContact(PharmacyContactBase):
+    id: int
+    external_id: Optional[str] = None
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PharmacySearchResponse(BaseModel):
+    total: int
+    items: List[PharmacyContact] = Field(default_factory=list)

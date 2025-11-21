@@ -15,12 +15,14 @@ const statusBadges = {
 export function AgendaDay({
   day,
   detailed = false,
-  onDownloadPrescription,
+  onPreview,
+  onSign,
   onSendPrescription,
   onSelectPatient,
   onEditPrescription,
   onDownloadConsent,
-  downloadingId,
+  previewingId,
+  signingId,
   sendingId,
 }) {
   const dateLabel = new Intl.DateTimeFormat('fr-FR', {
@@ -90,18 +92,34 @@ export function AgendaDay({
               <button
                 type="button"
                 className="btn btn-xs btn-outline"
-                onClick={() => onDownloadPrescription?.(appointment.appointment_id)}
-                disabled={downloadingId === appointment.appointment_id}
+                onClick={() => onPreview?.(appointment)}
+                disabled={previewingId === appointment.appointment_id}
               >
-                {downloadingId === appointment.appointment_id ? 'Génération…' : 'Ordonnance'}
+                {previewingId === appointment.appointment_id ? 'Préparation...' : 'Prévisualiser'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-xs btn-outline"
+                onClick={() => onSign?.(appointment)}
+                disabled={signingId === appointment.appointment_id || Boolean(appointment.prescription_signed_at)}
+              >
+                {appointment.prescription_signed_at
+                  ? 'Déjà signée'
+                  : signingId === appointment.appointment_id
+                  ? 'Signature...'
+                  : 'Signer l’ordonnance'}
               </button>
               <button
                 type="button"
                 className="btn btn-xs btn-ghost"
-                onClick={() => onSendPrescription?.(appointment.appointment_id)}
-                disabled={sendingId === appointment.appointment_id}
+                onClick={() => onSendPrescription?.(appointment)}
+                disabled={sendingId === appointment.appointment_id || !appointment.prescription_signed_at}
               >
-                {sendingId === appointment.appointment_id ? 'Envoi…' : 'Envoyer le lien'}
+                {sendingId === appointment.appointment_id
+                  ? 'Envoi...'
+                  : appointment.prescription_signed_at
+                  ? 'Envoyer au patient'
+                  : 'Signer avant envoi'}
               </button>
               <button
                 type="button"

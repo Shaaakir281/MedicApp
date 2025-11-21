@@ -5,6 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Calendar from '../components/Calendar.jsx';
 import TimeSlots from '../components/TimeSlots.jsx';
 import Toast from '../components/Toast.jsx';
+import PdfPreviewModal from '../components/PdfPreviewModal.jsx';
+import PharmacySelectorModal from '../components/PharmacySelectorModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   createAppointment,
@@ -13,6 +15,7 @@ import {
   fetchSlots,
   saveProcedure,
   sendConsentLink,
+  API_BASE_URL,
 } from '../lib/api.js';
 import { defaultProcedureValues, patientProcedureSchema } from '../lib/forms';
 import { AuthPanel } from './patient/components/AuthPanel.jsx';
@@ -56,6 +59,48 @@ const mapProcedureToFormValues = (procedure) => ({
   notes: procedure?.notes ?? '',
 });
 
+const { origin: API_BASE_ORIGIN, base: NORMALIZED_API_BASE } = (() => {
+  if (!API_BASE_URL) {
+    return { origin: '', base: '' };
+  }
+  try {
+    const parsed = new URL(API_BASE_URL);
+    const pathname = parsed.pathname.endsWith('/') ? parsed.pathname.slice(0, -1) : parsed.pathname;
+    return {
+      origin: parsed.origin,
+      base: `${parsed.origin}${pathname}`,
+    };
+  } catch (error) {
+    const sanitized = API_BASE_URL.replace(/\/$/, '');
+    return { origin: sanitized, base: sanitized };
+  }
+})();
+
+const buildDocumentUrl = (rawUrl, extraQuery = {}) => {
+  if (!rawUrl) {
+    return null;
+  }
+  try {
+    const fallbackOrigin = API_BASE_ORIGIN || 'http://localhost';
+    const parsed = rawUrl.startsWith('http') ? new URL(rawUrl) : new URL(rawUrl, fallbackOrigin);
+    const params = new URLSearchParams(parsed.search);
+    Object.entries(extraQuery).forEach(([key, value]) => {
+      if (value === null || value === undefined) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    });
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const base = NORMALIZED_API_BASE || parsed.origin;
+    return `${base}${parsed.pathname}${query}`;
+  } catch (error) {
+    return rawUrl;
+  }
+};
+
+const previewInitialState = { open: false, url: null, title: null, type: null };
+
 const Patient = () => {
   const {
     isAuthenticated,
@@ -89,6 +134,10 @@ const Patient = () => {
 
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [pharmacyFeedback, setPharmacyFeedback] = useState(null);
+  const [preferredPharmacy, setPreferredPharmacy] = useState(null);
+  const [pharmacyModalOpen, setPharmacyModalOpen] = useState(false);
+  const [previewState, setPreviewState] = useState(previewInitialState);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [procedureLoading, setProcedureLoading] = useState(false);
   const [sendingConsentEmail, setSendingConsentEmail] = useState(false);
@@ -189,6 +238,14 @@ const Patient = () => {
     }
     return undefined;
   }, [successMessage]);
+
+  useEffect(() => {
+    if (!pharmacyFeedback) {
+      return undefined;
+    }
+    const timer = setTimeout(() => setPharmacyFeedback(null), 4000);
+    return () => clearTimeout(timer);
+  }, [pharmacyFeedback]);
 
   useEffect(() => {
     if (procedureSelection !== 'circumcision') {
@@ -330,6 +387,21 @@ const Patient = () => {
   const showScheduling = showProcedureForm && canSchedule;
   const showConsentDownload = showProcedureForm && Boolean(consentLink);
   const showConsentPending = showProcedureForm && !consentLink && Boolean(procedureCase);
+  const ordonnanceDownloadUrl = useMemo(
+    () => buildDocumentUrl(procedureCase?.ordonnance_download_url),
+    [procedureCase?.ordonnance_download_url],
+  );
+  const ordonnancePreviewUrl = useMemo(
+    () => buildDocumentUrl(procedureCase?.ordonnance_download_url, { mode: 'inline' }),
+    [procedureCase?.ordonnance_download_url],
+  );
+  const ordonnanceSignedLabel = procedureCase?.ordonnance_signed_at
+    ? new Date(procedureCase.ordonnance_signed_at).toLocaleString('fr-FR', {
+        dateStyle: 'long',
+        timeStyle: 'medium',
+      })
+    : null;
+  const showOrdonnanceCard = Boolean(showProcedureForm && ordonnanceDownloadUrl);
 
   const handleSendConsentEmail = async () => {
     if (!token || sendingConsentEmail) {
@@ -346,6 +418,51 @@ const Patient = () => {
       setSendingConsentEmail(false);
     }
   };
+
+  const handlePreviewOrdonnance = () => {
+    if (!ordonnancePreviewUrl) {
+      setError("L'ordonnance n'est pas disponible pour le moment.");
+      return;
+    }
+    setPreviewState({
+      open: true,
+      url: ordonnancePreviewUrl,
+      title: 'Ordonnance médicale',
+      type: 'ordonnance',
+    });
+  };
+
+  const handlePharmacyInfo = () => {
+    setPharmacyModalOpen(true);
+  };
+
+  const handlePharmacySelected = (pharmacy) => {
+    setPreferredPharmacy(pharmacy);
+    setPharmacyFeedback(
+      `Pharmacie « ${pharmacy.name} » enregistrée comme point de collecte. Nous activerons l'envoi dès que possible.`,
+    );
+  };
+
+  const handleClosePreview = () => {
+    setPreviewState(previewInitialState);
+  };
+
+  const previewActions = useMemo(() => {
+    if (previewState.type === 'ordonnance' && ordonnanceDownloadUrl) {
+      return [
+        <a
+          key="download-ordonnance"
+          className="btn btn-primary btn-sm"
+          href={ordonnanceDownloadUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Télécharger le PDF
+        </a>,
+      ];
+    }
+    return null;
+  }, [previewState.type, ordonnanceDownloadUrl]);
 
   const childBirthdateString = watch('child_birthdate') || procedureCase?.child_birthdate || null;
   const childAgeDisplay = useMemo(() => formatChildAge(childBirthdateString), [childBirthdateString]);
@@ -429,6 +546,45 @@ const Patient = () => {
         </FormProvider>
       )}
 
+      {showOrdonnanceCard && (
+        <section className="p-6 border rounded-xl bg-white shadow-sm space-y-4">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-semibold">Ordonnance médicale</h2>
+            {ordonnanceSignedLabel ? (
+              <p className="text-sm text-slate-600">Signée le {ordonnanceSignedLabel}.</p>
+            ) : (
+              <p className="text-sm text-slate-600">Votre ordonnance est prête.</p>
+            )}
+            <p className="text-sm text-slate-500">
+              Vous pouvez la prévisualiser, la télécharger ou l&apos;envoyer à votre pharmacie.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className="btn btn-primary btn-sm" onClick={handlePreviewOrdonnance}>
+              Prévisualiser
+            </button>
+            <a
+              className="btn btn-outline btn-sm"
+              href={ordonnanceDownloadUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Télécharger le PDF
+            </a>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={handlePharmacyInfo}>
+              Choisir ma pharmacie (bientôt disponible)
+            </button>
+          </div>
+          {preferredPharmacy && (
+            <div className="p-3 border border-dashed rounded-lg border-slate-300 bg-slate-50 text-sm text-slate-700">
+              <p className="font-semibold">Email pharmacie enregistré :</p>
+              <p className="text-sm text-slate-800">{preferredPharmacy.ms_sante_address}</p>
+            </div>
+          )}
+          {pharmacyFeedback && <p className="text-sm text-slate-600">{pharmacyFeedback}</p>}
+        </section>
+      )}
+
       {showScheduling && (
         <section className="space-y-6">
           <div className="p-6 border rounded-xl bg-white shadow-sm space-y-4">
@@ -507,6 +663,18 @@ const Patient = () => {
 
       {error && <div className="alert alert-error">{error}</div>}
       <Toast message={successMessage} isVisible={Boolean(successMessage)} onClose={() => setSuccessMessage(null)} />
+      <PdfPreviewModal
+        isOpen={previewState.open}
+        onClose={handleClosePreview}
+        title={previewState.title || 'Document'}
+        url={previewState.url}
+        actions={previewActions}
+      />
+      <PharmacySelectorModal
+        isOpen={pharmacyModalOpen}
+        onClose={() => setPharmacyModalOpen(false)}
+        onSelect={handlePharmacySelected}
+      />
     </div>
   );
 };

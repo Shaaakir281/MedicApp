@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date as date_cls
+from datetime import date as date_cls, datetime
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
@@ -16,6 +16,7 @@ from dependencies.auth import get_current_user
 from core.config import get_settings
 from services import pdf as pdf_service
 from services import email as email_service
+from services import download_links
 from services.storage import StorageError, get_storage_backend
 
 
@@ -55,14 +56,42 @@ PATIENT_INFO: Dict[str, Any] = {
 def _serialize_case(case) -> schemas.ProcedureCase:
     today = date_cls.today()
     child_age_years = (today - case.child_birthdate).days / 365.25
-    appointments = [
+    appointments_payload = [
         schemas.Appointment.model_validate(appt, from_attributes=True)
         for appt in case.appointments
     ]
     download_url = None
+    base_url = get_settings().app_base_url.rstrip("/")
     if case.consent_download_token and case.consent_pdf_path:
-        base_url = get_settings().app_base_url.rstrip("/")
         download_url = f"{base_url}/procedures/{case.consent_download_token}/consent.pdf"
+
+    appointments_entities = case.appointments or []
+    latest_signed_prescription = None
+    for appointment in appointments_entities:
+        prescription = getattr(appointment, "prescription", None)
+        if prescription and prescription.signed_at:
+            if latest_signed_prescription is None:
+                latest_signed_prescription = prescription
+            else:
+                previous = latest_signed_prescription.signed_at or datetime.min
+                current = prescription.signed_at or datetime.min
+                if current > previous:
+                    latest_signed_prescription = prescription
+
+    ordonnance_prescription_id = None
+    ordonnance_signed_at = None
+    ordonnance_download_url = None
+    if latest_signed_prescription:
+        ordonnance_prescription_id = latest_signed_prescription.id
+        ordonnance_signed_at = latest_signed_prescription.signed_at
+        token = download_links.create_prescription_download_token(
+            latest_signed_prescription.id,
+            actor="patient",
+            channel="patient_case",
+        )
+        ordonnance_download_url = (
+            f"{base_url}/prescriptions/access/{token}?actor=patient&channel=patient_case"
+        )
 
     return schemas.ProcedureCase(
         id=case.id,
@@ -82,8 +111,14 @@ def _serialize_case(case) -> schemas.ProcedureCase:
         consent_pdf_path=case.consent_pdf_path,
         consent_download_url=download_url,
         ordonnance_pdf_path=case.ordonnance_pdf_path,
+        ordonnance_download_url=ordonnance_download_url,
+        ordonnance_prescription_id=ordonnance_prescription_id,
+        ordonnance_signed_at=ordonnance_signed_at,
         child_age_years=round(child_age_years, 2),
-        appointments=appointments,
+        appointments=appointments_payload,
+        steps_acknowledged=case.steps_acknowledged,
+        dossier_completed=case.dossier_completed,
+        missing_fields=case.missing_fields or [],
     )
 
 
@@ -120,6 +155,25 @@ def create_or_update_procedure(
         case = crud.create_procedure_case(db, current_user.id, payload)
 
     db.refresh(case)
+    return _serialize_case(case)
+
+
+@router.post("/acknowledge-steps", response_model=schemas.ProcedureCase)
+def acknowledge_steps(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> schemas.ProcedureCase:
+    case = crud.get_active_procedure_case(db, current_user.id)
+    if case is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aucune procedure en cours.",
+        )
+    if not case.steps_acknowledged:
+        case.steps_acknowledged = True
+        db.add(case)
+        db.commit()
+        db.refresh(case)
     return _serialize_case(case)
 
 

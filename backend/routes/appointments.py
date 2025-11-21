@@ -78,6 +78,34 @@ def create_appointment(
     return schemas.Appointment.from_orm(appointment)
 
 
+@router.delete("/{appointment_id}", response_model=schemas.Message, status_code=status.HTTP_200_OK)
+def cancel_appointment(
+    appointment_id: int,
+    cascade_act: bool = Query(True, description="Supprimer également l'acte associé le cas échéant."),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> schemas.Message:
+    """Cancel an appointment owned by the current user. If it is the preconsultation, any linked act is also removed."""
+    appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
+    if appointment is None or appointment.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rendez-vous introuvable.")
+
+    # If cancelling preconsultation, also remove the act for the same procedure (if any)
+    if (
+        cascade_act
+        and appointment.appointment_type == models.AppointmentType.preconsultation
+        and appointment.procedure_id
+    ):
+        db.query(models.Appointment).filter(
+            models.Appointment.procedure_id == appointment.procedure_id,
+            models.Appointment.appointment_type == models.AppointmentType.act,
+        ).delete(synchronize_session=False)
+
+    db.delete(appointment)
+    db.commit()
+    return schemas.Message(detail="Rendez-vous annulé.")
+
+
 @router.get("/reminders/{token}", response_model=schemas.Message, status_code=status.HTTP_200_OK)
 def acknowledge_reminder(token: str, db: Session = Depends(get_db)) -> schemas.Message:
     """Mark a reminder as opened by the patient."""

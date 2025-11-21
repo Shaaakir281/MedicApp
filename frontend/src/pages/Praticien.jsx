@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
@@ -6,6 +6,7 @@ import {
   fetchPractitionerStats,
   fetchNewPatients,
   createPrescription,
+  signPrescription,
   sendPrescriptionLink,
   updatePrescription,
   updatePatientCase,
@@ -29,18 +30,18 @@ const VIEW_OPTIONS = [1, 7, 14, 23];
 const AUTO_REFRESH_INTERVAL_MS = 60_000;
 const ACT_ITEMS = [
   'Bactigras 10x10 cm x 5',
-  'Compresses stériles 5x5 cm x 10',
-  'Set de pansement stérile',
-  'Doliprane 2,4% (adapté au poids)',
+  'Compresses stÃ©riles 5x5 cm x 10',
+  'Set de pansement stÃ©rile',
+  'Doliprane 2,4% (adaptÃ© au poids)',
   'Pansements compressifs 3x3 cm',
 ];
 const PRECONSULT_ITEMS = [
-  'Doliprane 2,4% (adapté au poids)',
-  'Thermomètre électronique',
-  'Carnet de santé',
+  'Doliprane 2,4% (adaptÃ© au poids)',
+  'ThermomÃ¨tre Ã©lectronique',
+  'Carnet de santÃ©',
 ];
 const DEFAULT_INSTRUCTIONS =
-  "Acheter les éléments 24h avant l'intervention, les conserver stériles et les apporter le jour J. En cas de complication (douleur importante, saignement, fièvre > 38,5°C), contacter immédiatement le praticien.";
+  "Acheter les Ã©lÃ©ments 24h avant l'intervention, les conserver stÃ©riles et les apporter le jour J. En cas de complication (douleur importante, saignement, fiÃ¨vre > 38,5Â°C), contacter immÃ©diatement le praticien.";
 
 const toDate = (isoDate) => new Date(`${isoDate}T00:00:00`);
 const toISODate = (dateObj) => dateObj.toISOString().split('T')[0];
@@ -61,8 +62,9 @@ const Praticien = () => {
   const [loginError, setLoginError] = useState(null);
   const [refreshIndex, setRefreshIndex] = useState(0);
   const [successMessage, setSuccessMessage] = useState(null);
-  const [activeDownloadId, setActiveDownloadId] = useState(null);
+  const [previewingId, setPreviewingId] = useState(null);
   const [activeSendId, setActiveSendId] = useState(null);
+  const [signingId, setSigningId] = useState(null);
   const [viewMode, setViewMode] = useState('agenda');
   const [editorState, setEditorState] = useState({
     open: false,
@@ -78,11 +80,39 @@ const Praticien = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState(null);
   const [historyRefreshIndex, setHistoryRefreshIndex] = useState(0);
-  const [previewState, setPreviewState] = useState({
+  const buildDefaultPreviewState = () => ({
     open: false,
     url: null,
-    title: 'Aperçu ordonnance',
+    title: "Aperçu de l'ordonnance",
+    appointmentId: null,
+    mode: 'view',
   });
+  const [previewState, setPreviewState] = useState(buildDefaultPreviewState);
+  const resetPreviewState = () => setPreviewState(buildDefaultPreviewState());
+
+  const toAbsoluteUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    const normalized = path.startsWith('/') ? path : `/${path}`;
+    return `${API_BASE_URL}${normalized}`;
+  };
+
+  const appendQueryParam = (url, key, value) => {
+    if (!url || url.includes(`${key}=`)) return url;
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}${key}=${value}`;
+  };
+
+  const buildPractitionerUrl = (path, { inline = false, channel = 'preview' } = {}) => {
+    if (!path) return null;
+    let url = toAbsoluteUrl(path);
+    url = appendQueryParam(url, 'actor', 'practitioner');
+    url = appendQueryParam(url, 'channel', channel);
+    if (inline) {
+      url = appendQueryParam(url, 'mode', 'inline');
+    }
+    return url;
+  };
 
   const endDate = useMemo(() => addDays(startDate, viewLength - 1), [startDate, viewLength]);
 
@@ -110,8 +140,12 @@ const Praticien = () => {
     refetchIntervalInBackground: false,
   });
 
-  const downloadMutation = useMutation({
+  const ensurePrescriptionMutation = useMutation({
     mutationFn: (appointmentId) => createPrescription(token, appointmentId),
+  });
+
+  const signMutation = useMutation({
+    mutationFn: (appointmentId) => signPrescription(token, appointmentId),
   });
 
   const sendLinkMutation = useMutation({
@@ -139,7 +173,7 @@ const Praticien = () => {
     try {
       await login(credentials);
     } catch (err) {
-      setLoginError(err.message || 'Échec de la connexion');
+      setLoginError(err.message || 'Ã‰chec de la connexion');
     }
   };
 
@@ -162,7 +196,7 @@ const Praticien = () => {
       })
       .catch((err) => {
         if (!cancelled) {
-          setHistoryError(err.message || 'Impossible de charger l’historique.');
+          setHistoryError(err.message || 'Impossible de charger lâ€™historique.');
         }
       })
       .finally(() => {
@@ -185,22 +219,97 @@ const Praticien = () => {
     setHistoryRefreshIndex((prev) => prev + 1);
   };
 
-  const handleDownloadPrescription = async (appointmentId) => {
+  const openPreviewWithUrl = ({ url, appointmentId = null, title, mode = 'view' }) => {
+    if (!url) return;
+    setPreviewState({
+      open: true,
+      url,
+      title: title || "Aperçu de l'ordonnance",
+      appointmentId,
+      mode,
+    });
+  };
+
+  const handlePreviewDocument = async (appointment, { mode = 'view' } = {}) => {
+    if (!appointment) return;
+    const appointmentId = appointment.appointment_id;
+    if (!appointmentId) return;
     setError(null);
     setSuccessMessage(null);
-    setActiveDownloadId(appointmentId);
+    setPreviewingId(appointmentId);
     try {
-      const data = await downloadMutation.mutateAsync(appointmentId);
-      const relativeUrl = data.url.startsWith('/') ? data.url : `/${data.url}`;
-      const fullUrl = `${API_BASE_URL}${relativeUrl}`;
-      window.open(fullUrl, '_blank', 'noopener');
-      setSuccessMessage('Ordonnance générée.');
-      triggerHistoryRefresh();
+      let previewPath = appointment.prescription_url;
+      let generated = false;
+      if (!previewPath) {
+        const data = await ensurePrescriptionMutation.mutateAsync(appointmentId);
+        previewPath = data.url;
+        generated = true;
+      }
+      const previewUrl = buildPractitionerUrl(previewPath, { inline: true, channel: 'preview' });
+      openPreviewWithUrl({
+        url: previewUrl,
+        appointmentId,
+        title:
+          mode === 'sign' ? "Vérifiez l'ordonnance avant signature" : "Aperçu de l'ordonnance",
+        mode,
+      });
+      if (generated) {
+        setSuccessMessage('Ordonnance générée.');
+        triggerHistoryRefresh();
+        handleRefresh();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
-      setActiveDownloadId(null);
+      setPreviewingId(null);
     }
+  };
+
+  const handleDirectPreview = (appointment, { url, title }) => {
+    if (!url) return;
+    openPreviewWithUrl({
+      url,
+      appointmentId: appointment?.appointment_id ?? null,
+      title: title || "Aperçu de l'ordonnance",
+      mode: 'view',
+    });
+  };
+
+  const handlePreviewAction = (appointment, options = {}) => {
+    if (options.url) {
+      handleDirectPreview(appointment, options);
+    } else {
+      handlePreviewDocument(appointment, options);
+    }
+  };
+
+  const handleSignAppointment = async (appointmentId) => {
+    if (!appointmentId) return;
+    setError(null);
+    setSuccessMessage(null);
+    setSigningId(appointmentId);
+    try {
+      const data = await signMutation.mutateAsync(appointmentId);
+      const previewUrl = buildPractitionerUrl(data.preview_url, { inline: true, channel: 'signature' });
+      setSuccessMessage('Ordonnance signée et envoyée au patient.');
+      triggerHistoryRefresh();
+      handleRefresh();
+      openPreviewWithUrl({
+        url: previewUrl,
+        appointmentId,
+        title: "Ordonnance signée",
+        mode: 'view',
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSigningId(null);
+    }
+  };
+
+  const handleConfirmSignature = async () => {
+    if (!previewState.appointmentId) return;
+    await handleSignAppointment(previewState.appointmentId);
   };
 
   const handleDownloadConsent = (appointment) => {
@@ -212,13 +321,19 @@ const Praticien = () => {
     window.open(url, '_blank', 'noopener');
   };
 
-  const handleSendPrescription = async (appointmentId) => {
+  const handleSendPrescription = async (appointment) => {
+    const appointmentId = appointment?.appointment_id;
+    if (!appointmentId) return;
+    if (!appointment?.prescription_signed_at) {
+      setError("Veuillez signer l'ordonnance avant l'envoi au patient.");
+      return;
+    }
     setError(null);
     setSuccessMessage(null);
     setActiveSendId(appointmentId);
     try {
       await sendLinkMutation.mutateAsync(appointmentId);
-      setSuccessMessage("Lien d'ordonnance envoyé au patient.");
+      setSuccessMessage('Lien renvoyé au patient.');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -249,7 +364,7 @@ const Praticien = () => {
         appointmentId: editorState.appointmentId,
         payload: { items, instructions },
       });
-      setSuccessMessage('Ordonnance mise à jour.');
+      setSuccessMessage('Ordonnance mise Ã  jour.');
       handleCloseEditor();
       handleRefresh();
       triggerHistoryRefresh();
@@ -260,7 +375,7 @@ const Praticien = () => {
 
   const handleSelectPatient = (appointment) => {
     setPatientDrawer({ open: true, appointment });
-    setPreviewState({ open: false, url: null, title: 'Aperçu ordonnance' });
+    resetPreviewState();
   };
 
   const closePatientDrawer = () => setPatientDrawer({ open: false, appointment: null });
@@ -330,7 +445,7 @@ const Praticien = () => {
           },
         };
       });
-      setSuccessMessage('Dossier patient mis à jour.');
+      setSuccessMessage('Dossier patient mis Ã  jour.');
       handleRefresh();
     } catch (err) {
       setError(err.message);
@@ -347,7 +462,7 @@ const Praticien = () => {
         payload,
       });
       setPatientDrawer({ open: true, appointment: updatedAppointment });
-      setSuccessMessage('Rendez-vous mis à jour.');
+      setSuccessMessage('Rendez-vous mis Ã  jour.');
       handleRefresh();
     } catch (err) {
       setError(err.message);
@@ -364,7 +479,7 @@ const Praticien = () => {
         ...payload,
       });
       setPatientDrawer({ open: true, appointment: createdAppointment });
-      setSuccessMessage('Rendez-vous planifié.');
+      setSuccessMessage('Rendez-vous planifiÃ©.');
       handleRefresh();
     } catch (err) {
       setError(err.message);
@@ -383,16 +498,29 @@ const Praticien = () => {
   const displayedDays = viewLength === 1 ? days.slice(0, 1) : days;
   const loadingData = agendaQuery.isLoading || statsQuery.isLoading;
   const stats = statsQuery.data;
+  const previewActions =
+    previewState.mode === 'sign'
+      ? (
+          <button
+            type="button"
+            className={`btn btn-primary ${signingId === previewState.appointmentId ? 'loading' : ''}`}
+            onClick={handleConfirmSignature}
+            disabled={signingId === previewState.appointmentId}
+          >
+            {signingId === previewState.appointmentId ? 'Signature en cours...' : 'Signer et archiver'}
+          </button>
+        )
+      : null;
 
   return (
     <div className="max-w-6xl mx-auto py-10 space-y-10">
       <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold text-slate-900">Tableau de bord praticien</h1>
-          {user?.email && <p className="text-sm text-slate-500">Connecté en tant que {user.email}</p>}
+          {user?.email && <p className="text-sm text-slate-500">ConnectÃ© en tant que {user.email}</p>}
         </div>
         <button type="button" className="btn btn-outline btn-sm" onClick={logout}>
-          Se déconnecter
+          Se dÃ©connecter
         </button>
       </header>
 
@@ -429,9 +557,9 @@ const Praticien = () => {
 
       <section className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <StatCard title="Rendez-vous du jour" value={stats?.total_appointments} tone="primary" />
-        <StatCard title="Créations aujourd&apos;hui" value={stats?.bookings_created} />
+        <StatCard title="CrÃ©ations aujourd&apos;hui" value={stats?.bookings_created} />
         <StatCard title="Nouveaux patients (7j)" value={stats?.new_patients_week} tone="success" />
-        <StatCard title="Relances nécessaires" value={stats?.follow_ups_required} tone="warning" />
+        <StatCard title="Relances nÃ©cessaires" value={stats?.follow_ups_required} tone="warning" />
         <StatCard title="Consents manquants" value={stats?.pending_consents} tone="danger" />
       </section>
 
@@ -448,12 +576,14 @@ const Praticien = () => {
                 key={day.date}
                 day={day}
                 detailed={viewLength === 1}
-                onDownloadPrescription={handleDownloadPrescription}
+                onPreview={(appointment) => handlePreviewDocument(appointment)}
+                onSign={(appointment) => handlePreviewDocument(appointment, { mode: 'sign' })}
                 onSendPrescription={handleSendPrescription}
                 onSelectPatient={handleSelectPatient}
                 onEditPrescription={handleOpenEditor}
                 onDownloadConsent={handleDownloadConsent}
-                downloadingId={activeDownloadId}
+                previewingId={previewingId}
+                signingId={signingId}
                 sendingId={activeSendId}
               />
             ))}
@@ -489,7 +619,12 @@ const Praticien = () => {
         onUpdateCase={handleUpdateCase}
         onReschedule={handleRescheduleAppointment}
         onCreateAppointment={handleCreateAppointment}
-        onPreview={setPreviewState}
+        onPreview={handlePreviewAction}
+        onSign={(appointment) => handlePreviewDocument(appointment, { mode: 'sign' })}
+        onSend={handleSendPrescription}
+        previewingId={previewingId}
+        signingId={signingId}
+        sendingId={activeSendId}
         updatingCase={updateCaseMutation.isLoading}
         updatingAppointment={rescheduleMutation.isLoading}
         creatingAppointment={createAppointmentMutation.isLoading}
@@ -499,12 +634,14 @@ const Praticien = () => {
       />
       <PdfPreviewModal
         isOpen={previewState.open}
-        onClose={() => setPreviewState({ open: false, url: null, title: 'Aperçu ordonnance' })}
+        onClose={resetPreviewState}
         url={previewState.url}
         title={previewState.title}
+        actions={previewActions}
       />
     </div>
   );
-};
+}
 
 export default Praticien;
+

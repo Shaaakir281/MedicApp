@@ -2,44 +2,281 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <title>Ordonnance - Circoncision rituelle</title>
+    <title>Ordonnance sécurisée - {{ clinic.name }}</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 40px; }
-      h1 { text-align: center; }
-      .section { margin-bottom: 20px; }
-      .prescriptions ul { list-style: none; padding: 0; }
-      .prescriptions li { margin: 8px 0; }
+      * { box-sizing: border-box; }
+      body {
+        font-family: "Segoe UI", "DejaVu Sans", Arial, sans-serif;
+        margin: 0;
+        padding: 32px;
+        background: #f7f7fb;
+        color: #1d1d1f;
+      }
+      .page {
+        background: #fff;
+        padding: 32px;
+        border-radius: 16px;
+        border: 1px solid #e3e6ef;
+        box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 2px solid #e9edf5;
+        padding-bottom: 16px;
+        margin-bottom: 24px;
+        gap: 24px;
+      }
+      .logo-circle {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 26px;
+        font-weight: 700;
+      }
+      .header-info {
+        flex: 1;
+      }
+      .header-info h1 {
+        margin: 0 0 6px;
+        font-size: 24px;
+        color: #0f172a;
+      }
+      .header-info p {
+        margin: 0;
+        font-size: 13px;
+        color: #475569;
+      }
+      .reference-block {
+        text-align: right;
+        font-size: 13px;
+        color: #334155;
+      }
+      .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #e0ecff;
+        color: #1d4ed8;
+        font-weight: 600;
+        font-size: 12px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      .section-card {
+        border: 1px solid #e4eaf2;
+        border-radius: 14px;
+        padding: 18px 20px;
+        margin-bottom: 20px;
+      }
+      .section-title {
+        margin: 0 0 12px;
+        font-size: 16px;
+        color: #0f172a;
+        letter-spacing: 0.02em;
+      }
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 24px;
+        font-size: 14px;
+      }
+      .info-grid span {
+        display: block;
+        color: #64748b;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 2px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 13px;
+      }
+      th {
+        text-align: left;
+        color: #475569;
+        font-weight: 600;
+        padding: 10px 8px;
+        border-bottom: 2px solid #e2e8f0;
+        background: #f8fbff;
+      }
+      td {
+        border-bottom: 1px solid #e7eef8;
+        padding: 10px 8px;
+        vertical-align: top;
+      }
+      .notes {
+        font-size: 12px;
+        color: #475569;
+        line-height: 1.4;
+      }
+      .instructions-list {
+        margin: 0;
+        padding-left: 20px;
+        font-size: 13px;
+        color: #1f2937;
+      }
+      .instructions-list li {
+        margin-bottom: 6px;
+      }
+      .footer {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 28px;
+        align-items: flex-end;
+      }
+      .signature-block img {
+        width: 100%;
+        max-width: 220px;
+        height: auto;
+      }
+      .signature-caption {
+        font-size: 12px;
+        color: #475569;
+        margin-top: 6px;
+      }
+      .stamp img {
+        width: 140px;
+        height: auto;
+      }
+      .qr-box {
+        text-align: center;
+        border: 1px dashed #cbd5f5;
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .qr-box img {
+        width: 120px;
+        height: 120px;
+      }
+      .qr-box p {
+        margin: 6px 0 0;
+        font-size: 11px;
+        color: #475569;
+      }
+      .security {
+        margin-top: 24px;
+        font-size: 11px;
+        color: #475569;
+        text-align: center;
+      }
     </style>
   </head>
   <body>
-    <h1>Ordonnance - Circoncision rituelle</h1>
+    <div class="page">
+      <header class="header">
+        <div class="logo-circle">{{ clinic.logo_letter }}</div>
+        <div class="header-info">
+          <h1>Ordonnance sécurisée</h1>
+          <p>{{ practitioner.full_name }} — {{ practitioner.specialty }}</p>
+          <p>RPPS {{ practitioner.license }} · Adeli {{ practitioner.adeli }}</p>
+          <p>{{ clinic.name }} · {{ clinic.city }} · {{ clinic.phone }}</p>
+        </div>
+        <div class="reference-block">
+          <div class="badge">Réf. {{ ordonnance.reference }}</div>
+          <div>Émise le {{ ordonnance.issued_at }}</div>
+          <div>Valable jusqu'au {{ ordonnance.valid_until }}</div>
+          <div>{{ ordonnance.page_label }}</div>
+        </div>
+      </header>
 
-    <div class="section">
-      <strong>Cabinet/Praticien :</strong> Dr / Mme / M. {{ praticien_nom }}<br />
-      <strong>Date :</strong> {{ date_ordonnance }}
-    </div>
+      <section class="section-card">
+        <h2 class="section-title">Identité du patient</h2>
+        <div class="info-grid">
+          <div>
+            <span>Nom / Prénom</span>
+            <strong>{{ patient.name }}</strong>
+          </div>
+          <div>
+            <span>Date de naissance</span>
+            <strong>
+              {{ patient.birthdate }}
+              {% if patient.age %} ({{ patient.age }}){% endif %}
+            </strong>
+          </div>
+          <div>
+            <span>Poids de référence</span>
+            <strong>{{ patient.weight }}</strong>
+          </div>
+          <div>
+            <span>Date prévue de l'acte</span>
+            <strong>{{ appointment.date }}</strong>
+          </div>
+          {% if patient.guardian %}
+          <div>
+            <span>Responsable légal</span>
+            <strong>{{ patient.guardian.name }}</strong>
+          </div>
+          <div>
+            <span>Contact</span>
+            <strong>{{ patient.guardian.email }}</strong>
+          </div>
+          {% endif %}
+        </div>
+      </section>
 
-    <div class="section">
-      <strong>Enfant :</strong> {{ enfant_nom }}, ne le {{ enfant_ddn }} - Poids : {{ enfant_poids }} kg<br />
-      <strong>Intervention prevue le :</strong> {{ date_intervention }}
-    </div>
+      <section class="section-card">
+        <h2 class="section-title">Matériel et médicaments prescrits</h2>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 36px;">#</th>
+              <th>Produit / dispositif</th>
+              <th>Posologie ou modalité</th>
+              <th>Remarques</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in line_items %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ item.label }}</td>
+              <td>{{ item.dosage or "Selon protocole" }}</td>
+              <td class="notes">{{ item.notes or "—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
 
-    <div class="section prescriptions">
-      <strong>Prescriptions :</strong>
-      <ul>
-        {% for item in prescriptions %}
-        <li>{{ item }}</li>
-        {% endfor %}
-      </ul>
-    </div>
+      <section class="section-card">
+        <h2 class="section-title">Instructions & rappels</h2>
+        <ul class="instructions-list">
+          {% for item in instructions_list %}
+          <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </section>
 
-    <div class="section">
-      <em>Instructions complementaires :</em><br />
-      {{ instructions }}
-    </div>
+      <section class="footer">
+        <div class="signature-block">
+          <img src="{{ signature_data_uri }}" alt="Signature du praticien" />
+          <div class="signature-caption">
+            {{ practitioner.signature_line }} — Signature électronique qualifiée
+          </div>
+        </div>
+        <div class="stamp" style="text-align:center;">
+          <img src="{{ stamp_data_uri }}" alt="Cachet du cabinet" />
+          <div class="signature-caption">{{ clinic.hours }}</div>
+        </div>
+        <div class="qr-box">
+          <img src="{{ qr_code_data_uri }}" alt="QR code de vérification" />
+          <p>{{ qr_caption }}</p>
+          <p>Code: {{ ordonnance.verification_code }}</p>
+        </div>
+      </section>
 
-    <div class="section signatures">
-      Signature praticien : ____________________  Date : __/__/____
+      <p class="security">{{ notes }}</p>
     </div>
   </body>
 </html>

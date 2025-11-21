@@ -119,6 +119,13 @@ export async function sendConsentLink(token) {
   return apiRequest('/procedures/send-consent-link', { method: 'POST', token });
 }
 
+export async function acknowledgeProcedureSteps(token) {
+  return apiRequest('/procedures/acknowledge-steps', {
+    method: 'POST',
+    token,
+  });
+}
+
 export async function fetchPractitionerAgenda({ start, end } = {}, token) {
   const params = new URLSearchParams();
   if (start) params.set('start', start);
@@ -132,8 +139,22 @@ export async function fetchPractitionerStats(date, token) {
   return apiRequest(`/practitioner/stats${query}`, { token });
 }
 
+export async function searchPharmacies({ query, city, limit = 10, offset = 0 }) {
+  const params = new URLSearchParams();
+  params.set('query', query);
+  if (city) params.set('city', city);
+  if (limit) params.set('limit', String(limit));
+  if (offset) params.set('offset', String(offset));
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest(`/directory/pharmacies${qs}`, { skipAuth: true });
+}
+
 export async function createPrescription(token, appointmentId) {
   return apiRequest(`/prescriptions/${appointmentId}`, { method: 'POST', token });
+}
+
+export async function signPrescription(token, appointmentId) {
+  return apiRequest(`/prescriptions/${appointmentId}/sign`, { method: 'POST', token });
 }
 
 export async function sendPrescriptionLink(token, appointmentId) {
@@ -200,6 +221,14 @@ export async function verifyEmailToken(token) {
   return apiRequest(`/auth/verify-email?token=${encodeURIComponent(token)}`, {
     method: 'GET',
     skipAuth: true,
+  });
+}
+
+export async function deleteAppointment(token, appointmentId, options = {}) {
+  const { cascadeAct = true } = options;
+  return apiRequest(`/appointments/${appointmentId}?cascade_act=${cascadeAct}`, {
+    method: 'DELETE',
+    token,
   });
 }
 
