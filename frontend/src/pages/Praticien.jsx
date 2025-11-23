@@ -72,6 +72,7 @@ const addDays = (isoDate, delta) => {
 };
 
 const getDefaultStartDate = () => toISODate(new Date());
+const UPCOMING_PAST_SPLIT_DAYS = 7;
 
 const Praticien = () => {
   const { isAuthenticated, login, logout, token, user, loading: authLoading } = useAuth();
@@ -211,8 +212,11 @@ const Praticien = () => {
   };
 
   useEffect(() => {
-    const appointmentId = patientDrawer.appointment?.appointment_id;
-    if (!token || !appointmentId) {
+    const overview = patientDrawer.appointment?.procedure?.appointments_overview || [];
+    const appointmentIds = Array.from(
+      new Set(overview.map((entry) => entry.appointment_id).filter(Boolean)),
+    );
+    if (!token || appointmentIds.length === 0) {
       setPrescriptionHistory([]);
       setHistoryError(null);
       setHistoryLoading(false);
@@ -221,15 +225,20 @@ const Praticien = () => {
     let cancelled = false;
     setHistoryLoading(true);
     setHistoryError(null);
-    fetchPrescriptionHistory(token, appointmentId)
-      .then((data) => {
-        if (!cancelled) {
-          setPrescriptionHistory(data);
-        }
+    Promise.all(
+      appointmentIds.map((id) =>
+        fetchPrescriptionHistory(token, id).catch((err) => {
+          throw new Error(err.message || 'Historique indisponible');
+        }),
+      ),
+    )
+      .then((allHistories) => {
+        if (cancelled) return;
+        setPrescriptionHistory(allHistories.flat());
       })
       .catch((err) => {
         if (!cancelled) {
-          setHistoryError(err.message || 'Impossible de charger laTMhistorique.');
+          setHistoryError(err.message || "Impossible de charger l'historique.");
         }
       })
       .finally(() => {
@@ -240,7 +249,7 @@ const Praticien = () => {
     return () => {
       cancelled = true;
     };
-  }, [token, patientDrawer.appointment?.appointment_id, historyRefreshIndex]);
+  }, [token, patientDrawer.appointment?.procedure?.appointments_overview, historyRefreshIndex]);
 
   const handleRefresh = () => {
     setRefreshIndex((prev) => prev + 1);
@@ -375,6 +384,8 @@ const Praticien = () => {
   };
 
   const handleOpenEditor = (appointment) => {
+    // Ferme la fenêtre dossier patient pour éviter toute superposition
+    setPatientDrawer({ open: false, appointment: null });
     setEditorState({
       open: true,
       appointmentId: appointment.appointment_id,
@@ -543,8 +554,9 @@ const Praticien = () => {
     const isoDate = normalizeISODate(dateValue);
     if (!isoDate) return;
     setViewMode('agenda');
-    setViewLength(1);
+    setViewLength(7);
     setStartDate(isoDate);
+    handleRefresh();
   };
 
   if (!isAuthenticated) {

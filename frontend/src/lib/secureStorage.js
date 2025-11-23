@@ -1,20 +1,27 @@
 const STORAGE_KEY_PREFIX = 'medicapp.secure.';
 const DEFAULT_SECRET = 'MedicApp::Auth::DefaultSecretKey__ChangeMe!';
+const MIN_SECRET_LENGTH = 24;
 
 const hasBrowserAPIs = typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
 const encoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 const decoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
 
-const secretSource =
-  (typeof import.meta !== 'undefined' &&
-    import.meta.env &&
-    import.meta.env.VITE_AUTH_STORAGE_SECRET &&
-    import.meta.env.VITE_AUTH_STORAGE_SECRET.trim()) ||
-  DEFAULT_SECRET;
+const rawSecret =
+  typeof import.meta !== 'undefined' &&
+  import.meta.env &&
+  typeof import.meta.env.VITE_AUTH_STORAGE_SECRET === 'string' &&
+  import.meta.env.VITE_AUTH_STORAGE_SECRET.trim()
+    ? import.meta.env.VITE_AUTH_STORAGE_SECRET.trim()
+    : null;
 
-const secretBytes = encoder
-  ? encoder.encode(secretSource.padEnd(64, '#').slice(0, 64))
-  : null;
+const secretSource =
+  rawSecret && rawSecret !== DEFAULT_SECRET && rawSecret.length >= MIN_SECRET_LENGTH
+    ? rawSecret
+    : null;
+
+const secretBytes = secretSource && encoder ? encoder.encode(secretSource.padEnd(64, '#').slice(0, 64)) : null;
+const persistenceEnabled = Boolean(hasBrowserAPIs && secretBytes);
+let warnedMissingSecret = false;
 
 function xorCipher(bytes) {
   if (!secretBytes) {
@@ -58,8 +65,18 @@ function decodeValue(payload) {
   return decoder.decode(descrambled);
 }
 
+function ensurePersistence() {
+  if (!persistenceEnabled && !warnedMissingSecret && hasBrowserAPIs) {
+    console.warn(
+      'Secure auth storage is disabled. Set VITE_AUTH_STORAGE_SECRET (24+ chars, not the default) to persist sessions.',
+    );
+    warnedMissingSecret = true;
+  }
+  return persistenceEnabled;
+}
+
 export function loadSecureItem(key) {
-  if (!hasBrowserAPIs) {
+  if (!hasBrowserAPIs || !ensurePersistence()) {
     return null;
   }
   try {
@@ -70,13 +87,13 @@ export function loadSecureItem(key) {
     const decoded = decodeValue(raw);
     return decoded ? JSON.parse(decoded) : null;
   } catch (error) {
-    console.warn('Impossible de charger l’élément sécurisé', error);
+    console.warn('Unable to load secure item', error);
     return null;
   }
 }
 
 export function saveSecureItem(key, value) {
-  if (!hasBrowserAPIs) {
+  if (!hasBrowserAPIs || !ensurePersistence()) {
     return;
   }
   if (value == null) {
@@ -87,7 +104,7 @@ export function saveSecureItem(key, value) {
     const encoded = encodeValue(JSON.stringify(value));
     window.sessionStorage.setItem(`${STORAGE_KEY_PREFIX}${key}`, encoded);
   } catch (error) {
-    console.warn('Impossible d’enregistrer l’élément sécurisé', error);
+    console.warn('Unable to save secure item', error);
   }
 }
 
@@ -98,6 +115,6 @@ export function clearSecureItem(key) {
   try {
     window.sessionStorage.removeItem(`${STORAGE_KEY_PREFIX}${key}`);
   } catch (error) {
-    console.warn('Impossible de supprimer l’élément sécurisé', error);
+    console.warn('Unable to clear secure item', error);
   }
 }

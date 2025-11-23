@@ -15,33 +15,53 @@ export function PrescriptionEditor({
   const [instructions, setInstructions] = useState('');
   const [selected, setSelected] = useState(new Set());
 
+  const normalizeKey = (value) =>
+    value
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+  const normalizeLines = (value) =>
+    value
+      .split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+  const syncSelectedFromText = (value) => new Set(normalizeLines(value).map(normalizeKey));
+
   useEffect(() => {
     if (isOpen) {
-      setItemsText((defaultItems || []).join('\n'));
+      const initial = (defaultItems || []).join('\n');
+      setItemsText(initial);
       setInstructions(defaultInstructions || '');
-      setSelected(new Set(defaultItems || []));
+      setSelected(syncSelectedFromText(initial));
     }
   }, [isOpen, defaultItems, defaultInstructions]);
 
   const toggleItem = (value) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(value)) {
-        next.delete(value);
-      } else {
-        next.add(value);
-      }
-      setItemsText(Array.from(next).join('\n'));
-      return next;
-    });
+    const key = normalizeKey(value);
+    const currentLines = normalizeLines(itemsText);
+    const currentKeys = currentLines.map(normalizeKey);
+    const idx = currentKeys.indexOf(key);
+    let nextLines;
+    if (idx >= 0) {
+      nextLines = [...currentLines.slice(0, idx), ...currentLines.slice(idx + 1)];
+    } else {
+      nextLines = [value, ...currentLines];
+    }
+    setItemsText(nextLines.join('\n'));
+    setSelected(syncSelectedFromText(nextLines.join('\n')));
+  };
+
+  const handleItemsChange = (event) => {
+    const value = event.target.value;
+    setItemsText(value);
+    setSelected(syncSelectedFromText(value));
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    const items = itemsText
-      .split('\n')
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const items = normalizeLines(itemsText);
     onSubmit({ items, instructions });
   };
 
@@ -60,7 +80,7 @@ export function PrescriptionEditor({
                   <input
                     type="checkbox"
                     className="checkbox checkbox-sm"
-                    checked={selected.has(item)}
+                    checked={selected.has(normalizeKey(item))}
                     onChange={() => toggleItem(item)}
                   />
                   {item}
@@ -75,7 +95,7 @@ export function PrescriptionEditor({
             className="textarea textarea-bordered w-full"
             rows={6}
             value={itemsText}
-            onChange={(event) => setItemsText(event.target.value)}
+            onChange={handleItemsChange}
             required
           />
           <span className="label-text-alt text-xs text-slate-500">

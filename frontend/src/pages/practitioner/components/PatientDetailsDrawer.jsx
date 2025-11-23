@@ -723,7 +723,10 @@ export function PatientDetailsDrawer({
               <button
                 type="button"
                 className="btn btn-xs btn-ghost"
-                onClick={() => onEdit?.(appointment)}
+                onClick={() => {
+                  onClose?.();
+                  onEdit?.(appointment);
+                }}
               >
                 Modifier
               </button>

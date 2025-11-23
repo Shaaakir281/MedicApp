@@ -7,12 +7,12 @@ import React from 'react';
 const Modal = ({ isOpen, onClose, children }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-base-100 rounded-lg p-4 max-w-3xl w-full relative">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-base-100 rounded-lg p-4 max-w-3xl w-full relative max-h-[85vh] overflow-y-auto">
         <button
           type="button"
           className="absolute top-2 right-2 btn btn-sm btn-circle btn-error"
-          aria-label="Fermer la fenêtre"
+          aria-label="Fermer la fenetre"
           onClick={onClose}
         >
           ✕

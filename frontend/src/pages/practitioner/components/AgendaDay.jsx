@@ -12,10 +12,52 @@ const statusBadges = {
   validated: 'badge-success',
 };
 
+const toneColors = {
+  ok: 'border-emerald-200 text-emerald-700 bg-emerald-50',
+  warn: 'border-amber-200 text-amber-700 bg-amber-50',
+  danger: 'border-rose-200 text-rose-700 bg-rose-50',
+  muted: 'border-slate-200 text-slate-600 bg-slate-50',
+};
+
+const consentStatus = (procedure) => {
+  if (!procedure) return { label: 'Consentement', ok: false, tone: 'warn' };
+  const signed = Boolean(procedure.has_consent);
+  const signableAt = procedure.consent_signable_at ? new Date(procedure.consent_signable_at) : null;
+  const now = new Date();
+  if (signed) {
+    return { label: 'Consentement', ok: true, tone: 'ok' };
+  }
+  if (signableAt && now < signableAt) {
+    return { label: 'Consentement (delai)', ok: false, tone: 'muted' };
+  }
+  if (signableAt && now.getTime() - signableAt.getTime() > 14 * 24 * 3600 * 1000) {
+    return { label: 'Consentement en retard', ok: false, tone: 'danger' };
+  }
+  return { label: 'Consentement', ok: false, tone: 'warn' };
+};
+
+const dossierChecks = (procedure, appointment) => {
+  if (!procedure) return [];
+  const patient = appointment?.patient || {};
+  const consent = consentStatus(procedure);
+  return [
+    { label: 'Identite', ok: Boolean(patient.child_full_name && procedure.child_birthdate), tone: 'ok' },
+    { label: 'Poids', ok: Boolean(procedure.child_weight_kg), tone: 'ok' },
+    { label: 'Autorite parentale', ok: procedure.parental_authority_ack, tone: 'ok' },
+    consent,
+    {
+      label: appointment?.appointment_type === 'act' ? 'Ordonnance acte' : 'Ordonnance pre-consultation',
+      ok: procedure.has_ordonnance,
+      tone: 'ok',
+    },
+    { label: 'Rdv pre-consultation', ok: procedure.has_preconsultation, tone: 'ok' },
+    { label: 'Rdv acte', ok: procedure.has_act_planned, tone: 'ok' },
+  ];
+};
+
 export function AgendaDay({
   day,
   detailed = false,
-  onPreview,
   onSign,
   onSendPrescription,
   onSelectPatient,
@@ -24,6 +66,7 @@ export function AgendaDay({
   previewingId,
   signingId,
   sendingId,
+  showPast = true,
 }) {
   const dateLabel = new Intl.DateTimeFormat('fr-FR', {
     weekday: 'long',
@@ -36,7 +79,7 @@ export function AgendaDay({
       <div className="space-y-2">
         <div className="text-lg font-semibold capitalize">{dateLabel}</div>
         <div className="rounded-xl border border-dashed border-slate-200 p-6 text-slate-500">
-          Aucun rendez-vous planifié.
+          Aucun rendez-vous planifie.
         </div>
       </div>
     );
@@ -46,7 +89,9 @@ export function AgendaDay({
     <div className="space-y-3">
       <div className="text-lg font-semibold capitalize">{dateLabel}</div>
       <div className="space-y-3">
-        {day.appointments.map((appointment) => (
+        {day.appointments
+          .filter((appt) => (showPast ? true : new Date(`${appt.date}T00:00:00`) >= new Date()))
+          .map((appointment) => (
           <div
             key={appointment.appointment_id}
             className="border rounded-2xl p-4 bg-white shadow-sm flex flex-col gap-3"
@@ -65,10 +110,10 @@ export function AgendaDay({
                   typeBadges[appointment.appointment_type] || typeBadges.general,
                 )}
               >
-                {appointment.appointment_type === 'act' ? 'Acte' : 'Pré-consultation'}
+                {appointment.appointment_type === 'act' ? 'Acte' : 'Pre-consultation'}
               </span>
               <span className={clsx('badge', statusBadges[appointment.status] || 'badge-ghost')}>
-                {appointment.status === 'validated' ? 'Validé' : 'En attente'}
+                {appointment.status === 'validated' ? 'Valide' : 'En attente'}
               </span>
             </div>
             <div className="text-sm text-slate-600 flex flex-wrap gap-4 items-center">
@@ -76,7 +121,7 @@ export function AgendaDay({
                 {appointment.time?.slice(0, 5)}
               </span>
               <span className="px-3 py-1 rounded-full bg-slate-100 text-xs uppercase tracking-wide">
-                {appointment.mode === 'visio' ? 'Visio' : 'Présentiel'}
+                {appointment.mode === 'visio' ? 'Visio' : 'Presentiel'}
               </span>
               {appointment.patient?.email && (
                 <span>
@@ -87,55 +132,48 @@ export function AgendaDay({
             {detailed && appointment.notes && (
               <p className="text-sm text-slate-500">Notes : {appointment.notes}</p>
             )}
-            <DossierStatus procedure={appointment.procedure} reminder={appointment} />
-            <div className="flex flex-wrap gap-2 pt-2">
-              <button
-                type="button"
-                className="btn btn-xs btn-outline"
-                onClick={() => onPreview?.(appointment)}
-                disabled={previewingId === appointment.appointment_id}
-              >
-                {previewingId === appointment.appointment_id ? 'Préparation...' : 'Prévisualiser'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-xs btn-outline"
-                onClick={() => onSign?.(appointment)}
-                disabled={signingId === appointment.appointment_id || Boolean(appointment.prescription_signed_at)}
-              >
-                {appointment.prescription_signed_at
-                  ? 'Déjà signée'
-                  : signingId === appointment.appointment_id
-                  ? 'Signature...'
-                  : 'Signer l’ordonnance'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-xs btn-ghost"
-                onClick={() => onSendPrescription?.(appointment)}
-                disabled={sendingId === appointment.appointment_id || !appointment.prescription_signed_at}
-              >
-                {sendingId === appointment.appointment_id
-                  ? 'Envoi...'
-                  : appointment.prescription_signed_at
-                  ? 'Envoyer au patient'
-                  : 'Signer avant envoi'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-xs btn-ghost"
-                onClick={() => onEditPrescription?.(appointment)}
-              >
-                Modifier
-              </button>
+            <div className="flex flex-col gap-3 pt-2">
+              <DossierStatus procedure={appointment.procedure} reminder={appointment} appointment={appointment} />
+              <div className="border rounded-lg p-3 bg-slate-50 space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Ordonnances</div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline"
+                    onClick={() => onSign?.(appointment)}
+                    disabled={
+                      signingId === appointment.appointment_id || previewingId === appointment.appointment_id
+                    }
+                  >
+                    {signingId === appointment.appointment_id || previewingId === appointment.appointment_id
+                      ? 'Preparation...'
+                      : 'Voir / signer'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-ghost"
+                    onClick={() => onSendPrescription?.(appointment)}
+                    disabled={sendingId === appointment.appointment_id || !appointment.prescription_signed_at}
+                  >
+                    {sendingId === appointment.appointment_id
+                      ? 'Envoi...'
+                      : appointment.prescription_signed_at
+                      ? 'Envoyer au patient'
+                      : 'Signer avant envoi'}
+                  </button>
+                </div>
+              </div>
               {appointment.procedure?.consent_download_url && (
-                <button
-                  type="button"
-                  className="btn btn-xs btn-outline"
-                  onClick={() => onDownloadConsent?.(appointment)}
-                >
-                  Consentements
-                </button>
+                <div className="border rounded-lg p-3 bg-slate-50 space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Consentement</div>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline"
+                    onClick={() => onDownloadConsent?.(appointment)}
+                  >
+                    Ouvrir le consentement
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -147,24 +185,22 @@ export function AgendaDay({
 
 function DossierStatus({ procedure, reminder }) {
   if (!procedure) return null;
-  const indicators = [
-    { label: 'Autorité parentale', ok: procedure.parental_authority_ack },
-    { label: 'Consentement', ok: procedure.has_consent },
-    { label: 'Checklist', ok: procedure.has_checklist },
-    { label: 'Ordonnance', ok: procedure.has_ordonnance },
-    { label: 'Pré-consultation', ok: procedure.has_preconsultation },
-    { label: 'Acte', ok: procedure.has_act_planned },
-  ];
+  const indicators = dossierChecks(procedure, reminder);
   const missing = indicators.filter((item) => !item.ok);
+  const completedCount = indicators.filter((item) => item.ok).length;
+  const requiredCount = indicators.length;
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2 text-xs">
+      <div className="flex flex-wrap gap-2 text-xs items-center">
+        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px]">
+          Dossier : {completedCount}/{requiredCount}
+        </span>
         {indicators.map((item) => (
           <span
             key={item.label}
             className={clsx(
               'px-2 py-0.5 rounded-full border text-[11px]',
-              item.ok ? 'border-emerald-200 text-emerald-700 bg-emerald-50' : 'border-rose-200 text-rose-700 bg-rose-50',
+              item.ok ? toneColors.ok : toneColors[item.tone] || toneColors.warn,
             )}
           >
             {item.label}
@@ -173,21 +209,21 @@ function DossierStatus({ procedure, reminder }) {
       </div>
       {missing.length > 0 && (
         <p className="text-[11px] text-rose-600">
-          À compléter : {missing.map((item) => item.label.toLowerCase()).join(', ')}
+          A completer : {missing.map((item) => item.label.toLowerCase()).join(', ')}
         </p>
       )}
       <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">
         {reminder.reminder_sent_at ? (
           <span className="badge badge-outline badge-sm">
-            Rappel envoyé {reminder.reminder_opened_at ? 'et confirmé' : '(en attente de lecture)'}
+            Rappel envoye {reminder.reminder_opened_at ? 'et confirme' : '(en attente de lecture)'}
           </span>
         ) : (
-          <span className="badge badge-outline badge-sm badge-warning">Rappel non envoyé</span>
+          <span className="badge badge-outline badge-sm badge-warning">Rappel non envoye</span>
         )}
-        {reminder.prescription_sent_at && <span className="badge badge-outline badge-sm">Ordonnance envoyée</span>}
+        {reminder.prescription_sent_at && <span className="badge badge-outline badge-sm">Ordonnance envoyee</span>}
         {reminder.prescription_download_count > 0 && (
           <span className="badge badge-ghost badge-sm">
-            {reminder.prescription_download_count} téléchargement(s)
+            {reminder.prescription_download_count} telechargement(s)
           </span>
         )}
       </div>

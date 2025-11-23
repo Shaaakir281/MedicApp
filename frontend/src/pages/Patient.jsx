@@ -486,9 +486,9 @@ const Patient = () => {
     }
     const subject = encodeURIComponent('Ordonnance');
     const body = encodeURIComponent(
-      Bonjour,\n\nVeuillez trouver l'ordonnance du patient via ce lien securise : \n\nCordialement,,
+      `Bonjour,\n\nVeuillez trouver l'ordonnance du patient via ce lien securise : ${targetUrl}\n\nCordialement,`,
     );
-    window.location.href = mailto:?subject=&body=;
+    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
   };
 
   const handlePharmacySelected = (pharmacy) => {
@@ -499,7 +499,7 @@ const Patient = () => {
       return;
     }
     handleSendToPharmacy(email, pharmacyTargetUrl);
-    setPharmacyFeedback(Lien prepare pour );
+    setPharmacyFeedback(`Lien prepare pour ${email}`);
     setPharmacyModalOpen(false);
     setPharmacyTargetUrl(null);
   };
@@ -521,14 +521,14 @@ const Patient = () => {
   const pastAppointments = appointments.filter((appt) => appt.date && appt.date < todayISO);
 
   const handlePreviewAppointmentPrescription = (appt) => {
-    const url = buildDocumentUrl(appt.prescription_url, { mode: 'inline' });
-    if (!url) {
+    const { previewUrl } = getPrescriptionUrls(appt);
+    if (!previewUrl) {
       setError("L'ordonnance n'est pas disponible pour ce rendez-vous.");
       return;
     }
     setPreviewState({
       open: true,
-      url,
+      url: previewUrl,
       title: appt.appointment_type === 'act' ? 'Ordonnance acte' : 'Ordonnance pre-consultation',
       type: 'ordonnance',
     });
@@ -721,10 +721,7 @@ const Patient = () => {
               )}
               {upcomingAppointments.map((appt) => {
                 const apptId = appt.appointment_id || appt.id;
-                const fallbackDownload =
-                  appt.appointment_type === 'preconsultation' ? ordonnanceDownloadUrl : null;
-                const downloadUrl = buildDocumentUrl(appt.prescription_url) || fallbackDownload;
-                const previewUrl = buildDocumentUrl(appt.prescription_url, { mode: 'inline' }) || fallbackDownload;
+                const { downloadUrl, previewUrl } = getPrescriptionUrls(appt);
                 return (
                   <div key={apptId} className="border rounded-lg p-3 space-y-1">
                     <div className="flex items-center gap-2 text-sm">
@@ -754,10 +751,10 @@ const Patient = () => {
                       </a>
                       <button
                         type="button"
-                        className={`btn btn-xs btn-ghost ${!downloadUrl || !preferredPharmacy?.ms_sante_address ? 'btn-disabled' : ''}`}
-                        onClick={() => downloadUrl && preferredPharmacy?.ms_sante_address && handleSendToPharmacy(downloadUrl)}
+                        className={`btn btn-xs btn-ghost ${!downloadUrl ? 'btn-disabled' : ''}`}
+                        onClick={() => downloadUrl && handlePharmacyInfo(downloadUrl)}
                       >
-                        Envoyer pharmacie
+                        Envoyer a une pharmacie
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-2 pt-1 border-t border-dashed border-slate-200 mt-2">
@@ -788,10 +785,7 @@ const Patient = () => {
               )}
               {pastAppointments.map((appt) => {
                 const apptId = appt.appointment_id || appt.id;
-                const fallbackDownload =
-                  appt.appointment_type === 'preconsultation' ? ordonnanceDownloadUrl : null;
-                const downloadUrl = buildDocumentUrl(appt.prescription_url) || fallbackDownload;
-                const previewUrl = buildDocumentUrl(appt.prescription_url, { mode: 'inline' }) || fallbackDownload;
+                const { downloadUrl, previewUrl } = getPrescriptionUrls(appt);
                 return (
                   <div key={apptId} className="border rounded-lg p-3 space-y-1 bg-slate-50">
                     <div className="flex items-center gap-2 text-sm">
@@ -821,10 +815,10 @@ const Patient = () => {
                       </a>
                       <button
                         type="button"
-                        className={`btn btn-xs btn-ghost ${!downloadUrl || !preferredPharmacy?.ms_sante_address ? 'btn-disabled' : ''}`}
-                        onClick={() => downloadUrl && preferredPharmacy?.ms_sante_address && handleSendToPharmacy(downloadUrl)}
+                        className={`btn btn-xs btn-ghost ${!downloadUrl ? 'btn-disabled' : ''}`}
+                        onClick={() => downloadUrl && handlePharmacyInfo(downloadUrl)}
                       >
-                        Envoyer pharmacie
+                        Envoyer a une pharmacie
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-2 pt-1 border-t border-dashed border-slate-200 mt-2">
@@ -852,36 +846,7 @@ const Patient = () => {
         </section>
       ) : null}
 
-      {hasAnyPrescription && (
-        <section className="p-6 border rounded-xl bg-white shadow-sm space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold">Pharmacie</h2>
-              <p className="text-sm text-slate-600">
-                Enregistrez l'email de votre pharmacie pour lui envoyer l'ordonnance.
-              </p>
-            </div>
-            <button type="button" className="btn btn-sm btn-ghost" onClick={handlePharmacyInfo}>
-              Choisir / modifier la pharmacie
-            </button>
-          </div>
-          {preferredPharmacy?.ms_sante_address && (
-            <div className="flex flex-wrap gap-2 items-center text-sm text-slate-700">
-              <span className="font-semibold">Email :</span>
-              <span>{preferredPharmacy.ms_sante_address}</span>
-              <button type="button" className="btn btn-sm btn-outline" onClick={() => handleSendToPharmacy()}>
-                Envoyer l'ordonnance
-              </button>
-            </div>
-          )}
-          {!preferredPharmacy?.ms_sante_address && (
-            <p className="text-sm text-slate-600">Aucune pharmacie enregistrée pour le moment.</p>
-          )}
-          {pharmacyFeedback && <p className="text-sm text-slate-600">{pharmacyFeedback}</p>}
-        </section>
-      )}
-
-      {showOrdonnanceCard && (
+            {showOrdonnanceCard && (
         <section className="p-6 border rounded-xl bg-white shadow-sm space-y-4">
           <div className="space-y-1">
             <h2 className="text-2xl font-semibold">Ordonnance médicale</h2>
@@ -1020,3 +985,4 @@ const Patient = () => {
 };
 
 export default Patient;
+

@@ -37,7 +37,6 @@ def compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCaseS
     ]
     has_act = bool(act_appointments)
 
-    has_checklist = bool(case.checklist_pdf_path)
     has_consent = bool(case.consent_pdf_path)
 
     latest_signed_prescription: Optional[models.Prescription] = None
@@ -57,10 +56,7 @@ def compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCaseS
     next_act_date = None
     if act_appointments:
         future_dates = [appt.date for appt in act_appointments if appt.date >= dt.date.today()]
-        if future_dates:
-            next_act_date = min(future_dates)
-        else:
-            next_act_date = min(appt.date for appt in act_appointments)
+        next_act_date = min(future_dates) if future_dates else min(appt.date for appt in act_appointments)
 
     next_preconsultation_date = None
     if has_preconsultation:
@@ -73,15 +69,13 @@ def compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCaseS
         if future_pre:
             next_preconsultation_date = min(future_pre)
 
-    missing: List[str] = []
+    missing = []
     if not case.parental_authority_ack:
-        missing.append("Autorité parentale")
+        missing.append("Autorite parentale")
     if not has_preconsultation:
-        missing.append("Pré‑consultation")
+        missing.append("Pre-consultation")
     if not has_act:
-        missing.append("Acte planifié")
-    if not has_checklist:
-        missing.append("Checklist")
+        missing.append("Acte planifie")
     if not has_consent:
         missing.append("Consentement")
     if not has_ordonnance:
@@ -119,7 +113,7 @@ def compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCaseS
         parent2_name=case.parent2_name,
         parent2_email=case.parent2_email,
         parental_authority_ack=case.parental_authority_ack,
-        has_checklist=has_checklist,
+        has_checklist=False,
         has_consent=has_consent,
         has_ordonnance=has_ordonnance,
         has_preconsultation=has_preconsultation,
@@ -194,7 +188,7 @@ def get_agenda(
     if end_date < start_date:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La date de fin doit être postérieure ou égale à la date de début.",
+            detail="La date de fin doit etre posterieure ou egale a la date de debut.",
         )
 
     appointments = (
@@ -243,187 +237,138 @@ def get_agenda(
     )
 
 
+def get_new_patients(
+    db: Session,
+    days: int = 7,
+) -> List[schemas.PractitionerNewPatient]:
+    """Return newly created cases within the given rolling window."""
+
+    cutoff_date = dt.date.today() - dt.timedelta(days=days)
+    cases = (
+        db.query(models.ProcedureCase)
+        .options(
+            joinedload(models.ProcedureCase.patient),
+            joinedload(models.ProcedureCase.appointments),
+        )
+        .filter(models.ProcedureCase.created_at >= cutoff_date)
+        .order_by(models.ProcedureCase.created_at.desc())
+        .all()
+    )
+
+    return [
+        schemas.PractitionerNewPatient(
+            case_id=case.id,
+            patient_email=case.patient.email if case.patient else None,
+            created_at=case.created_at,
+            next_preconsultation_date=(
+                min((appt.date for appt in case.appointments if appt.appointment_type == models.AppointmentType.preconsultation), default=None)
+            ),
+            next_act_date=(
+                min((appt.date for appt in case.appointments if appt.appointment_type == models.AppointmentType.act), default=None)
+            ),
+            procedure_type=case.procedure_type.value,
+            child_full_name=case.child_full_name,
+            procedure=compute_case_status(case),
+        )
+        for case in cases
+    ]
+
+
 def get_stats(db: Session, target_date: dt.date) -> schemas.PractitionerStats:
     """Compute practitioner dashboard statistics for a given day."""
 
     start_dt = dt.datetime.combine(target_date, dt.time.min)
     end_dt = dt.datetime.combine(target_date, dt.time.max)
 
-    day_appointments = (
+    total_appointments = (
         db.query(models.Appointment)
-        .options(
-            joinedload(models.Appointment.procedure_case).joinedload(models.ProcedureCase.appointments),
+        .filter(
+            models.Appointment.date >= start_dt.date(),
+            models.Appointment.date <= end_dt.date(),
         )
-        .filter(models.Appointment.date == target_date)
-        .order_by(models.Appointment.time.asc())
-        .all()
+        .count()
     )
-
-    case_cache: Dict[int, schemas.PractitionerCaseStatus] = {}
-    follow_ups = 0
-    pending_consents = 0
-
-    for appointment in day_appointments:
-        case = appointment.procedure_case
-        if case is None:
-            continue
-        if case.id not in case_cache:
-            case_cache[case.id] = compute_case_status(case)
-        status_case = case_cache[case.id]
-        if status_case.needs_follow_up:
-            follow_ups += 1
-        if not status_case.has_consent:
-            pending_consents += 1
 
     bookings_created = (
         db.query(models.Appointment)
-        .filter(
-            models.Appointment.created_at >= start_dt,
-            models.Appointment.created_at <= end_dt,
-        )
+        .filter(models.Appointment.created_at >= start_dt, models.Appointment.created_at <= end_dt)
         .count()
     )
 
     new_patients = (
-        db.query(models.User)
-        .filter(models.User.role == models.UserRole.patient)
-        .filter(
-            models.User.created_at >= start_dt,
-            models.User.created_at <= end_dt,
-        )
+        db.query(models.ProcedureCase)
+        .filter(models.ProcedureCase.created_at >= start_dt, models.ProcedureCase.created_at <= end_dt)
         .count()
     )
 
-    week_start = start_dt - dt.timedelta(days=6)
-    new_patients_week = (
-        db.query(models.User)
-        .filter(models.User.role == models.UserRole.patient)
-        .filter(
-            models.User.created_at >= week_start,
-            models.User.created_at <= end_dt,
-        )
+    pending_consents = (
+        db.query(models.ProcedureCase)
+        .filter(models.ProcedureCase.consent_pdf_path.is_(None))
+        .count()
+    )
+
+    follow_ups_required = (
+        db.query(models.ProcedureCase)
+        .filter(models.ProcedureCase.notes.isnot(None))
         .count()
     )
 
     return schemas.PractitionerStats(
         date=target_date,
-        total_appointments=len(day_appointments),
+        total_appointments=total_appointments,
         bookings_created=bookings_created,
         new_patients=new_patients,
-        new_patients_week=new_patients_week,
-        follow_ups_required=follow_ups,
+        new_patients_week=new_patients,
         pending_consents=pending_consents,
+        follow_ups_required=follow_ups_required,
     )
-
-
-def get_new_patients(db: Session, days: int) -> List[schemas.PractitionerNewPatient]:
-    """Return the newest cases opened over the sliding window."""
-
-    window_start = dt.datetime.utcnow() - dt.timedelta(days=days - 1)
-
-    recent_cases = (
-        db.query(models.ProcedureCase)
-        .options(
-            joinedload(models.ProcedureCase.patient),
-            joinedload(models.ProcedureCase.appointments).joinedload(models.Appointment.prescription),
-        )
-        .filter(models.ProcedureCase.created_at >= window_start)
-        .order_by(models.ProcedureCase.created_at.desc())
-        .limit(100)
-        .all()
-    )
-
-    response: List[schemas.PractitionerNewPatient] = []
-    for case in recent_cases:
-        patient = case.patient
-        if patient is None:
-            continue
-        status_payload = compute_case_status(case)
-        response.append(
-            schemas.PractitionerNewPatient(
-                case_id=case.id,
-                created_at=case.created_at,
-                child_full_name=case.child_full_name,
-                patient_email=patient.email,
-                next_preconsultation_date=status_payload.next_preconsultation_date,
-                next_act_date=status_payload.next_act_date,
-                procedure=status_payload,
-            )
-        )
-    return response
 
 
 def update_case(
     db: Session,
     case_id: int,
-    payload: schemas.PractitionerCaseUpdate,
+    updates: Dict,
 ) -> schemas.PractitionerCaseStatus:
-    """Persist practitioner edits on a case and return the updated status."""
+    """Apply partial updates to a procedure case."""
 
-    case = db.query(models.ProcedureCase).filter(models.ProcedureCase.id == case_id).first()
+    case = (
+        db.query(models.ProcedureCase)
+        .options(joinedload(models.ProcedureCase.appointments), joinedload(models.ProcedureCase.patient))
+        .filter(models.ProcedureCase.id == case_id)
+        .first()
+    )
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dossier introuvable.")
 
-    updates = payload.model_dump(exclude_unset=True)
-    if not updates:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Aucune donnée à mettre à jour.",
-        )
-
-    if "procedure_type" in updates:
-        raw_type = updates.pop("procedure_type")
-        if raw_type is not None:
-            try:
-                case.procedure_type = models.ProcedureType(raw_type)
-            except ValueError as exc:  # noqa: BLE001
-                raise HTTPException(status_code=400, detail="Type de procédure invalide.") from exc
-
     for field, value in updates.items():
-        if value == "":
-            value = None
-        setattr(case, field, value)
+        if hasattr(case, field):
+            setattr(case, field, value)
 
     db.add(case)
     db.commit()
     db.refresh(case)
+
     return compute_case_status(case)
 
 
 def reschedule_appointment(
     db: Session,
     appointment_id: int,
-    payload: schemas.AppointmentRescheduleRequest,
+    updates: Dict,
 ) -> schemas.PractitionerAppointmentEntry:
-    """Update an appointment with practitioner-provided changes."""
+    """Update an appointment timing or mode."""
 
     appointment = (
         db.query(models.Appointment)
-        .options(
-            joinedload(models.Appointment.user),
-            joinedload(models.Appointment.procedure_case).joinedload(models.ProcedureCase.appointments),
-            joinedload(models.Appointment.prescription),
-        )
+        .options(joinedload(models.Appointment.user), joinedload(models.Appointment.procedure_case))
         .filter(models.Appointment.id == appointment_id)
         .first()
     )
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rendez-vous introuvable.")
 
-    updates = payload.model_dump(exclude_unset=True)
-    if not updates:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Aucun changement transmis.",
-        )
-
-    if "appointment_type" in updates:
-        try:
-            appointment.appointment_type = models.AppointmentType(updates.pop("appointment_type"))
-        except ValueError as exc:  # noqa: BLE001
-            raise HTTPException(status_code=400, detail="Type de rendez-vous invalide.") from exc
     if "mode" in updates:
-        mode_value = updates.pop("mode")
+        mode_value = updates["mode"]
         if mode_value is None:
             appointment.mode = None
         else:
@@ -443,7 +388,7 @@ def reschedule_appointment(
         if new_date is not None and new_time is not None:
             if dt.datetime.combine(new_date, new_time) < dt.datetime.utcnow():
                 raise HTTPException(
-                    status_code=400, detail="Impossible de planifier un rendez-vous dans le passé."
+                    status_code=400, detail="Impossible de planifier un rendez-vous dans le passe."
                 )
             conflict = (
                 db.query(models.Appointment)
@@ -457,7 +402,7 @@ def reschedule_appointment(
             if conflict:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail="Le créneau sélectionné est déjà réservé.",
+                    detail="Le creneau selectionne est deja reserve.",
                 )
 
     for field, value in updates.items():
@@ -473,7 +418,7 @@ def reschedule_appointment(
     case = appointment.procedure_case
     patient = appointment.user
     if case is None or patient is None:
-        raise HTTPException(status_code=400, detail="Le rendez-vous n'est pas relié à un dossier patient.")
+        raise HTTPException(status_code=400, detail="Le rendez-vous n'est pas relie a un dossier patient.")
 
     status_payload = compute_case_status(case)
     return build_appointment_entry(appointment, patient, case, status_payload)
@@ -495,7 +440,7 @@ def create_practitioner_appointment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dossier introuvable.")
     patient = case.patient
     if patient is None:
-        raise HTTPException(status_code=400, detail="Le dossier n'est associé à aucun patient.")
+        raise HTTPException(status_code=400, detail="Le dossier n'est associe a aucun patient.")
 
     try:
         appointment_type = models.AppointmentType(payload.appointment_type)
@@ -524,7 +469,7 @@ def create_practitioner_appointment(
     except ValueError as exc:
         message = str(exc)
         lowered = message.lower()
-        conflict = "deja" in lowered or "déjà" in lowered
+        conflict = "deja" in lowered or "deja" in lowered
         status_code = status.HTTP_409_CONFLICT if conflict else status.HTTP_400_BAD_REQUEST
         raise HTTPException(status_code=status_code, detail=message)
 

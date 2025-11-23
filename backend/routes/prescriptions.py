@@ -128,7 +128,23 @@ def _append_version_entry(
     appointment: models.Appointment,
     prescription: models.Prescription,
     pdf_path: str,
+    *,
+    skip_if_duplicate: bool = False,
 ) -> models.PrescriptionVersion:
+    last_version = (
+        db.query(models.PrescriptionVersion)
+        .filter(models.PrescriptionVersion.prescription_id == prescription.id)
+        .order_by(models.PrescriptionVersion.created_at.desc())
+        .first()
+    )
+    if skip_if_duplicate and last_version:
+        if (
+            last_version.items == prescription.items
+            and last_version.instructions == prescription.instructions
+            and last_version.pdf_path == pdf_path
+        ):
+            return last_version
+
     version = models.PrescriptionVersion(
         prescription_id=prescription.id,
         appointment_id=appointment.id,
@@ -263,12 +279,45 @@ def _serve_prescription_version_file(
 
 
 def _ensure_prescription(db: Session, appointment: models.Appointment) -> models.Prescription:
+    storage = get_storage_backend()
     if appointment.prescription:
-        return appointment.prescription
+        pres = appointment.prescription
+        file_missing = not (pres.pdf_path and storage.exists(ORDONNANCE_CATEGORY, pres.pdf_path))
+        if not file_missing:
+            return pres
+
+        existing_qr = pres.qr_codes[0] if pres.qr_codes else None
+        context, reference, qr_meta = _build_prescription_context(
+            db,
+            appointment,
+            issued_at=pres.signed_at,
+            existing_slug=existing_qr.slug if existing_qr else None,
+            existing_url=existing_qr.verification_url if existing_qr else None,
+        )
+        try:
+            filename = generate_ordonnance_pdf(context)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+        pres.pdf_path = filename
+        pres.reference = reference
+        db.add(pres)
+        db.flush()
+        version = _append_version_entry(db, appointment, pres, filename, skip_if_duplicate=True)
+        qr_codes.upsert_qr_code(
+            db,
+            prescription=pres,
+            reference=reference,
+            slug=qr_meta["slug"],
+            verification_url=qr_meta["verification_url"],
+            payload=qr_meta["payload"],
+            version=version,
+        )
+        db.commit()
+        db.refresh(pres)
+        return pres
 
     existing_qr = None
-    if appointment.prescription and appointment.prescription.qr_codes:
-        existing_qr = appointment.prescription.qr_codes[0]
     context, reference, qr_meta = _build_prescription_context(
         db,
         appointment,
@@ -290,7 +339,7 @@ def _ensure_prescription(db: Session, appointment: models.Appointment) -> models
     )
     db.add(prescription)
     db.flush()
-    version = _append_version_entry(db, appointment, prescription, filename)
+    version = _append_version_entry(db, appointment, prescription, filename, skip_if_duplicate=False)
     qr_codes.upsert_qr_code(
         db,
         prescription=prescription,
@@ -374,7 +423,7 @@ def sign_prescription(
         db.add(appointment.procedure_case)
 
     db.flush()
-    version = _append_version_entry(db, appointment, prescription, filename)
+    version = _append_version_entry(db, appointment, prescription, filename, skip_if_duplicate=True)
     qr_codes.upsert_qr_code(
         db,
         prescription=prescription,
