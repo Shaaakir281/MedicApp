@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Modal from '../../../components/Modal.jsx';
 import { SectionHeading } from '../../../components/ui';
 import { API_BASE_URL, fetchSlots } from '../../../lib/api.js';
@@ -111,7 +111,9 @@ export function PatientDetailsDrawer({
   onCreateAppointment,
   onPreview,
   onSign,
+  onEdit,
   onSend,
+  onNavigateDate,
   previewingId,
   signingId,
   sendingId,
@@ -133,6 +135,19 @@ export function PatientDetailsDrawer({
     return `${base}${actorChannel}${inlineParam}`;
   };
   const prescriptionUrl = buildAbsoluteUrl(appointment.prescription_url, false, 'download');
+  const appointmentSummaries = procedure?.appointments_overview || [];
+  const latestHistoryByType = (type) => {
+    const entries = (prescriptionHistory || []).filter((entry) => entry.appointment_type === type);
+    if (!entries.length) return null;
+    return entries.reduce((latest, curr) =>
+      new Date(curr.created_at) > new Date(latest.created_at) ? curr : latest,
+    );
+  };
+
+  const distinctPrescriptions = [
+    { type: 'preconsultation', label: 'Ordonnance pre-consultation' },
+    { type: 'act', label: 'Ordonnance acte' },
+  ];
 
   const [isEditingCase, setIsEditingCase] = useState(false);
   const [caseForm, setCaseForm] = useState(buildCaseForm(procedure, patient));
@@ -329,7 +344,7 @@ export function PatientDetailsDrawer({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
-      <div className="space-y-4">
+      <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <SectionHeading
             title={`Dossier de ${patient?.child_full_name || 'Patient'}`}
@@ -601,7 +616,6 @@ export function PatientDetailsDrawer({
             <h4 className="font-semibold text-slate-700">Statut dossier</h4>
             <ul className="list-disc list-inside text-sm text-slate-600 space-y-1">
               <li>Autorite parentale : {procedure?.parental_authority_ack ? 'OK' : 'Manquante'}</li>
-              <li>Checklist : {procedure?.has_checklist ? 'OK' : 'A fournir'}</li>
               <li>Consentement : {procedure?.has_consent ? 'OK' : 'A recuperer'}</li>
               <li>Ordonnance : {procedure?.has_ordonnance ? 'OK' : 'Non generee'}</li>
               <li>
@@ -664,26 +678,54 @@ export function PatientDetailsDrawer({
                 : '--'}
             </p>
             <p>Telechargements : {appointment.prescription_download_count || 0}</p>
+            <div className="space-y-1 text-xs text-slate-600">
+              <p className="font-semibold text-slate-700">Acces rapide</p>
+              <div className="flex flex-wrap gap-2">
+                {appointmentSummaries.map((entry) => {
+                  const isPast = entry.date && new Date(entry.date) < new Date();
+                  const badgeClass = isPast ? 'badge-ghost' : 'badge-outline';
+                  return (
+                  <button
+                    key={entry.appointment_id}
+                    type="button"
+                    className={`badge ${badgeClass} hover:bg-slate-100`}
+                    onClick={() => onNavigateDate?.(entry.date)}
+                  >
+                    {entry.appointment_type === 'act' ? 'Acte' : 'Pre-consultation'} • {formatDate(entry.date)}
+                  </button>
+                  );
+                })}
+              </div>
+              <div className="flex flex-col gap-1 pt-2">
+                {distinctPrescriptions.map((p) => {
+                  const history = latestHistoryByType(p.type);
+                  const previewUrl = history
+                    ? buildAbsoluteUrl(history.url, true, 'history')
+                    : null;
+                  return (
+                    <div key={p.type} className="flex items-center gap-2">
+                      <span className="badge badge-ghost">{p.label}</span>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-outline"
+                        onClick={() => onPreview?.(appointment, { url: previewUrl, title: p.label })}
+                        disabled={!previewUrl}
+                      >
+                        Voir
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2 pt-1">
+              {/* On passe désormais par les boutons Voir/Modifier pour signer si nécessaire */}
               <button
                 type="button"
-                className="btn btn-xs btn-outline"
-                onClick={() => onPreview?.(appointment)}
-                disabled={previewingId === appointment.appointment_id}
+                className="btn btn-xs btn-ghost"
+                onClick={() => onEdit?.(appointment)}
               >
-                {previewingId === appointment.appointment_id ? 'Preparation...' : 'Previsualiser'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-xs btn-outline"
-                onClick={() => onSign?.(appointment)}
-                disabled={signingId === appointment.appointment_id || Boolean(appointment.prescription_signed_at)}
-              >
-                {appointment.prescription_signed_at
-                  ? 'Deja signee'
-                  : signingId === appointment.appointment_id
-                  ? 'Signature...'
-                  : 'Signer'}
+                Modifier
               </button>
               <button
                 type="button"
@@ -713,7 +755,7 @@ export function PatientDetailsDrawer({
               )}
               {!historyLoading && !historyError && !prescriptionHistory.length && (
                 <p className="text-xs text-slate-500">
-                  Aucune version disponible pour lâ€™instant.
+                  Aucune version disponible pour laTMinstant.
                 </p>
               )}
               {!historyLoading && !historyError && prescriptionHistory.length > 0 && (
@@ -765,7 +807,7 @@ export function PatientDetailsDrawer({
                           </p>
                         ) : (
                           <p className="text-[11px] text-slate-500 italic">
-                            Aucun detail dâ€™items enregistre.
+                            Aucun detail daTMitems enregistre.
                           </p>
                         )}
                         {version.downloads?.length ? (
@@ -774,7 +816,7 @@ export function PatientDetailsDrawer({
                             <ul className="text-[10px] text-slate-500 space-y-1">
                               {version.downloads.map((log) => (
                                 <li key={log.id}>
-                                  {formatDateTime(log.downloaded_at)} â€”{' '}
+                                  {formatDateTime(log.downloaded_at)} a{' '}
                                   {log.actor === 'patient' || log.actor === 'patient_link'
                                     ? 'Patient'
                                     : 'Praticien'}{' '}

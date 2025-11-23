@@ -16,6 +16,7 @@ import {
   saveProcedure,
   sendConsentLink,
   API_BASE_URL,
+  deleteAppointment,
 } from '../lib/api.js';
 import { defaultProcedureValues, patientProcedureSchema } from '../lib/forms';
 import { AuthPanel } from './patient/components/AuthPanel.jsx';
@@ -135,12 +136,15 @@ const Patient = () => {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [pharmacyFeedback, setPharmacyFeedback] = useState(null);
-  const [preferredPharmacy, setPreferredPharmacy] = useState(null);
   const [pharmacyModalOpen, setPharmacyModalOpen] = useState(false);
+  const [pharmacyTargetUrl, setPharmacyTargetUrl] = useState(null);
   const [previewState, setPreviewState] = useState(previewInitialState);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [procedureLoading, setProcedureLoading] = useState(false);
   const [sendingConsentEmail, setSendingConsentEmail] = useState(false);
+  const [isEditingCase, setIsEditingCase] = useState(false);
+  const [editingAppointmentId, setEditingAppointmentId] = useState(null);
+  const [cancelingId, setCancelingId] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -148,12 +152,14 @@ const Patient = () => {
       setProcedureCase(null);
       reset(defaultProcedureValues);
       setProcedureInfo(null);
+      setIsEditingCase(false);
     }
   }, [isAuthenticated, reset]);
 
   useEffect(() => {
     if (!isAuthenticated || procedureSelection !== 'circumcision') {
       setProcedureInfo(null);
+      setIsEditingCase(false);
       return;
     }
     let cancelled = false;
@@ -179,8 +185,10 @@ const Patient = () => {
       setProcedureCase(current);
       if (current) {
         reset(mapProcedureToFormValues(current));
+        setIsEditingCase(false);
       } else {
         reset(defaultProcedureValues);
+        setIsEditingCase(true);
       }
     } catch (err) {
       setError(err.message);
@@ -315,12 +323,15 @@ const Patient = () => {
       setProcedureCase(caseData);
       reset(mapProcedureToFormValues(caseData));
       setSuccessMessage('Dossier mis à jour. Un consentement pré-rempli est disponible au téléchargement.');
+      setIsEditingCase(false);
     } catch (err) {
       setError(err.message);
     } finally {
       setProcedureLoading(false);
     }
   };
+
+
 
   const handleCreateAppointment = async () => {
     if (
@@ -333,7 +344,31 @@ const Patient = () => {
       return;
     }
     setError(null);
+    setSuccessMessage(null);
+
+    const currentAppointments = procedureCase?.appointments || [];
+    const preconsultationAppt = currentAppointments.find(
+      (appt) => appt.appointment_type === 'preconsultation',
+    );
+    if (appointmentType === 'act') {
+      if (!preconsultationAppt) {
+        setError("Planifiez d'abord la pre-consultation avant l'acte.");
+        return;
+      }
+      const preDate = preconsultationAppt.date ? new Date(preconsultationAppt.date) : null;
+      const diffDays = preDate
+        ? (selectedDate.getTime() - preDate.getTime()) / (1000 * 60 * 60 * 24)
+        : null;
+      if (diffDays !== null && diffDays < 14) {
+        setError("L'acte doit etre au moins 14 jours apres la pre-consultation.");
+        return;
+      }
+    }
+
     try {
+      if (editingAppointmentId) {
+        await deleteAppointment(token, editingAppointmentId, { cascadeAct: false });
+      }
       const payload = {
         date: formatDateISO(selectedDate),
         time: `${selectedSlot}:00`,
@@ -342,12 +377,13 @@ const Patient = () => {
         mode: appointmentType === 'act' ? 'presentiel' : appointmentMode,
       };
       await createAppointment(token, payload);
-      const modeLabel = payload.mode === 'visio' ? 'en visio' : 'en présentiel';
+      const modeLabel = payload.mode === 'visio' ? 'en visio' : 'en presentiel';
       setSuccessMessage(
-        `Rendez-vous confirmé le ${payload.date} à ${selectedSlot} (${modeLabel}). Un e-mail de confirmation a été envoyé.`,
+        `Rendez-vous confirme le ${payload.date} a ${selectedSlot} (${modeLabel}). Un e-mail de confirmation a ete envoye.`,
       );
       setSelectedSlot(null);
       setAvailableSlots((prev) => prev.filter((slot) => slot !== selectedSlot));
+      setEditingAppointmentId(null);
       await loadProcedureCase();
     } catch (err) {
       setError(err.message);
@@ -381,10 +417,12 @@ const Patient = () => {
       procedureCase &&
       procedureCase.parental_authority_ack,
   );
+  const bothAppointmentsBooked = hasPreconsultation && hasAct;
   const showProcedureSelection = isAuthenticated && procedureSelection == null;
   const showProcedureForm = isAuthenticated && procedureSelection === 'circumcision';
   const showAutreMessage = isAuthenticated && procedureSelection === 'autre';
-  const showScheduling = showProcedureForm && canSchedule;
+  const showScheduling =
+    showProcedureForm && canSchedule && (!bothAppointmentsBooked || editingAppointmentId);
   const showConsentDownload = showProcedureForm && Boolean(consentLink);
   const showConsentPending = showProcedureForm && !consentLink && Boolean(procedureCase);
   const ordonnanceDownloadUrl = useMemo(
@@ -395,13 +433,16 @@ const Patient = () => {
     () => buildDocumentUrl(procedureCase?.ordonnance_download_url, { mode: 'inline' }),
     [procedureCase?.ordonnance_download_url],
   );
+  const hasAnyPrescription =
+    Boolean(ordonnanceDownloadUrl) || (procedureCase?.appointments || []).some((a) => a.prescription_url);
   const ordonnanceSignedLabel = procedureCase?.ordonnance_signed_at
     ? new Date(procedureCase.ordonnance_signed_at).toLocaleString('fr-FR', {
         dateStyle: 'long',
         timeStyle: 'medium',
       })
     : null;
-  const showOrdonnanceCard = Boolean(showProcedureForm && ordonnanceDownloadUrl);
+  // On masque l'ancien bloc ordonnance si la section "Rendez-vous & ordonnances" est affichée
+  const showOrdonnanceCard = Boolean(showProcedureForm && ordonnanceDownloadUrl && !(procedureCase?.appointments?.length));
 
   const handleSendConsentEmail = async () => {
     if (!token || sendingConsentEmail) {
@@ -432,19 +473,102 @@ const Patient = () => {
     });
   };
 
-  const handlePharmacyInfo = () => {
+  const handlePharmacyInfo = (url = null) => {
+    setPharmacyTargetUrl(url || ordonnanceDownloadUrl || null);
     setPharmacyModalOpen(true);
   };
 
-  const handlePharmacySelected = (pharmacy) => {
-    setPreferredPharmacy(pharmacy);
-    setPharmacyFeedback(
-      `Pharmacie « ${pharmacy.name} » enregistrée comme point de collecte. Nous activerons l'envoi dès que possible.`,
+  const handleSendToPharmacy = (email, urlToSend = ordonnanceDownloadUrl) => {
+    const targetUrl = urlToSend || ordonnanceDownloadUrl;
+    if (!email || !targetUrl) {
+      setError("Ajoutez l'email de la pharmacie et assurez-vous que l'ordonnance est disponible.");
+      return;
+    }
+    const subject = encodeURIComponent('Ordonnance');
+    const body = encodeURIComponent(
+      Bonjour,\n\nVeuillez trouver l'ordonnance du patient via ce lien securise : \n\nCordialement,,
     );
+    window.location.href = mailto:?subject=&body=;
+  };
+
+  const handlePharmacySelected = (pharmacy) => {
+    const email = pharmacy?.ms_sante_address || pharmacy?.email;
+    if (!email || !pharmacyTargetUrl) {
+      setPharmacyFeedback("Email de pharmacie manquant.");
+      setPharmacyModalOpen(false);
+      return;
+    }
+    handleSendToPharmacy(email, pharmacyTargetUrl);
+    setPharmacyFeedback(Lien prepare pour );
+    setPharmacyModalOpen(false);
+    setPharmacyTargetUrl(null);
+  };
+
+  const getPrescriptionUrls = (appt) => {
+    const baseDownload = buildDocumentUrl(appt?.prescription_url);
+    const basePreview = buildDocumentUrl(appt?.prescription_url, { mode: 'inline' });
+    const fallbackDownload = appt?.appointment_type === 'preconsultation' ? ordonnanceDownloadUrl : null;
+    const fallbackPreview = appt?.appointment_type === 'preconsultation' ? ordonnancePreviewUrl : null;
+    return {
+      downloadUrl: baseDownload || fallbackDownload,
+      previewUrl: basePreview || fallbackPreview,
+    };
+  };
+
+  const todayISO = formatDateISO(new Date());
+  const appointments = procedureCase?.appointments || [];
+  const upcomingAppointments = appointments.filter((appt) => appt.date && appt.date >= todayISO);
+  const pastAppointments = appointments.filter((appt) => appt.date && appt.date < todayISO);
+
+  const handlePreviewAppointmentPrescription = (appt) => {
+    const url = buildDocumentUrl(appt.prescription_url, { mode: 'inline' });
+    if (!url) {
+      setError("L'ordonnance n'est pas disponible pour ce rendez-vous.");
+      return;
+    }
+    setPreviewState({
+      open: true,
+      url,
+      title: appt.appointment_type === 'act' ? 'Ordonnance acte' : 'Ordonnance pre-consultation',
+      type: 'ordonnance',
+    });
   };
 
   const handleClosePreview = () => {
     setPreviewState(previewInitialState);
+  };
+
+  const handleEditAppointment = (appt) => {
+    if (!appt) return;
+    const apptId = appt.appointment_id || appt.id || null;
+    setError(null);
+    setSuccessMessage(null);
+    setEditingAppointmentId(apptId);
+    setAppointmentType(appt.appointment_type || 'preconsultation');
+    setAppointmentMode(appt.mode || (appt.appointment_type === 'act' ? 'presentiel' : 'visio'));
+    setSelectedDate(new Date(appt.date));
+    setSelectedSlot(appt.time ? appt.time.slice(0, 5) : null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelAppointment = async (appt) => {
+    const apptId = appt?.appointment_id || appt?.id;
+    if (!apptId || !token || cancelingId) return;
+    setCancelingId(apptId);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      await deleteAppointment(token, apptId, { cascadeAct: false });
+      setSuccessMessage('Rendez-vous annulé. Vous pouvez en planifier un nouveau.');
+      await loadProcedureCase();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCancelingId(null);
+      if (editingAppointmentId === apptId) {
+        setEditingAppointmentId(null);
+      }
+    }
   };
 
   const previewActions = useMemo(() => {
@@ -529,7 +653,47 @@ const Patient = () => {
         </section>
       )}
 
-      {showProcedureForm && (
+      {showProcedureForm && !isEditingCase && procedureCase && (
+        <section className="p-6 border rounded-xl bg-white shadow-sm space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold">Dossier patient</h2>
+              <p className="text-sm text-slate-600">
+                Dossier enregistré. Vous pouvez le modifier si besoin.
+              </p>
+            </div>
+            <button type="button" className="btn btn-sm btn-outline" onClick={() => setIsEditingCase(true)}>
+              Modifier le dossier
+            </button>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3 text-sm text-slate-700">
+            <div className="space-y-1">
+              <p><span className="font-semibold">Enfant :</span> {procedureCase.child_full_name || 'Non renseigné'}</p>
+              <p><span className="font-semibold">Date de naissance :</span> {procedureCase.child_birthdate || 'Non renseignée'}</p>
+              <p><span className="font-semibold">Poids :</span> {procedureCase.child_weight_kg ? `${procedureCase.child_weight_kg} kg` : 'Non renseigné'}</p>
+            </div>
+            <div className="space-y-1">
+              <p><span className="font-semibold">Parent 1 :</span> {procedureCase.parent1_name || 'Non renseigné'}</p>
+              <p><span className="font-semibold">Email parent 1 :</span> {procedureCase.parent1_email || 'Non renseigné'}</p>
+              <p><span className="font-semibold">Parent 2 :</span> {procedureCase.parent2_name || 'Non renseigné'}</p>
+            </div>
+          </div>
+          <div className="p-3 border rounded-lg bg-slate-50">
+            <p className="font-semibold text-slate-700">Infos manquantes</p>
+            {procedureCase.missing_fields?.length ? (
+              <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
+                {procedureCase.missing_fields.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-600">Aucune info manquante.</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {showProcedureForm && isEditingCase && (
         <FormProvider {...formMethods}>
           <ProcedureForm
             info={procedureInfo}
@@ -544,6 +708,177 @@ const Patient = () => {
             canSendConsent={Boolean(procedureCase)}
           />
         </FormProvider>
+      )}
+
+      {procedureCase?.appointments?.length ? (
+        <section className="p-6 border rounded-xl bg-white shadow-sm space-y-4">
+          <h2 className="text-2xl font-semibold">Rendez-vous & ordonnances</h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <h3 className="font-semibold text-slate-700">A venir</h3>
+              {upcomingAppointments.length === 0 && (
+                <p className="text-sm text-slate-500">Aucun rendez-vous planifie.</p>
+              )}
+              {upcomingAppointments.map((appt) => {
+                const apptId = appt.appointment_id || appt.id;
+                const fallbackDownload =
+                  appt.appointment_type === 'preconsultation' ? ordonnanceDownloadUrl : null;
+                const downloadUrl = buildDocumentUrl(appt.prescription_url) || fallbackDownload;
+                const previewUrl = buildDocumentUrl(appt.prescription_url, { mode: 'inline' }) || fallbackDownload;
+                return (
+                  <div key={apptId} className="border rounded-lg p-3 space-y-1">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs">
+                        {appt.appointment_type === 'act' ? 'Acte' : 'Pre-consultation'}
+                      </span>
+                      <span className="text-slate-700 font-medium">
+                        {new Date(appt.date).toLocaleDateString('fr-FR')} {appt.time?.slice(0, 5)}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-outline"
+                        onClick={() => handlePreviewAppointmentPrescription(appt)}
+                        disabled={!previewUrl}
+                      >
+                        Voir l'ordonnance
+                      </button>
+                      <a
+                        className={`btn btn-xs btn-ghost ${!downloadUrl ? 'btn-disabled' : ''}`}
+                        href={downloadUrl || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Telecharger
+                      </a>
+                      <button
+                        type="button"
+                        className={`btn btn-xs btn-ghost ${!downloadUrl || !preferredPharmacy?.ms_sante_address ? 'btn-disabled' : ''}`}
+                        onClick={() => downloadUrl && preferredPharmacy?.ms_sante_address && handleSendToPharmacy(downloadUrl)}
+                      >
+                        Envoyer pharmacie
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1 border-t border-dashed border-slate-200 mt-2">
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-ghost"
+                        onClick={() => handleEditAppointment(appt)}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-ghost"
+                        onClick={() => handleCancelAppointment(appt)}
+                        disabled={cancelingId === apptId}
+                      >
+                        {cancelingId === apptId ? 'Annulation...' : 'Annuler'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-slate-700">Passes</h3>
+              {pastAppointments.length === 0 && (
+                <p className="text-sm text-slate-500">Aucun rendez-vous passe.</p>
+              )}
+              {pastAppointments.map((appt) => {
+                const apptId = appt.appointment_id || appt.id;
+                const fallbackDownload =
+                  appt.appointment_type === 'preconsultation' ? ordonnanceDownloadUrl : null;
+                const downloadUrl = buildDocumentUrl(appt.prescription_url) || fallbackDownload;
+                const previewUrl = buildDocumentUrl(appt.prescription_url, { mode: 'inline' }) || fallbackDownload;
+                return (
+                  <div key={apptId} className="border rounded-lg p-3 space-y-1 bg-slate-50">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-xs">
+                        {appt.appointment_type === 'act' ? 'Acte' : 'Pre-consultation'}
+                      </span>
+                      <span className="text-slate-700 font-medium">
+                        {new Date(appt.date).toLocaleDateString('fr-FR')} {appt.time?.slice(0, 5)}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-outline"
+                        onClick={() => handlePreviewAppointmentPrescription(appt)}
+                        disabled={!previewUrl}
+                      >
+                        Voir l'ordonnance
+                      </button>
+                      <a
+                        className={`btn btn-xs btn-ghost ${!downloadUrl ? 'btn-disabled' : ''}`}
+                        href={downloadUrl || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Telecharger
+                      </a>
+                      <button
+                        type="button"
+                        className={`btn btn-xs btn-ghost ${!downloadUrl || !preferredPharmacy?.ms_sante_address ? 'btn-disabled' : ''}`}
+                        onClick={() => downloadUrl && preferredPharmacy?.ms_sante_address && handleSendToPharmacy(downloadUrl)}
+                      >
+                        Envoyer pharmacie
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1 border-t border-dashed border-slate-200 mt-2">
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-ghost"
+                        onClick={() => handleEditAppointment(appt)}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-ghost"
+                        onClick={() => handleCancelAppointment(appt)}
+                        disabled={cancelingId === apptId}
+                      >
+                        {cancelingId === apptId ? 'Annulation...' : 'Annuler'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {hasAnyPrescription && (
+        <section className="p-6 border rounded-xl bg-white shadow-sm space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold">Pharmacie</h2>
+              <p className="text-sm text-slate-600">
+                Enregistrez l'email de votre pharmacie pour lui envoyer l'ordonnance.
+              </p>
+            </div>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={handlePharmacyInfo}>
+              Choisir / modifier la pharmacie
+            </button>
+          </div>
+          {preferredPharmacy?.ms_sante_address && (
+            <div className="flex flex-wrap gap-2 items-center text-sm text-slate-700">
+              <span className="font-semibold">Email :</span>
+              <span>{preferredPharmacy.ms_sante_address}</span>
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => handleSendToPharmacy()}>
+                Envoyer l'ordonnance
+              </button>
+            </div>
+          )}
+          {!preferredPharmacy?.ms_sante_address && (
+            <p className="text-sm text-slate-600">Aucune pharmacie enregistrée pour le moment.</p>
+          )}
+          {pharmacyFeedback && <p className="text-sm text-slate-600">{pharmacyFeedback}</p>}
+        </section>
       )}
 
       {showOrdonnanceCard && (
@@ -572,8 +907,13 @@ const Patient = () => {
               Télécharger le PDF
             </a>
             <button type="button" className="btn btn-ghost btn-sm" onClick={handlePharmacyInfo}>
-              Choisir ma pharmacie (bientôt disponible)
+              Choisir ma pharmacie
             </button>
+            {preferredPharmacy?.ms_sante_address && (
+              <button type="button" className="btn btn-outline btn-sm" onClick={handleSendToPharmacy}>
+                Envoyer a ma pharmacie
+              </button>
+            )}
           </div>
           {preferredPharmacy && (
             <div className="p-3 border border-dashed rounded-lg border-slate-300 bg-slate-50 text-sm text-slate-700">

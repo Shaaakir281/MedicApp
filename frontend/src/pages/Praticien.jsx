@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
@@ -29,22 +29,42 @@ import PdfPreviewModal from '../components/PdfPreviewModal.jsx';
 const VIEW_OPTIONS = [1, 7, 14, 23];
 const AUTO_REFRESH_INTERVAL_MS = 60_000;
 const ACT_ITEMS = [
-  'Bactigras 10x10 cm x 5',
-  'Compresses stÃ©riles 5x5 cm x 10',
-  'Set de pansement stÃ©rile',
-  'Doliprane 2,4% (adaptÃ© au poids)',
+  'Antiseptique cutane type Biseptine 250 ml',
+  'Compresses steriles non tissees 5x5 cm',
   'Pansements compressifs 3x3 cm',
+  "Paracetamol pediatrique (Doliprane 2,4 %) 15 mg/kg par prise (base sur le poids actualise de l'enfant)",
+  'Serum physiologique sterile 0,9 %',
+  'Gants steriles usage unique',
+  'Creme cicatrisante type Cicalfate',
 ];
 const PRECONSULT_ITEMS = [
-  'Doliprane 2,4% (adaptÃ© au poids)',
-  'ThermomÃ¨tre Ã©lectronique',
-  'Carnet de santÃ©',
+  "Carnet de sante de l'enfant - A presenter le jour de la consultation",
+  'Compte-rendu du pediatre ou medecin traitant - Moins de 6 mois',
+  "Thermometre electronique - Verifier l'absence de fievre",
+  "Paracetamol pediatrique (Doliprane 2,4 %) - 15 mg/kg par prise (base sur le poids actualise de l'enfant)",
 ];
-const DEFAULT_INSTRUCTIONS =
-  "Acheter les Ã©lÃ©ments 24h avant l'intervention, les conserver stÃ©riles et les apporter le jour J. En cas de complication (douleur importante, saignement, fiÃ¨vre > 38,5Â°C), contacter immÃ©diatement le praticien.";
+const DEFAULT_INSTRUCTION_LINES = [
+  "Acheter l'ensemble du materiel au plus tard 48 h avant l'intervention et conserver les dispositifs steriles fermes.",
+  "Realiser une toilette soigneuse avec antiseptique la veille et le matin de l'acte.",
+  "Respecter la posologie des antalgiques adaptee au poids de l'enfant ; ne pas depasser 4 prises par 24 h.",
+  "Surveiller la plaie : rougeur anormale, saignement continu ou fievre >= 38 C necessitent un avis medical rapide.",
+  "En cas de doute ou d'effet indesirable, contacter immediatement le praticien via le numero d'astreinte communique.",
+];
+const DEFAULT_INSTRUCTIONS = DEFAULT_INSTRUCTION_LINES.join('\n');
 
 const toDate = (isoDate) => new Date(`${isoDate}T00:00:00`);
 const toISODate = (dateObj) => dateObj.toISOString().split('T')[0];
+const normalizeISODate = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return toISODate(value);
+  }
+  if (typeof value === 'string') {
+    if (value.includes('T')) return value.split('T')[0];
+    return value;
+  }
+  return null;
+};
 const addDays = (isoDate, delta) => {
   const base = toDate(isoDate);
   base.setDate(base.getDate() + delta);
@@ -83,12 +103,25 @@ const Praticien = () => {
   const buildDefaultPreviewState = () => ({
     open: false,
     url: null,
-    title: "Aperçu de l'ordonnance",
+    title: "Apercu de l'ordonnance",
     appointmentId: null,
     mode: 'view',
   });
   const [previewState, setPreviewState] = useState(buildDefaultPreviewState);
   const resetPreviewState = () => setPreviewState(buildDefaultPreviewState());
+
+  const findAppointmentById = (appointmentId) => {
+    if (!appointmentId) return null;
+    const days = agendaQuery.data?.days || [];
+    for (const day of days) {
+      const found = day.appointments?.find((appt) => appt.appointment_id === appointmentId);
+      if (found) return found;
+    }
+    if (patientDrawer.appointment?.appointment_id === appointmentId) {
+      return patientDrawer.appointment;
+    }
+    return null;
+  };
 
   const toAbsoluteUrl = (path) => {
     if (!path) return null;
@@ -173,7 +206,7 @@ const Praticien = () => {
     try {
       await login(credentials);
     } catch (err) {
-      setLoginError(err.message || 'Ã‰chec de la connexion');
+      setLoginError(err.message || 'Echec de la connexion');
     }
   };
 
@@ -196,7 +229,7 @@ const Praticien = () => {
       })
       .catch((err) => {
         if (!cancelled) {
-          setHistoryError(err.message || 'Impossible de charger lâ€™historique.');
+          setHistoryError(err.message || 'Impossible de charger laTMhistorique.');
         }
       })
       .finally(() => {
@@ -224,7 +257,7 @@ const Praticien = () => {
     setPreviewState({
       open: true,
       url,
-      title: title || "Aperçu de l'ordonnance",
+      title: title || "Apercu de l'ordonnance",
       appointmentId,
       mode,
     });
@@ -250,11 +283,11 @@ const Praticien = () => {
         url: previewUrl,
         appointmentId,
         title:
-          mode === 'sign' ? "Vérifiez l'ordonnance avant signature" : "Aperçu de l'ordonnance",
+          mode === 'sign' ? "Verifiez l'ordonnance avant signature" : "Apercu de l'ordonnance",
         mode,
       });
       if (generated) {
-        setSuccessMessage('Ordonnance générée.');
+        setSuccessMessage('Ordonnance generee.');
         triggerHistoryRefresh();
         handleRefresh();
       }
@@ -270,7 +303,7 @@ const Praticien = () => {
     openPreviewWithUrl({
       url,
       appointmentId: appointment?.appointment_id ?? null,
-      title: title || "Aperçu de l'ordonnance",
+      title: title || "Apercu de l'ordonnance",
       mode: 'view',
     });
   };
@@ -291,13 +324,13 @@ const Praticien = () => {
     try {
       const data = await signMutation.mutateAsync(appointmentId);
       const previewUrl = buildPractitionerUrl(data.preview_url, { inline: true, channel: 'signature' });
-      setSuccessMessage('Ordonnance signée et envoyée au patient.');
+      setSuccessMessage('Ordonnance signee et envoyee au patient.');
       triggerHistoryRefresh();
       handleRefresh();
       openPreviewWithUrl({
         url: previewUrl,
         appointmentId,
-        title: "Ordonnance signée",
+        title: "Ordonnance signee",
         mode: 'view',
       });
     } catch (err) {
@@ -333,7 +366,7 @@ const Praticien = () => {
     setActiveSendId(appointmentId);
     try {
       await sendLinkMutation.mutateAsync(appointmentId);
-      setSuccessMessage('Lien renvoyé au patient.');
+      setSuccessMessage('Lien renvoye au patient.');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -355,17 +388,37 @@ const Praticien = () => {
     setEditorState((prev) => ({ ...prev, open: false }));
   };
 
+  const handleEditFromPreview = () => {
+    if (!previewState.appointmentId) return;
+    const appt = findAppointmentById(previewState.appointmentId);
+    if (!appt) {
+      setError("Impossible de retrouver ce rendez-vous pour modification.");
+      return;
+    }
+    handleOpenEditor(appt);
+    resetPreviewState();
+  };
+
   const handleSubmitEditor = async ({ items, instructions }) => {
     if (!editorState.appointmentId) return;
     setError(null);
     setSuccessMessage(null);
     try {
-      await updatePrescriptionMutation.mutateAsync({
+      const data = await updatePrescriptionMutation.mutateAsync({
         appointmentId: editorState.appointmentId,
         payload: { items, instructions },
       });
-      setSuccessMessage('Ordonnance mise Ã  jour.');
+      setSuccessMessage('Ordonnance mise a jour.');
       handleCloseEditor();
+      const previewUrl = buildPractitionerUrl(data.url, { inline: true, channel: 'preview' });
+      if (previewUrl) {
+        openPreviewWithUrl({
+          url: previewUrl,
+          appointmentId: data.appointment_id,
+          title: "Apercu de l'ordonnance",
+          mode: 'sign',
+        });
+      }
       handleRefresh();
       triggerHistoryRefresh();
     } catch (err) {
@@ -445,7 +498,7 @@ const Praticien = () => {
           },
         };
       });
-      setSuccessMessage('Dossier patient mis Ã  jour.');
+      setSuccessMessage('Dossier patient mis a jour.');
       handleRefresh();
     } catch (err) {
       setError(err.message);
@@ -462,7 +515,7 @@ const Praticien = () => {
         payload,
       });
       setPatientDrawer({ open: true, appointment: updatedAppointment });
-      setSuccessMessage('Rendez-vous mis Ã  jour.');
+      setSuccessMessage('Rendez-vous mis a jour.');
       handleRefresh();
     } catch (err) {
       setError(err.message);
@@ -479,11 +532,19 @@ const Praticien = () => {
         ...payload,
       });
       setPatientDrawer({ open: true, appointment: createdAppointment });
-      setSuccessMessage('Rendez-vous planifiÃ©.');
+      setSuccessMessage('Rendez-vous planifie.');
       handleRefresh();
     } catch (err) {
       setError(err.message);
     }
+  };
+
+  const handleNavigateToDate = (dateValue) => {
+    const isoDate = normalizeISODate(dateValue);
+    if (!isoDate) return;
+    setViewMode('agenda');
+    setViewLength(1);
+    setStartDate(isoDate);
   };
 
   if (!isAuthenticated) {
@@ -498,29 +559,32 @@ const Praticien = () => {
   const displayedDays = viewLength === 1 ? days.slice(0, 1) : days;
   const loadingData = agendaQuery.isLoading || statsQuery.isLoading;
   const stats = statsQuery.data;
-  const previewActions =
-    previewState.mode === 'sign'
-      ? (
-          <button
-            type="button"
-            className={`btn btn-primary ${signingId === previewState.appointmentId ? 'loading' : ''}`}
-            onClick={handleConfirmSignature}
-            disabled={signingId === previewState.appointmentId}
-          >
-            {signingId === previewState.appointmentId ? 'Signature en cours...' : 'Signer et archiver'}
-          </button>
-        )
-      : null;
+  const previewActions = [
+    previewState.mode === 'sign' ? (
+      <button
+        key="sign"
+        type="button"
+        className={`btn btn-primary ${signingId === previewState.appointmentId ? 'loading' : ''}`}
+        onClick={handleConfirmSignature}
+        disabled={signingId === previewState.appointmentId}
+      >
+        {signingId === previewState.appointmentId ? 'Signature en cours...' : 'Signer et archiver'}
+      </button>
+    ) : null,
+    <button key="edit" type="button" className="btn" onClick={handleEditFromPreview} disabled={!previewState.appointmentId}>
+      Modifier l'ordonnance
+    </button>,
+  ].filter(Boolean);
 
   return (
     <div className="max-w-6xl mx-auto py-10 space-y-10">
       <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold text-slate-900">Tableau de bord praticien</h1>
-          {user?.email && <p className="text-sm text-slate-500">ConnectÃ© en tant que {user.email}</p>}
+          {user?.email && <p className="text-sm text-slate-500">Connecte en tant que {user.email}</p>}
         </div>
         <button type="button" className="btn btn-outline btn-sm" onClick={logout}>
-          Se dÃ©connecter
+          Se deconnecter
         </button>
       </header>
 
@@ -557,9 +621,9 @@ const Praticien = () => {
 
       <section className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <StatCard title="Rendez-vous du jour" value={stats?.total_appointments} tone="primary" />
-        <StatCard title="CrÃ©ations aujourd&apos;hui" value={stats?.bookings_created} />
+        <StatCard title="Creations aujourd&apos;hui" value={stats?.bookings_created} />
         <StatCard title="Nouveaux patients (7j)" value={stats?.new_patients_week} tone="success" />
-        <StatCard title="Relances nÃ©cessaires" value={stats?.follow_ups_required} tone="warning" />
+        <StatCard title="Relances necessaires" value={stats?.follow_ups_required} tone="warning" />
         <StatCard title="Consents manquants" value={stats?.pending_consents} tone="danger" />
       </section>
 
@@ -576,7 +640,6 @@ const Praticien = () => {
                 key={day.date}
                 day={day}
                 detailed={viewLength === 1}
-                onPreview={(appointment) => handlePreviewDocument(appointment)}
                 onSign={(appointment) => handlePreviewDocument(appointment, { mode: 'sign' })}
                 onSendPrescription={handleSendPrescription}
                 onSelectPatient={handleSelectPatient}
@@ -602,13 +665,16 @@ const Praticien = () => {
         onClose={handleCloseEditor}
         defaultItems={editorState.items}
         defaultInstructions={editorState.instructions}
-        catalog={
-          editorState.appointmentType === 'act'
-            ? ACT_ITEMS
-            : editorState.appointmentType === 'preconsultation'
-            ? PRECONSULT_ITEMS
-            : PRECONSULT_ITEMS
-        }
+        catalog={Array.from(
+          new Set([
+            ...(editorState.appointmentType === 'act'
+              ? ACT_ITEMS
+              : editorState.appointmentType === 'preconsultation'
+              ? PRECONSULT_ITEMS
+              : PRECONSULT_ITEMS),
+            ...(editorState.items || []),
+          ]),
+        )}
         loading={updatePrescriptionMutation.isLoading}
         onSubmit={handleSubmitEditor}
       />
@@ -621,7 +687,9 @@ const Praticien = () => {
         onCreateAppointment={handleCreateAppointment}
         onPreview={handlePreviewAction}
         onSign={(appointment) => handlePreviewDocument(appointment, { mode: 'sign' })}
+        onEdit={handleOpenEditor}
         onSend={handleSendPrescription}
+        onNavigateDate={handleNavigateToDate}
         previewingId={previewingId}
         signingId={signingId}
         sendingId={activeSendId}

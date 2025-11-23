@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import io
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -16,7 +17,7 @@ _ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 
 DEFAULT_PRACTITIONER = {
     "full_name": "Dr Ariel Benhamou",
-    "specialty": "Chirurgie pédiatrique & actes rituels",
+    "specialty": "Chirurgie pediatrique & actes rituels",
     "license": "RPPS 1045 321 897",
     "adeli": "Adeli 75 1 23456 7",
     "phone": "+33 1 86 95 00 00",
@@ -25,7 +26,7 @@ DEFAULT_PRACTITIONER = {
 }
 
 DEFAULT_CLINIC = {
-    "name": "Cabinet Médical Saint-Antoine",
+    "name": "Cabinet Medical Saint-Antoine",
     "address_lines": [
         "12 rue des Saules",
         "75011 Paris",
@@ -33,20 +34,20 @@ DEFAULT_CLINIC = {
     ],
     "city": "Paris",
     "phone": "+33 1 86 95 00 00",
-    "hours": "Consultations du lundi au vendredi — 8h30 / 19h30",
+    "hours": "Consultations du lundi au vendredi  8h30 / 19h30",
 }
 
 DEFAULT_INSTRUCTION_LINES = [
-    "Acheter l'ensemble du matériel au plus tard 48 h avant l'intervention et conserver les dispositifs stériles fermés.",
-    "Réaliser une toilette soigneuse avec antiseptique la veille et le matin de l'acte.",
-    "Respecter la posologie des antalgiques adaptée au poids de l'enfant ; ne pas dépasser 4 prises par 24 h.",
-    "Surveiller la plaie : rougeur anormale, saignement continu ou fièvre ≥ 38 °C nécessitent un avis médical rapide.",
-    "En cas de doute ou d'effet indésirable, contacter immédiatement le praticien via le numéro d'astreinte communiqué.",
+    "Acheter l'ensemble du materiel au plus tard 48 h avant l'intervention et conserver les dispositifs steriles fermes.",
+    "Realiser une toilette soigneuse avec antiseptique la veille et le matin de l'acte.",
+    "Respecter la posologie des antalgiques adaptee au poids de l'enfant ; ne pas depasser 4 prises par 24 h.",
+    "Surveiller la plaie : rougeur anormale, saignement continu ou fievre >= 38 C necessitent un avis medical rapide.",
+    "En cas de doute ou d'effet indesirable, contacter immediatement le praticien via le numero d'astreinte communique.",
 ]
 
 _DEFAULT_SECURITY_NOTICE = (
-    "Document médical confidentiel. Sa diffusion est réservée au patient, à ses représentants légaux et aux "
-    "professionnels de santé participant à la prise en charge."
+    "Document medical confidentiel. Sa diffusion est reservee au patient, a ses representants legaux et aux "
+    "professionnels de sante participant a la prise en charge."
 )
 
 _SIGNATURE_FALLBACK_SVG = """
@@ -68,69 +69,69 @@ _STAMP_FALLBACK_SVG = """
 
 _ACT_LINE_LIBRARY = [
     {
-        "label": "Antiseptique cutané type Biseptine 250 ml",
-        "dosage": "Toilette pré-opératoire + soins biquotidiens pendant 5 jours",
-        "notes": "Appliquer généreusement sur compresse stérile avant tout pansement.",
+        "label": "Antiseptique cutane type Biseptine 250 ml",
+        "dosage": "Toilette pre-operatoire + soins biquotidiens pendant 5 jours",
+        "notes": "Appliquer genereusement sur compresse sterile avant tout pansement.",
     },
     {
-        "label": "Compresses stériles non tissées 5×5 cm",
+        "label": "Compresses steriles non tissees 5x5 cm",
         "dosage": "10 paquets minimum",
-        "notes": "Manipuler avec des gants propres / stériles uniquement.",
+        "notes": "Manipuler avec des gants propres / steriles uniquement.",
     },
     {
-        "label": "Pansements compressifs 3×3 cm",
-        "dosage": "Prévoir 6 à 8 pièces",
-        "notes": "Permettent de maintenir l'hémostase après les soins.",
+        "label": "Pansements compressifs 3x3 cm",
+        "dosage": "Prevoir 6 a 8 pieces",
+        "notes": "Permettent de maintenir l'hemostase apres les soins.",
     },
     {
-        "label": "Paracétamol pédiatrique (Doliprane 2,4 %)",
-        "dosage": "15 mg/kg par prise (basé sur {weight}), toutes les 6 h",
-        "notes": "Ne pas dépasser 4 prises sur 24 h. Contacter le cabinet en cas de vomissements.",
+        "label": "Paracetamol pediatrique (Doliprane 2,4 %)",
+        "dosage": "15 mg/kg par prise (base sur {weight}), toutes les 6 h",
+        "notes": "Ne pas depasser 4 prises sur 24 h. Contacter le cabinet en cas de vomissements.",
     },
     {
-        "label": "Serum physiologique stérile 0,9 %",
-        "dosage": "Flacons unidose × 10",
-        "notes": "Nettoyage atraumatique de la zone opérée avant antiseptique.",
+        "label": "Serum physiologique sterile 0,9 %",
+        "dosage": "Flacons unidose x 10",
+        "notes": "Nettoyage atraumatique de la zone opere avant antiseptique.",
     },
     {
-        "label": "Gants stériles usage unique",
-        "dosage": "1 boîte de 10 paires",
-        "notes": "Utiliser pour tous les soins jusqu'à cicatrisation complète.",
+        "label": "Gants steriles usage unique",
+        "dosage": "1 boite de 10 paires",
+        "notes": "Utiliser pour tous les soins jusqu'a cicatrisation complete.",
     },
     {
-        "label": "Crème cicatrisante type Cicalfate",
-        "dosage": "Application fine 2×/jour pendant 7 jours",
-        "notes": "A poser après l'antiseptique une fois la zone parfaitement sèche.",
+        "label": "Creme cicatrisante type Cicalfate",
+        "dosage": "Application fine 2x/jour pendant 7 jours",
+        "notes": "A poser apres l'antiseptique une fois la zone parfaitement seche.",
     },
 ]
 
 _PRECONSULT_LINE_LIBRARY = [
     {
-        "label": "Carnet de santé de l'enfant",
-        "dosage": "À présenter le jour de la consultation",
-        "notes": "Permet de confirmer les vaccinations et les antécédents.",
+        "label": "Carnet de sante de l'enfant",
+        "dosage": "A presenter le jour de la consultation",
+        "notes": "Permet de confirmer les vaccinations et les antecedents.",
     },
     {
-        "label": "Compte-rendu du pédiatre ou médecin traitant",
+        "label": "Compte-rendu du pediatre ou medecin traitant",
         "dosage": "Moins de 6 mois",
-        "notes": "Aide à évaluer l'aptitude à l'acte et le contexte médical.",
+        "notes": "Aide a evaluer l'aptitude a l'acte et le contexte medical.",
     },
     {
-        "label": "Thermomètre électronique",
-        "dosage": "Vérifier l'absence de fièvre la veille et le matin même",
-        "notes": "Reporter toute température ≥ 38 °C avant de vous déplacer.",
+        "label": "Thermometre electronique",
+        "dosage": "Verifier l'absence de fievre la veille et le matin meme",
+        "notes": "Reporter toute temperature >= 38 C avant de vous deplacer.",
     },
     {
-        "label": "Paracétamol pédiatrique (Doliprane 2,4 %)",
-        "dosage": "15 mg/kg par prise (basé sur {weight})",
-        "notes": "Uniquement après avis médical. Ne pas administrer à jeun.",
+        "label": "Paracetamol pediatrique (Doliprane 2,4 %)",
+        "dosage": "15 mg/kg par prise (base sur {weight})",
+        "notes": "Uniquement apres avis medical. Ne pas administrer a jeun.",
     },
 ]
 
 
 def _format_date(value: Optional[date | datetime | str]) -> str:
     if value is None:
-        return "—"
+        return ""
     if isinstance(value, str):
         return value
     if isinstance(value, datetime):
@@ -162,7 +163,7 @@ def _weight_text(weight: Optional[float | int | str]) -> tuple[str, Optional[flo
         return f"{weight:.1f} kg", float(weight)
     if isinstance(weight, str) and weight.strip():
         return weight.strip(), None
-    return "—", None
+    return "", None
 
 
 def _render_line_library(kind: Optional[str], weight: Optional[float]) -> List[Dict[str, str]]:
@@ -171,9 +172,9 @@ def _render_line_library(kind: Optional[str], weight: Optional[float]) -> List[D
     for row in library:
         dosage = row["dosage"]
         if "{weight}" in dosage:
-            formatted = f"{weight:.1f} kg" if weight is not None else "le poids actualisé de l'enfant"
+            formatted = f"{weight:.1f} kg" if weight is not None else "le poids actualise de l'enfant"
             dosage = dosage.replace("{weight}", formatted)
-        summary = f"{row['label']} — {dosage}"
+        summary = f"{row['label']}  {dosage}"
         rendered.append(
             {
                 "label": row["label"],
@@ -188,8 +189,8 @@ def _render_line_library(kind: Optional[str], weight: Optional[float]) -> List[D
 def _line_items_from_strings(prescriptions: Sequence[str]) -> List[Dict[str, str]]:
     line_items: List[Dict[str, str]] = []
     for line in prescriptions:
-        normalized = line.replace(" - ", " — ")
-        parts = [part.strip() for part in normalized.split("—") if part.strip()]
+        normalized = line.replace(" - ", "  ")
+        parts = [part.strip() for part in re.split(r"\s{2,}", normalized) if part.strip()]
         if not parts:
             continue
         label = parts[0]
@@ -221,7 +222,7 @@ def _split_instructions(text: str) -> List[str]:
     cleaned = text.replace("\r", "\n")
     parts = []
     for raw in cleaned.split("\n"):
-        snippet = raw.strip("• \t")
+        snippet = raw.strip("-• \t")
         if snippet:
             parts.append(snippet)
     return parts
@@ -274,8 +275,8 @@ def build_ordonnance_context(
     guardian = None
     if guardian_name or guardian_email:
         guardian = {
-            "name": guardian_name or "—",
-            "email": guardian_email or "—",
+          "name": guardian_name or "",
+          "email": guardian_email or "",
         }
 
     return {
@@ -321,6 +322,7 @@ def build_ordonnance_context(
         "signature_data_uri": _load_asset_data_uri("signature.png", _SIGNATURE_FALLBACK_SVG),
         "stamp_data_uri": _load_asset_data_uri("stamp.png", _STAMP_FALLBACK_SVG),
         "qr_code_data_uri": qr_data_uri,
-        "qr_caption": qr_caption or "Scanner pour vérifier l'authenticité de ce document.",
+        "qr_caption": qr_caption or "Scanner pour verifier l'authenticite de ce document.",
         "notes": notes or _DEFAULT_SECURITY_NOTICE,
     }
+
