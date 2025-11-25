@@ -56,12 +56,43 @@ PATIENT_INFO: Dict[str, Any] = {
 def _serialize_case(case) -> schemas.ProcedureCase:
     today = date_cls.today()
     child_age_years = (today - case.child_birthdate).days / 365.25
-    appointments_payload = [
-        schemas.Appointment.model_validate(appt, from_attributes=True)
-        for appt in case.appointments
-    ]
-    download_url = None
     base_url = get_settings().app_base_url.rstrip("/")
+
+    appointments_payload = []
+    for appt in sorted(case.appointments, key=lambda a: (a.date, a.time)):
+        prescription = getattr(appt, "prescription", None)
+        pres_id = prescription.id if prescription else None
+        pres_signed_at = prescription.signed_at if prescription else None
+        pres_signed = bool(prescription and prescription.signed_at)
+        pres_url = None
+        if prescription:
+            token = download_links.create_prescription_download_token(
+                prescription.id,
+                actor="patient",
+                channel="patient_rdv",
+            )
+            pres_url = (
+                f"{base_url}/prescriptions/access/{token}?actor=patient&channel=patient_rdv"
+            )
+
+        appointments_payload.append(
+            schemas.Appointment(
+                id=appt.id,
+                user_id=appt.user_id,
+                status=appt.status.value,
+                created_at=appt.created_at,
+                appointment_type=appt.appointment_type.value,
+                mode=appt.mode.value if appt.mode else None,
+                procedure_id=appt.procedure_id,
+                date=appt.date,
+                time=appt.time,
+                prescription_id=pres_id,
+                prescription_url=pres_url,
+                prescription_signed_at=pres_signed_at,
+                prescription_signed=pres_signed,
+            )
+        )
+    download_url = None
     if case.consent_download_token and case.consent_pdf_path:
         download_url = f"{base_url}/procedures/{case.consent_download_token}/consent.pdf"
 

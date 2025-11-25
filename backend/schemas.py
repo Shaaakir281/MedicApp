@@ -55,6 +55,10 @@ class Appointment(AppointmentBase):
     appointment_type: str
     mode: Optional[str] = None
     procedure_id: Optional[int] = None
+    prescription_id: Optional[int] = None
+    prescription_url: Optional[str] = None
+    prescription_signed_at: Optional[datetime] = None
+    prescription_signed: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)
 

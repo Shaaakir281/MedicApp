@@ -114,7 +114,7 @@ const buildDocumentUrl = (rawUrl, extraQuery = {}) => {
   }
 };
 
-const previewInitialState = { open: false, url: null, title: null, type: null };
+const previewInitialState = { open: false, url: null, downloadUrl: null, title: null, type: null };
 
 const Patient = () => {
   const {
@@ -449,22 +449,6 @@ const Patient = () => {
     showProcedureForm && canSchedule && (!bothAppointmentsBooked || editingAppointmentId);
   const showConsentDownload = showProcedureForm && Boolean(consentLink);
   const showConsentPending = showProcedureForm && !consentLink && Boolean(procedureCase);
-  const ordonnanceDownloadUrl = useMemo(
-    () => buildDocumentUrl(procedureCase?.ordonnance_download_url),
-    [procedureCase?.ordonnance_download_url],
-  );
-  const ordonnancePreviewUrl = useMemo(
-    () => buildDocumentUrl(procedureCase?.ordonnance_download_url, { mode: 'inline' }),
-    [procedureCase?.ordonnance_download_url],
-  );
-  const hasAnyPrescription =
-    Boolean(ordonnanceDownloadUrl) || (procedureCase?.appointments || []).some((a) => a.prescription_url);
-  const ordonnanceSignedLabel = procedureCase?.ordonnance_signed_at
-    ? new Date(procedureCase.ordonnance_signed_at).toLocaleString('fr-FR', {
-        dateStyle: 'long',
-        timeStyle: 'medium',
-      })
-    : null;
 
   const handleSendConsentEmail = async () => {
     if (!token || sendingConsentEmail) {
@@ -482,18 +466,6 @@ const Patient = () => {
     }
   };
 
-  const handlePreviewOrdonnance = () => {
-    if (!ordonnancePreviewUrl) {
-      setError("L'ordonnance n'est pas disponible pour le moment.");
-      return;
-    }
-    setPreviewState({
-      open: true,
-      url: ordonnancePreviewUrl,
-      title: 'Ordonnance médicale',
-      type: 'ordonnance',
-    });
-  };
 
 
   const handleSendByEmail = (url) => {
@@ -509,15 +481,13 @@ const Patient = () => {
   };
 
   const getPrescriptionUrls = (appt) => {
-    const baseDownload = buildDocumentUrl(appt?.prescription_url);
-    const basePreview = buildDocumentUrl(appt?.prescription_url, { mode: 'inline' });
-    const isAct = appt?.appointment_type === 'act';
-    const downloadUrl = baseDownload || (isAct ? ordonnanceDownloadUrl : null) || null;
-    const previewUrl = basePreview || (isAct ? ordonnancePreviewUrl : null) || null;
+    const signed = Boolean(appt?.prescription_signed || appt?.prescription_signed_at);
+    const downloadUrl = signed ? buildDocumentUrl(appt?.prescription_url) : null;
+    const previewUrl = signed ? buildDocumentUrl(appt?.prescription_url, { mode: 'inline' }) : null;
     return {
-      downloadUrl,
-      previewUrl,
-      signed: Boolean(downloadUrl),
+      downloadUrl: downloadUrl || null,
+      previewUrl: previewUrl || null,
+      signed,
     };
   };
 
@@ -544,7 +514,7 @@ const Patient = () => {
   );
 
   const handlePreviewAppointmentPrescription = (appt) => {
-    const { previewUrl } = getPrescriptionUrls(appt);
+    const { previewUrl, downloadUrl } = getPrescriptionUrls(appt);
     if (!previewUrl) {
       setError("L'ordonnance n'est pas disponible pour ce rendez-vous.");
       return;
@@ -552,6 +522,7 @@ const Patient = () => {
     setPreviewState({
       open: true,
       url: previewUrl,
+      downloadUrl: downloadUrl || previewUrl,
       title: appt.appointment_type === 'act' ? 'Ordonnance acte' : 'Ordonnance pre-consultation',
       type: 'ordonnance',
     });
@@ -610,21 +581,22 @@ const Patient = () => {
   };
 
   const previewActions = useMemo(() => {
-    if (previewState.type === 'ordonnance' && ordonnanceDownloadUrl) {
+    if (previewState.type === 'ordonnance' && (previewState.downloadUrl || previewState.url)) {
       return [
         <a
           key="download-ordonnance"
           className="btn btn-primary btn-sm"
-          href={ordonnanceDownloadUrl}
+          href={previewState.downloadUrl || previewState.url}
           target="_blank"
           rel="noopener noreferrer"
         >
-          Télécharger le PDF
+          Telecharger le PDF
         </a>,
       ];
     }
     return null;
-  }, [previewState.type, ordonnanceDownloadUrl]);
+  }, [previewState.type, previewState.downloadUrl, previewState.url]);
+
 
   const childBirthdateString = watch('child_birthdate') || procedureCase?.child_birthdate || null;
   const childAgeDisplay = useMemo(() => formatChildAge(childBirthdateString), [childBirthdateString]);
@@ -951,37 +923,6 @@ const Patient = () => {
         </section>
       ) : null}
 
-            {showOrdonnanceCard && (
-        <section className="p-6 border rounded-xl bg-white shadow-sm space-y-4">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-semibold">Ordonnance médicale</h2>
-            {ordonnanceSignedLabel ? (
-              <p className="text-sm text-slate-600">Signée le {ordonnanceSignedLabel}.</p>
-            ) : (
-              <p className="text-sm text-slate-600">Votre ordonnance est prête.</p>
-            )}
-            <p className="text-sm text-slate-500">
-              Vous pouvez la prévisualiser, la télécharger ou l&apos;envoyer par e-mail.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button type="button" className="btn btn-primary btn-sm" onClick={handlePreviewOrdonnance}>
-              Prévisualiser
-            </button>
-            <a
-              className="btn btn-outline btn-sm"
-              href={ordonnanceDownloadUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Télécharger le PDF
-            </a>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleSendByEmail(ordonnanceDownloadUrl)}>
-              Envoyer par e-mail
-            </button>
-          </div>
-        </section>
-      )}
 
       {showScheduling && (
         <section className="space-y-6">
