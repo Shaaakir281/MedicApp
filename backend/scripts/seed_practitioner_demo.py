@@ -56,12 +56,12 @@ PROFILES: list[CaseProfile] = [
     CaseProfile(
         label="complet",
         preconsult_mode=models.AppointmentMode.visio,
-        act_offset_days=7,
+        act_offset_days=15,
     ),
     CaseProfile(
         label="consentement_manquant",
         preconsult_mode=models.AppointmentMode.presentiel,
-        act_offset_days=10,
+        act_offset_days=16,
         mark_missing_consent=True,
         add_followup_note="Consentement à relancer - en attente de signature.",
     ),
@@ -75,7 +75,7 @@ PROFILES: list[CaseProfile] = [
     CaseProfile(
         label="acte_planifie",
         preconsult_mode=models.AppointmentMode.presentiel,
-        act_offset_days=14,
+        act_offset_days=18,
     ),
 ]
 
