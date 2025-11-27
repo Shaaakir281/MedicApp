@@ -72,7 +72,6 @@ const addDays = (isoDate, delta) => {
 };
 
 const getDefaultStartDate = () => toISODate(new Date());
-const UPCOMING_PAST_SPLIT_DAYS = 7;
 
 const Praticien = () => {
   const { isAuthenticated, login, logout, token, user, loading: authLoading } = useAuth();
@@ -584,7 +583,7 @@ const Praticien = () => {
       </button>
     ) : null,
     <button key="edit" type="button" className="btn" onClick={handleEditFromPreview} disabled={!previewState.appointmentId}>
-      Modifier l'ordonnance
+      Modifier l&apos;ordonnance
     </button>,
   ].filter(Boolean);
 

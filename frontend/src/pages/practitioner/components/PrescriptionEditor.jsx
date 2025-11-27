@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Modal from '../../../components/Modal.jsx';
 import { Button } from '../../../components/ui';
 
@@ -27,7 +27,10 @@ export function PrescriptionEditor({
       .map((item) => item.trim())
       .filter(Boolean);
 
-  const syncSelectedFromText = (value) => new Set(normalizeLines(value).map(normalizeKey));
+  const syncSelectedFromText = useCallback(
+    (value) => new Set(normalizeLines(value).map(normalizeKey)),
+    [],
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -36,7 +39,7 @@ export function PrescriptionEditor({
       setInstructions(defaultInstructions || '');
       setSelected(syncSelectedFromText(initial));
     }
-  }, [isOpen, defaultItems, defaultInstructions]);
+  }, [isOpen, defaultItems, defaultInstructions, syncSelectedFromText]);
 
   const toggleItem = (value) => {
     const key = normalizeKey(value);

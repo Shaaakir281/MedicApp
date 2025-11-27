@@ -54,7 +54,7 @@ function decodeValue(payload) {
   let binary;
   try {
     binary = atob(payload);
-  } catch (error) {
+  } catch {
     return null;
   }
   const bytes = new Uint8Array(binary.length);

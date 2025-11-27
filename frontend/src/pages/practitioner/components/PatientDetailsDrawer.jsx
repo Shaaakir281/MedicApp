@@ -110,12 +110,9 @@ export function PatientDetailsDrawer({
   onReschedule,
   onCreateAppointment,
   onPreview,
-  onSign,
   onEdit,
   onSend,
   onNavigateDate,
-  previewingId,
-  signingId,
   sendingId,
   updatingCase = false,
   updatingAppointment = false,
@@ -124,8 +121,8 @@ export function PatientDetailsDrawer({
   historyLoading = false,
   historyError = null,
 }) {
-  if (!appointment) return null;
-  const { procedure, patient } = appointment;
+  const currentAppointment = appointment || {};
+  const { procedure, patient } = currentAppointment;
   const buildAbsoluteUrl = (path, inline = false, channel = 'download') => {
     if (!path) return null;
     const base = path.startsWith('http') ? path : `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
@@ -134,7 +131,7 @@ export function PatientDetailsDrawer({
     const inlineParam = inline ? '&mode=inline' : '';
     return `${base}${actorChannel}${inlineParam}`;
   };
-  const prescriptionUrl = buildAbsoluteUrl(appointment.prescription_url, false, 'download');
+  const prescriptionUrl = buildAbsoluteUrl(appointment?.prescription_url, false, 'download');
   const appointmentSummaries = procedure?.appointments_overview || [];
   const latestHistoryByType = (type) => {
     const entries = (prescriptionHistory || []).filter((entry) => entry.appointment_type === type);
@@ -173,7 +170,7 @@ export function PatientDetailsDrawer({
     setCaseForm(nextCaseForm);
     setInitialCaseForm(nextCaseForm);
     setIsEditingCase(false);
-  }, [procedure, patient?.child_full_name]);
+  }, [procedure, patient]);
 
   useEffect(() => {
     const nextSchedule = buildScheduleForm(appointment);
@@ -183,7 +180,7 @@ export function PatientDetailsDrawer({
     setAvailableSlots([]);
     setSlotsError(null);
     setEditedAppointmentId(appointment?.appointment_id ?? null);
-  }, [appointment?.appointment_id, appointment?.date, appointment?.time]);
+  }, [appointment]);
 
   useEffect(() => {
     if (!isEditingSchedule || !scheduleForm.date) {
@@ -342,13 +339,17 @@ export function PatientDetailsDrawer({
     }
   };
 
+  if (!appointment) {
+    return null;
+  }
+
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <SectionHeading
             title={`Dossier de ${patient?.child_full_name || 'Patient'}`}
-            subtitle={`Rendez-vous du ${formatDate(appointment.date)}`}
+            subtitle={`Rendez-vous du ${formatDate(appointment?.date)}`}
           />
           <div className="flex flex-wrap gap-2">
             <button

@@ -61,7 +61,6 @@ export function AgendaDay({
   onSign,
   onSendPrescription,
   onSelectPatient,
-  onEditPrescription,
   onDownloadConsent,
   previewingId,
   signingId,
