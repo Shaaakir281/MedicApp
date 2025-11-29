@@ -1,33 +1,28 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
-  fetchPractitionerAgenda,
-  fetchPractitionerStats,
-  fetchNewPatients,
-  createPrescription,
-  signPrescription,
-  sendPrescriptionLink,
   updatePrescription,
   updatePatientCase,
   rescheduleAppointment,
   createPractitionerAppointment,
-  fetchPrescriptionHistory,
-  API_BASE_URL,
 } from '../lib/api.js';
 import {
   PractitionerLogin,
   StatCard,
-  AgendaControls,
-  AgendaDay,
   PrescriptionEditor,
   PatientDetailsDrawer,
   NewPatientsList,
+  PractitionerHeader,
+  ViewToggle,
+  AgendaView,
 } from './practitioner/components';
 import PdfPreviewModal from '../components/PdfPreviewModal.jsx';
+import { usePractitionerData } from '../hooks/usePractitionerData.js';
+import { usePrescriptionHistory } from '../hooks/usePrescriptionHistory.js';
+import { usePractitionerPrescriptions } from '../hooks/usePractitionerPrescriptions.js';
 
 const VIEW_OPTIONS = [1, 7, 14, 23];
-const AUTO_REFRESH_INTERVAL_MS = 60_000;
 const ACT_ITEMS = [
   'Antiseptique cutane type Biseptine 250 ml',
   'Compresses steriles non tissees 5x5 cm',
@@ -52,12 +47,10 @@ const DEFAULT_INSTRUCTION_LINES = [
 ];
 const DEFAULT_INSTRUCTIONS = DEFAULT_INSTRUCTION_LINES.join('\n');
 
-const toDate = (isoDate) => new Date(`${isoDate}T00:00:00`);
-const toISODate = (dateObj) => dateObj.toISOString().split('T')[0];
 const normalizeISODate = (value) => {
   if (!value) return null;
   if (value instanceof Date) {
-    return toISODate(value);
+    return value.toISOString().split('T')[0];
   }
   if (typeof value === 'string') {
     if (value.includes('T')) return value.split('T')[0];
@@ -65,27 +58,13 @@ const normalizeISODate = (value) => {
   }
   return null;
 };
-const addDays = (isoDate, delta) => {
-  const base = toDate(isoDate);
-  base.setDate(base.getDate() + delta);
-  return toISODate(base);
-};
-
-const getDefaultStartDate = () => toISODate(new Date());
 
 const Praticien = () => {
   const { isAuthenticated, login, logout, token, user, loading: authLoading } = useAuth();
-  const [startDate, setStartDate] = useState(() => getDefaultStartDate());
-  const [viewLength, setViewLength] = useState(7);
-  const queryClient = useQueryClient();
+  const [viewMode, setViewMode] = useState('agenda');
   const [error, setError] = useState(null);
   const [loginError, setLoginError] = useState(null);
-  const [refreshIndex, setRefreshIndex] = useState(0);
   const [successMessage, setSuccessMessage] = useState(null);
-  const [previewingId, setPreviewingId] = useState(null);
-  const [activeSendId, setActiveSendId] = useState(null);
-  const [signingId, setSigningId] = useState(null);
-  const [viewMode, setViewMode] = useState('agenda');
   const [editorState, setEditorState] = useState({
     open: false,
     appointmentId: null,
@@ -96,19 +75,48 @@ const Praticien = () => {
     open: false,
     appointment: null,
   });
-  const [prescriptionHistory, setPrescriptionHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState(null);
-  const [historyRefreshIndex, setHistoryRefreshIndex] = useState(0);
-  const buildDefaultPreviewState = () => ({
-    open: false,
-    url: null,
-    title: "Apercu de l'ordonnance",
-    appointmentId: null,
-    mode: 'view',
+  const {
+    startDate,
+    setStartDate,
+    viewLength,
+    setViewLength,
+    endDate,
+    agendaQuery,
+    statsQuery,
+    newPatientsQuery,
+    displayedDays,
+    loadingData,
+    handleRefresh,
+  } = usePractitionerData({ token, viewMode });
+
+  const {
+    prescriptionHistory,
+    historyLoading,
+    historyError,
+    triggerHistoryRefresh,
+  } = usePrescriptionHistory({
+    token,
+    appointmentsOverview: patientDrawer.appointment?.procedure?.appointments_overview || [],
   });
-  const [previewState, setPreviewState] = useState(buildDefaultPreviewState);
-  const resetPreviewState = () => setPreviewState(buildDefaultPreviewState());
+
+  const {
+    previewingId,
+    activeSendId,
+    signingId,
+    previewState,
+    resetPreviewState,
+    handlePreviewDocument,
+    handlePreviewAction,
+    handleConfirmSignature,
+    handleSendPrescription,
+    buildPractitionerUrl,
+  } = usePractitionerPrescriptions({
+    token,
+    setError,
+    setSuccessMessage,
+    handleRefresh,
+    triggerHistoryRefresh,
+  });
 
   const findAppointmentById = (appointmentId) => {
     if (!appointmentId) return null;
@@ -122,68 +130,6 @@ const Praticien = () => {
     }
     return null;
   };
-
-  const toAbsoluteUrl = (path) => {
-    if (!path) return null;
-    if (path.startsWith('http')) return path;
-    const normalized = path.startsWith('/') ? path : `/${path}`;
-    return `${API_BASE_URL}${normalized}`;
-  };
-
-  const appendQueryParam = (url, key, value) => {
-    if (!url || url.includes(`${key}=`)) return url;
-    const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}${key}=${value}`;
-  };
-
-  const buildPractitionerUrl = (path, { inline = false, channel = 'preview' } = {}) => {
-    if (!path) return null;
-    let url = toAbsoluteUrl(path);
-    url = appendQueryParam(url, 'actor', 'practitioner');
-    url = appendQueryParam(url, 'channel', channel);
-    if (inline) {
-      url = appendQueryParam(url, 'mode', 'inline');
-    }
-    return url;
-  };
-
-  const endDate = useMemo(() => addDays(startDate, viewLength - 1), [startDate, viewLength]);
-
-  const agendaQuery = useQuery({
-    queryKey: ['practitionerAgenda', startDate, endDate, refreshIndex],
-    queryFn: () => fetchPractitionerAgenda({ start: startDate, end: endDate }, token),
-    enabled: Boolean(token),
-    refetchInterval: token && viewMode === 'agenda' ? AUTO_REFRESH_INTERVAL_MS : false,
-    refetchIntervalInBackground: false,
-  });
-
-  const statsQuery = useQuery({
-    queryKey: ['practitionerStats', startDate, refreshIndex],
-    queryFn: () => fetchPractitionerStats(startDate, token),
-    enabled: Boolean(token),
-    refetchInterval: token ? AUTO_REFRESH_INTERVAL_MS : false,
-    refetchIntervalInBackground: false,
-  });
-
-  const newPatientsQuery = useQuery({
-    queryKey: ['practitionerNewPatients', viewMode, refreshIndex],
-    queryFn: () => fetchNewPatients({ days: 7 }, token),
-    enabled: Boolean(token && viewMode === 'patients'),
-    refetchInterval: token && viewMode === 'patients' ? AUTO_REFRESH_INTERVAL_MS : false,
-    refetchIntervalInBackground: false,
-  });
-
-  const ensurePrescriptionMutation = useMutation({
-    mutationFn: (appointmentId) => createPrescription(token, appointmentId),
-  });
-
-  const signMutation = useMutation({
-    mutationFn: (appointmentId) => signPrescription(token, appointmentId),
-  });
-
-  const sendLinkMutation = useMutation({
-    mutationFn: (appointmentId) => sendPrescriptionLink(token, appointmentId),
-  });
 
   const updatePrescriptionMutation = useMutation({
     mutationFn: ({ appointmentId, payload }) => updatePrescription(token, appointmentId, payload),
@@ -210,149 +156,6 @@ const Praticien = () => {
     }
   };
 
-  useEffect(() => {
-    const overview = patientDrawer.appointment?.procedure?.appointments_overview || [];
-    const appointmentIds = Array.from(
-      new Set(overview.map((entry) => entry.appointment_id).filter(Boolean)),
-    );
-    if (!token || appointmentIds.length === 0) {
-      setPrescriptionHistory([]);
-      setHistoryError(null);
-      setHistoryLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setHistoryLoading(true);
-    setHistoryError(null);
-    Promise.all(
-      appointmentIds.map((id) =>
-        fetchPrescriptionHistory(token, id).catch((err) => {
-          throw new Error(err.message || 'Historique indisponible');
-        }),
-      ),
-    )
-      .then((allHistories) => {
-        if (cancelled) return;
-        setPrescriptionHistory(allHistories.flat());
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setHistoryError(err.message || "Impossible de charger l'historique.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setHistoryLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [token, patientDrawer.appointment?.procedure?.appointments_overview, historyRefreshIndex]);
-
-  const handleRefresh = () => {
-    setRefreshIndex((prev) => prev + 1);
-    queryClient.invalidateQueries({ queryKey: ['practitionerAgenda'] });
-    queryClient.invalidateQueries({ queryKey: ['practitionerStats'] });
-  };
-
-  const triggerHistoryRefresh = () => {
-    setHistoryRefreshIndex((prev) => prev + 1);
-  };
-
-  const openPreviewWithUrl = ({ url, appointmentId = null, title, mode = 'view' }) => {
-    if (!url) return;
-    setPreviewState({
-      open: true,
-      url,
-      title: title || "Apercu de l'ordonnance",
-      appointmentId,
-      mode,
-    });
-  };
-
-  const handlePreviewDocument = async (appointment, { mode = 'view' } = {}) => {
-    if (!appointment) return;
-    const appointmentId = appointment.appointment_id;
-    if (!appointmentId) return;
-    setError(null);
-    setSuccessMessage(null);
-    setPreviewingId(appointmentId);
-    try {
-      let previewPath = appointment.prescription_url;
-      let generated = false;
-      if (!previewPath) {
-        const data = await ensurePrescriptionMutation.mutateAsync(appointmentId);
-        previewPath = data.url;
-        generated = true;
-      }
-      const previewUrl = buildPractitionerUrl(previewPath, { inline: true, channel: 'preview' });
-      openPreviewWithUrl({
-        url: previewUrl,
-        appointmentId,
-        title:
-          mode === 'sign' ? "Verifiez l'ordonnance avant signature" : "Apercu de l'ordonnance",
-        mode,
-      });
-      if (generated) {
-        setSuccessMessage('Ordonnance generee.');
-        triggerHistoryRefresh();
-        handleRefresh();
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setPreviewingId(null);
-    }
-  };
-
-  const handleDirectPreview = (appointment, { url, title }) => {
-    if (!url) return;
-    openPreviewWithUrl({
-      url,
-      appointmentId: appointment?.appointment_id ?? null,
-      title: title || "Apercu de l'ordonnance",
-      mode: 'view',
-    });
-  };
-
-  const handlePreviewAction = (appointment, options = {}) => {
-    if (options.url) {
-      handleDirectPreview(appointment, options);
-    } else {
-      handlePreviewDocument(appointment, options);
-    }
-  };
-
-  const handleSignAppointment = async (appointmentId) => {
-    if (!appointmentId) return;
-    setError(null);
-    setSuccessMessage(null);
-    setSigningId(appointmentId);
-    try {
-      const data = await signMutation.mutateAsync(appointmentId);
-      const previewUrl = buildPractitionerUrl(data.preview_url, { inline: true, channel: 'signature' });
-      setSuccessMessage('Ordonnance signee et envoyee au patient.');
-      triggerHistoryRefresh();
-      handleRefresh();
-      openPreviewWithUrl({
-        url: previewUrl,
-        appointmentId,
-        title: "Ordonnance signee",
-        mode: 'view',
-      });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSigningId(null);
-    }
-  };
-
-  const handleConfirmSignature = async () => {
-    if (!previewState.appointmentId) return;
-    await handleSignAppointment(previewState.appointmentId);
-  };
-
   const handleDownloadConsent = (appointment) => {
     const url = appointment?.procedure?.consent_download_url;
     if (!url) {
@@ -360,26 +163,6 @@ const Praticien = () => {
       return;
     }
     window.open(url, '_blank', 'noopener');
-  };
-
-  const handleSendPrescription = async (appointment) => {
-    const appointmentId = appointment?.appointment_id;
-    if (!appointmentId) return;
-    if (!appointment?.prescription_signed_at) {
-      setError("Veuillez signer l'ordonnance avant l'envoi au patient.");
-      return;
-    }
-    setError(null);
-    setSuccessMessage(null);
-    setActiveSendId(appointmentId);
-    try {
-      await sendLinkMutation.mutateAsync(appointmentId);
-      setSuccessMessage('Lien renvoye au patient.');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setActiveSendId(null);
-    }
   };
 
   const handleOpenEditor = (appointment) => {
@@ -422,12 +205,10 @@ const Praticien = () => {
       handleCloseEditor();
       const previewUrl = buildPractitionerUrl(data.url, { inline: true, channel: 'preview' });
       if (previewUrl) {
-        openPreviewWithUrl({
-          url: previewUrl,
-          appointmentId: data.appointment_id,
-          title: "Apercu de l'ordonnance",
-          mode: 'sign',
-        });
+        handlePreviewAction(
+          { appointment_id: data.appointment_id },
+          { url: previewUrl, title: "Apercu de l'ordonnance", mode: 'sign' },
+        );
       }
       handleRefresh();
       triggerHistoryRefresh();
@@ -566,67 +347,12 @@ const Praticien = () => {
     );
   }
 
-  const days = agendaQuery.data?.days ?? [];
-  const displayedDays = viewLength === 1 ? days.slice(0, 1) : days;
-  const loadingData = agendaQuery.isLoading || statsQuery.isLoading;
   const stats = statsQuery.data;
-  const previewActions = [
-    previewState.mode === 'sign' ? (
-      <button
-        key="sign"
-        type="button"
-        className={`btn btn-primary ${signingId === previewState.appointmentId ? 'loading' : ''}`}
-        onClick={handleConfirmSignature}
-        disabled={signingId === previewState.appointmentId}
-      >
-        {signingId === previewState.appointmentId ? 'Signature en cours...' : 'Signer et archiver'}
-      </button>
-    ) : null,
-    <button key="edit" type="button" className="btn" onClick={handleEditFromPreview} disabled={!previewState.appointmentId}>
-      Modifier l&apos;ordonnance
-    </button>,
-  ].filter(Boolean);
-
   return (
     <div className="max-w-6xl mx-auto py-10 space-y-10">
-      <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Tableau de bord praticien</h1>
-          {user?.email && <p className="text-sm text-slate-500">Connecte en tant que {user.email}</p>}
-        </div>
-        <button type="button" className="btn btn-outline btn-sm" onClick={logout}>
-          Se deconnecter
-        </button>
-      </header>
+      <PractitionerHeader userEmail={user?.email} onLogout={logout} />
 
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className={`btn btn-sm ${viewMode === 'agenda' ? 'btn-primary' : 'btn-ghost'}`}
-          onClick={() => setViewMode('agenda')}
-        >
-          Agenda
-        </button>
-        <button
-          type="button"
-          className={`btn btn-sm ${viewMode === 'patients' ? 'btn-primary' : 'btn-ghost'}`}
-          onClick={() => setViewMode('patients')}
-        >
-          Nouveaux dossiers
-        </button>
-      </div>
-      {viewMode === 'agenda' && (
-        <AgendaControls
-          startDate={startDate}
-          endDate={endDate}
-          viewLength={viewLength}
-          viewOptions={VIEW_OPTIONS}
-          onChangeStart={setStartDate}
-          onChangeLength={setViewLength}
-          onRefresh={handleRefresh}
-          loading={loadingData}
-        />
-      )}
+      <ViewToggle viewMode={viewMode} onChange={setViewMode} />
       {error && <div className="alert alert-error">{error}</div>}
       {successMessage && <div className="alert alert-success">{successMessage}</div>}
 
@@ -639,29 +365,25 @@ const Praticien = () => {
       </section>
 
       {viewMode === 'agenda' ? (
-        <section className="space-y-8">
-          {loadingData && (
-            <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-center text-slate-500">
-              Chargement de l&apos;agenda...
-            </div>
-          )}
-          {!loadingData &&
-            displayedDays.map((day) => (
-              <AgendaDay
-                key={day.date}
-                day={day}
-                detailed={viewLength === 1}
-                onSign={(appointment) => handlePreviewDocument(appointment, { mode: 'sign' })}
-                onSendPrescription={handleSendPrescription}
-                onSelectPatient={handleSelectPatient}
-                onEditPrescription={handleOpenEditor}
-                onDownloadConsent={handleDownloadConsent}
-                previewingId={previewingId}
-                signingId={signingId}
-                sendingId={activeSendId}
-              />
-            ))}
-        </section>
+        <AgendaView
+          displayedDays={displayedDays}
+          viewLength={viewLength}
+          startDate={startDate}
+          endDate={endDate}
+          viewOptions={VIEW_OPTIONS}
+          onChangeStart={setStartDate}
+          onChangeLength={setViewLength}
+          onRefresh={handleRefresh}
+          loadingData={loadingData}
+          onSign={(appointment) => handlePreviewDocument(appointment, { mode: 'sign' })}
+          onSendPrescription={handleSendPrescription}
+          onSelectPatient={handleSelectPatient}
+          onEditPrescription={handleOpenEditor}
+          onDownloadConsent={handleDownloadConsent}
+          previewingId={previewingId}
+          signingId={signingId}
+          sendingId={activeSendId}
+        />
       ) : (
         <NewPatientsList
           patients={newPatientsQuery.data}
@@ -716,7 +438,22 @@ const Praticien = () => {
         onClose={resetPreviewState}
         url={previewState.url}
         title={previewState.title}
-        actions={previewActions}
+        actions={[
+          previewState.mode === 'sign' ? (
+            <button
+              key="sign"
+              type="button"
+              className={`btn btn-primary ${signingId === previewState.appointmentId ? 'loading' : ''}`}
+              onClick={handleConfirmSignature}
+              disabled={signingId === previewState.appointmentId}
+            >
+              {signingId === previewState.appointmentId ? 'Signature en cours...' : 'Signer et archiver'}
+            </button>
+          ) : null,
+          <button key="edit" type="button" className="btn" onClick={handleEditFromPreview} disabled={!previewState.appointmentId}>
+            Modifier l&apos;ordonnance
+          </button>,
+        ].filter(Boolean)}
       />
     </div>
   );

@@ -5,3 +5,6 @@ export * from './AgendaDay.jsx';
 export * from './PrescriptionEditor.jsx';
 export * from './PatientDetailsDrawer.jsx';
 export * from './NewPatientsList.jsx';
+export * from './PractitionerHeader.jsx';
+export * from './ViewToggle.jsx';
+export * from './AgendaView.jsx';
