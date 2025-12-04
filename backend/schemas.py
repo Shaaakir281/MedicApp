@@ -93,8 +93,13 @@ class ProcedureCaseBase(BaseModel):
     parent1_email: Optional[EmailStr] = None
     parent2_name: Optional[str] = None
     parent2_email: Optional[EmailStr] = None
+    parent1_phone: Optional[str] = None
+    parent2_phone: Optional[str] = None
+    parent1_sms_optin: bool = False
+    parent2_sms_optin: bool = False
     parental_authority_ack: bool = False
     notes: Optional[str] = None
+    preconsultation_date: Optional[date] = None
 
 
 class ProcedureCaseCreate(ProcedureCaseBase):
@@ -117,6 +122,27 @@ class ProcedureCase(ProcedureCaseBase):
     steps_acknowledged: bool
     dossier_completed: bool
     missing_fields: List[str] = Field(default_factory=list)
+    consent_signed_pdf_url: Optional[str] = None
+    consent_evidence_pdf_url: Optional[str] = None
+    consent_last_status: Optional[str] = None
+    consent_ready_at: Optional[datetime] = None
+    yousign_procedure_id: Optional[str] = None
+    parent1_yousign_signer_id: Optional[str] = None
+    parent2_yousign_signer_id: Optional[str] = None
+    parent1_consent_status: str
+    parent2_consent_status: str
+    parent1_consent_sent_at: Optional[datetime] = None
+    parent2_consent_sent_at: Optional[datetime] = None
+    parent1_consent_signed_at: Optional[datetime] = None
+    parent2_consent_signed_at: Optional[datetime] = None
+    parent1_consent_method: Optional[str] = None
+    parent2_consent_method: Optional[str] = None
+    parent1_signature_link: Optional[str] = None
+    parent2_signature_link: Optional[str] = None
+    preconsultation_date: Optional[date] = None
+    signature_open_at: Optional[date] = None
+    parent1_phone_verified_at: Optional[datetime] = None
+    parent2_phone_verified_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -136,6 +162,10 @@ class PractitionerCaseStatus(BaseModel):
     parent1_email: Optional[EmailStr] = None
     parent2_name: Optional[str] = None
     parent2_email: Optional[EmailStr] = None
+    parent1_phone: Optional[str] = None
+    parent2_phone: Optional[str] = None
+    parent1_sms_optin: Optional[bool] = None
+    parent2_sms_optin: Optional[bool] = None
     parental_authority_ack: bool
     has_checklist: bool
     has_consent: bool
@@ -151,6 +181,25 @@ class PractitionerCaseStatus(BaseModel):
     needs_follow_up: bool
     appointments_overview: List["PractitionerAppointmentSummary"] = Field(default_factory=list)
     consent_download_url: Optional[str] = None
+    consent_signed_pdf_url: Optional[str] = None
+    consent_evidence_pdf_url: Optional[str] = None
+    consent_last_status: Optional[str] = None
+    consent_ready_at: Optional[datetime] = None
+    yousign_procedure_id: Optional[str] = None
+    parent1_consent_status: Optional[str] = None
+    parent2_consent_status: Optional[str] = None
+    parent1_consent_sent_at: Optional[datetime] = None
+    parent2_consent_sent_at: Optional[datetime] = None
+    parent1_consent_signed_at: Optional[datetime] = None
+    parent2_consent_signed_at: Optional[datetime] = None
+    parent1_consent_method: Optional[str] = None
+    parent2_consent_method: Optional[str] = None
+    parent1_signature_link: Optional[str] = None
+    parent2_signature_link: Optional[str] = None
+    preconsultation_date: Optional[date] = None
+    signature_open_at: Optional[date] = None
+    parent1_phone_verified_at: Optional[datetime] = None
+    parent2_phone_verified_at: Optional[datetime] = None
 
 
 class PractitionerAppointmentSummary(BaseModel):
@@ -230,9 +279,14 @@ class PractitionerCaseUpdate(BaseModel):
     parent1_email: Optional[EmailStr] = None
     parent2_name: Optional[str] = None
     parent2_email: Optional[EmailStr] = None
+    parent1_phone: Optional[str] = None
+    parent2_phone: Optional[str] = None
+    parent1_sms_optin: Optional[bool] = None
+    parent2_sms_optin: Optional[bool] = None
     parental_authority_ack: Optional[bool] = None
     notes: Optional[str] = None
     procedure_type: Optional[str] = None
+    preconsultation_date: Optional[date] = None
 
 
 class AppointmentRescheduleRequest(BaseModel):

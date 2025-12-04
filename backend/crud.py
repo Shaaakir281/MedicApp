@@ -241,6 +241,8 @@ def _recompute_case_flags(case: models.ProcedureCase) -> None:
         missing.append("parent1_email")
     if not case.parental_authority_ack:
         missing.append("parental_authority_ack")
+    if not case.parent1_phone:
+        missing.append("parent1_phone")
     if not case.parent2_name or not case.parent2_email:
         missing.append("parent2_contact")
     case.missing_fields = missing
@@ -361,10 +363,17 @@ def create_procedure_case(
         parent1_email=case_data.parent1_email,
         parent2_name=case_data.parent2_name,
         parent2_email=case_data.parent2_email,
+        parent1_phone=case_data.parent1_phone,
+        parent2_phone=case_data.parent2_phone,
+        parent1_sms_optin=bool(case_data.parent1_sms_optin),
+        parent2_sms_optin=bool(case_data.parent2_sms_optin),
         parental_authority_ack=case_data.parental_authority_ack,
         notes=case_data.notes,
         consent_download_token=secrets.token_urlsafe(24),
+        preconsultation_date=case_data.preconsultation_date,
     )
+    if procedure.preconsultation_date:
+        procedure.signature_open_at = procedure.preconsultation_date + datetime.timedelta(days=15)
     _recompute_case_flags(procedure)
     db.add(procedure)
     db.commit()
@@ -392,8 +401,15 @@ def update_procedure_case(
     procedure.parent1_email = case_data.parent1_email
     procedure.parent2_name = case_data.parent2_name
     procedure.parent2_email = case_data.parent2_email
+    procedure.parent1_phone = case_data.parent1_phone
+    procedure.parent2_phone = case_data.parent2_phone
+    procedure.parent1_sms_optin = bool(case_data.parent1_sms_optin)
+    procedure.parent2_sms_optin = bool(case_data.parent2_sms_optin)
     procedure.parental_authority_ack = case_data.parental_authority_ack
     procedure.notes = case_data.notes
+    procedure.preconsultation_date = case_data.preconsultation_date
+    if procedure.preconsultation_date:
+        procedure.signature_open_at = procedure.preconsultation_date + datetime.timedelta(days=15)
     _recompute_case_flags(procedure)
     db.add(procedure)
     db.commit()

@@ -232,4 +232,24 @@ export async function deleteAppointment(token, appointmentId, options = {}) {
   });
 }
 
+export async function initiateConsentProcedure(token, caseId) {
+  return apiRequest(`/consents/procedures/${caseId}/initiate`, { method: 'POST', token });
+}
+
+export async function remindConsent(token, caseId) {
+  return apiRequest(`/consents/procedures/${caseId}/remind`, { method: 'POST', token });
+}
+
+export async function fetchConsentStatus(token, caseId) {
+  return apiRequest(`/consents/procedures/${caseId}/status`, { method: 'GET', token });
+}
+
+export async function requestPhoneOtp(token, payload) {
+  return apiRequest('/procedures/phone-otp/request', { method: 'POST', body: payload, token });
+}
+
+export async function verifyPhoneOtp(token, payload) {
+  return apiRequest('/procedures/phone-otp/verify', { method: 'POST', body: payload, token });
+}
+
 export { API_BASE_URL };

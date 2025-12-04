@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import date as date_cls, datetime
+from datetime import date as date_cls, datetime, timedelta
+import random
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 
 import crud
 import schemas
+from pydantic import BaseModel, Field
 from database import get_db
 from dependencies.auth import get_current_user
 from core.config import get_settings
@@ -18,6 +20,7 @@ from services import pdf as pdf_service
 from services import email as email_service
 from services import download_links
 from services.storage import StorageError, get_storage_backend
+from services.sms import send_sms
 
 
 router = APIRouter(prefix="/procedures", tags=["procedures"])
@@ -51,6 +54,16 @@ PATIENT_INFO: Dict[str, Any] = {
         },
     ],
 }
+
+
+class PhoneOtpRequest(BaseModel):
+    parent: str = Field(pattern="^(parent1|parent2)$")
+    phone: str | None = None
+
+
+class PhoneOtpVerify(BaseModel):
+    parent: str = Field(pattern="^(parent1|parent2)$")
+    code: str
 
 
 def _serialize_case(case) -> schemas.ProcedureCase:
@@ -134,6 +147,12 @@ def _serialize_case(case) -> schemas.ProcedureCase:
         parent1_email=case.parent1_email,
         parent2_name=case.parent2_name,
         parent2_email=case.parent2_email,
+        parent1_phone=case.parent1_phone,
+        parent2_phone=case.parent2_phone,
+        parent1_sms_optin=case.parent1_sms_optin,
+        parent2_sms_optin=case.parent2_sms_optin,
+        parent1_phone_verified_at=case.parent1_phone_verified_at,
+        parent2_phone_verified_at=case.parent2_phone_verified_at,
         parental_authority_ack=case.parental_authority_ack,
         notes=case.notes,
         created_at=case.created_at,
@@ -141,6 +160,25 @@ def _serialize_case(case) -> schemas.ProcedureCase:
         checklist_pdf_path=case.checklist_pdf_path,
         consent_pdf_path=case.consent_pdf_path,
         consent_download_url=download_url,
+        consent_signed_pdf_url=case.consent_signed_pdf_url,
+        consent_evidence_pdf_url=case.consent_evidence_pdf_url,
+        consent_last_status=case.consent_last_status,
+        consent_ready_at=case.consent_ready_at,
+        yousign_procedure_id=case.yousign_procedure_id,
+        parent1_yousign_signer_id=case.parent1_yousign_signer_id,
+        parent2_yousign_signer_id=case.parent2_yousign_signer_id,
+        parent1_consent_status=case.parent1_consent_status,
+        parent2_consent_status=case.parent2_consent_status,
+        parent1_consent_sent_at=case.parent1_consent_sent_at,
+        parent2_consent_sent_at=case.parent2_consent_sent_at,
+        parent1_consent_signed_at=case.parent1_consent_signed_at,
+        parent2_consent_signed_at=case.parent2_consent_signed_at,
+        parent1_consent_method=case.parent1_consent_method,
+        parent2_consent_method=case.parent2_consent_method,
+        parent1_signature_link=case.parent1_signature_link,
+        parent2_signature_link=case.parent2_signature_link,
+        preconsultation_date=case.preconsultation_date,
+        signature_open_at=case.signature_open_at,
         ordonnance_pdf_path=case.ordonnance_pdf_path,
         ordonnance_download_url=ordonnance_download_url,
         ordonnance_prescription_id=ordonnance_prescription_id,
@@ -157,6 +195,16 @@ def _serialize_case(case) -> schemas.ProcedureCase:
 def get_procedure_information() -> Dict[str, Any]:
     """Return informational content for the circumcision workflow."""
     return PATIENT_INFO
+
+
+def _get_case_for_user(db: Session, user_id: int):
+    case = crud.get_active_procedure_case(db, user_id)
+    if case is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aucune procedure en cours.",
+        )
+    return case
 
 
 @router.get("/current", response_model=schemas.ProcedureCase)
@@ -300,3 +348,64 @@ def download_consent_pdf(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Fichier manquant sur le serveur.",
         ) from exc
+
+
+@router.post("/phone-otp/request", response_model=schemas.ProcedureCase)
+def request_phone_otp(
+    payload: PhoneOtpRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> schemas.ProcedureCase:
+    case = _get_case_for_user(db, current_user.id)
+    parent = payload.parent
+    phone = payload.phone or getattr(case, f"{parent}_phone")
+    if not phone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Numero de telephone manquant.")
+
+    code = f"{random.randint(0, 999999):06d}"
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+
+    setattr(case, f"{parent}_phone", phone)
+    setattr(case, f"{parent}_phone_otp_code", code)
+    setattr(case, f"{parent}_phone_otp_expires_at", expires_at)
+    # reset verification if phone changed
+    setattr(case, f"{parent}_phone_verified_at", None)
+
+    db.add(case)
+    db.commit()
+    db.refresh(case)
+
+    try:
+        send_sms(phone, f"Code de verification MedScript : {code}")
+    except Exception:
+        # ne bloque pas si SMS KO, l'utilisateur peut demander un nouveau code
+        pass
+
+    return _serialize_case(case)
+
+
+@router.post("/phone-otp/verify", response_model=schemas.ProcedureCase)
+def verify_phone_otp(
+    payload: PhoneOtpVerify,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> schemas.ProcedureCase:
+    case = _get_case_for_user(db, current_user.id)
+    parent = payload.parent
+    code = payload.code.strip()
+    stored = getattr(case, f"{parent}_phone_otp_code")
+    expires_at = getattr(case, f"{parent}_phone_otp_expires_at")
+
+    if not stored or stored != code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Code invalide.")
+    if expires_at and expires_at < datetime.utcnow():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Code expire, veuillez renvoyer un code.")
+
+    setattr(case, f"{parent}_phone_verified_at", datetime.utcnow())
+    setattr(case, f"{parent}_phone_otp_code", None)
+    setattr(case, f"{parent}_phone_otp_expires_at", None)
+
+    db.add(case)
+    db.commit()
+    db.refresh(case)
+    return _serialize_case(case)

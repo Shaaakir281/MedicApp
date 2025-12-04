@@ -37,7 +37,7 @@ def compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCaseS
     ]
     has_act = bool(act_appointments)
 
-    has_consent = bool(case.consent_pdf_path)
+    has_consent = bool(case.consent_pdf_path or case.consent_signed_pdf_url)
 
     latest_signed_prescription: Optional[models.Prescription] = None
     for appt in appointments:
@@ -91,6 +91,23 @@ def compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCaseS
     if case.consent_download_token and case.consent_pdf_path:
         consent_download_url = f"{base_url}/procedures/{case.consent_download_token}/consent.pdf"
 
+    # signature window
+    preconsultation_date = case.preconsultation_date
+    if preconsultation_date is None:
+        pre_appt = next(
+            (
+                appt
+                for appt in appointments
+                if appt.appointment_type == models.AppointmentType.preconsultation
+            ),
+            None,
+        )
+        if pre_appt:
+            preconsultation_date = pre_appt.date
+    signature_open_at = case.signature_open_at
+    if signature_open_at is None and preconsultation_date:
+        signature_open_at = preconsultation_date + dt.timedelta(days=15)
+
     appointments_overview = [
         schemas.PractitionerAppointmentSummary(
             appointment_id=appt.id,
@@ -112,6 +129,12 @@ def compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCaseS
         parent1_email=case.parent1_email,
         parent2_name=case.parent2_name,
         parent2_email=case.parent2_email,
+        parent1_phone=case.parent1_phone,
+        parent2_phone=case.parent2_phone,
+        parent1_sms_optin=case.parent1_sms_optin,
+        parent2_sms_optin=case.parent2_sms_optin,
+        parent1_phone_verified_at=case.parent1_phone_verified_at,
+        parent2_phone_verified_at=case.parent2_phone_verified_at,
         parental_authority_ack=case.parental_authority_ack,
         has_checklist=False,
         has_consent=has_consent,
@@ -125,6 +148,23 @@ def compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCaseS
         needs_follow_up=needs_follow_up,
         appointments_overview=appointments_overview,
         consent_download_url=consent_download_url,
+        consent_signed_pdf_url=case.consent_signed_pdf_url,
+        consent_evidence_pdf_url=case.consent_evidence_pdf_url,
+        consent_last_status=case.consent_last_status,
+        consent_ready_at=case.consent_ready_at,
+        yousign_procedure_id=case.yousign_procedure_id,
+        parent1_consent_status=case.parent1_consent_status,
+        parent2_consent_status=case.parent2_consent_status,
+        parent1_consent_sent_at=case.parent1_consent_sent_at,
+        parent2_consent_sent_at=case.parent2_consent_sent_at,
+        parent1_consent_signed_at=case.parent1_consent_signed_at,
+        parent2_consent_signed_at=case.parent2_consent_signed_at,
+        parent1_consent_method=case.parent1_consent_method,
+        parent2_consent_method=case.parent2_consent_method,
+        parent1_signature_link=case.parent1_signature_link,
+        parent2_signature_link=case.parent2_signature_link,
+        preconsultation_date=preconsultation_date,
+        signature_open_at=signature_open_at,
         ordonnance_signed_at=(
             latest_signed_prescription.signed_at if latest_signed_prescription else None
         ),
@@ -303,7 +343,10 @@ def get_stats(db: Session, target_date: dt.date) -> schemas.PractitionerStats:
 
     pending_consents = (
         db.query(models.ProcedureCase)
-        .filter(models.ProcedureCase.consent_pdf_path.is_(None))
+        .filter(
+            models.ProcedureCase.consent_pdf_path.is_(None),
+            models.ProcedureCase.consent_signed_pdf_url.is_(None),
+        )
         .count()
     )
 

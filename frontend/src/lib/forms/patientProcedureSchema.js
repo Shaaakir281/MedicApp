@@ -12,6 +12,11 @@ export const patientProcedureSchema = z.object({
     }),
   parent1_name: z.string().min(2, 'Nom du parent requis'),
   parent1_email: z.string().email('Email parent 1 invalide'),
+  parent1_phone: z
+    .string()
+    .min(6, 'Telephone parent 1 requis')
+    .regex(/^[+\d][\d\s-]+$/, 'Telephone invalide'),
+  parent1_sms_optin: z.boolean().optional(),
   parent2_name: z.string().optional(),
   parent2_email: z
     .string()
@@ -21,6 +26,15 @@ export const patientProcedureSchema = z.object({
     .refine((value) => value === null || /\S+@\S+\.\S+/.test(value), {
       message: 'Email parent 2 invalide',
     }),
+  parent2_phone: z
+    .string()
+    .optional()
+    .or(z.literal(''))
+    .transform((value) => (value ? value : null))
+    .refine((value) => value === null || /^[+\d][\d\s-]+$/.test(value), {
+      message: 'Telephone parent 2 invalide',
+    }),
+  parent2_sms_optin: z.boolean().optional(),
   parental_authority_ack: z.boolean().refine((value) => value, {
     message: "L'autorisation parentale est requise",
   }),
@@ -33,8 +47,12 @@ export const defaultProcedureValues = {
   child_weight_kg: '',
   parent1_name: '',
   parent1_email: '',
+  parent1_phone: '',
+  parent1_sms_optin: true,
   parent2_name: '',
   parent2_email: '',
+  parent2_phone: '',
+  parent2_sms_optin: false,
   parental_authority_ack: false,
   notes: '',
 };

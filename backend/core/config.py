@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     storage_local_path: Optional[str] = Field(default=None, alias="STORAGE_LOCAL_PATH")
     azure_blob_connection_string: Optional[str] = Field(default=None, alias="AZURE_BLOB_CONNECTION_STRING")
     azure_blob_container: Optional[str] = Field(default=None, alias="AZURE_BLOB_CONTAINER")
+    yousign_api_key: Optional[str] = Field(default=None, alias="YOUSIGN_API_KEY")
+    yousign_api_base_url: str = Field(default="https://api.yousign.app/v3", alias="YOUSIGN_API_BASE_URL")
+    yousign_webhook_secret: Optional[str] = Field(default=None, alias="YOUSIGN_WEBHOOK_SECRET")
+    sms_provider: Literal["twilio", "none"] = Field(default="twilio", alias="SMS_PROVIDER")
+    twilio_account_sid: Optional[str] = Field(default=None, alias="TWILIO_ACCOUNT_SID")
+    twilio_auth_token: Optional[str] = Field(default=None, alias="TWILIO_AUTH_TOKEN")
+    twilio_from_number: Optional[str] = Field(default=None, alias="TWILIO_FROM_NUMBER")
 
     @field_validator("jwt_secret_key")
     @classmethod

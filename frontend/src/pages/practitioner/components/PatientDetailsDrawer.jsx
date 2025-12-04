@@ -20,6 +20,10 @@ const buildCaseForm = (procedure, patient) => ({
   parent1_email: procedure?.parent1_email || '',
   parent2_name: procedure?.parent2_name || '',
   parent2_email: procedure?.parent2_email || '',
+  parent1_phone: procedure?.parent1_phone || '',
+  parent2_phone: procedure?.parent2_phone || '',
+  parent1_sms_optin: Boolean(procedure?.parent1_sms_optin),
+  parent2_sms_optin: Boolean(procedure?.parent2_sms_optin),
   parental_authority_ack: Boolean(procedure?.parental_authority_ack),
   notes: procedure?.notes || '',
 });
@@ -56,6 +60,10 @@ const sanitizeCaseValues = (form) => {
     parent1_email: nullable(form.parent1_email),
     parent2_name: nullable(form.parent2_name),
     parent2_email: nullable(form.parent2_email),
+    parent1_phone: nullable(form.parent1_phone),
+    parent2_phone: nullable(form.parent2_phone),
+    parent1_sms_optin: Boolean(form.parent1_sms_optin),
+    parent2_sms_optin: Boolean(form.parent2_sms_optin),
     parental_authority_ack: Boolean(form.parental_authority_ack),
     notes: nullable(form.notes),
   };
@@ -111,10 +119,13 @@ export function PatientDetailsDrawer({
   onSend,
   onDownloadConsent,
   onNavigateDate,
+  onInitiateConsent,
+  onRemindConsent,
   sendingId,
   updatingCase = false,
   updatingAppointment = false,
   creatingAppointment = false,
+  consentActionLoading = false,
   prescriptionHistory = [],
 }) {
   const currentAppointment = appointment || {};
@@ -382,7 +393,14 @@ export function PatientDetailsDrawer({
           />
         )}
 
-        <CaseStatus appointment={appointment} procedure={procedure} onNavigateDate={onNavigateDate} />
+        <CaseStatus
+          appointment={appointment}
+          procedure={procedure}
+          onNavigateDate={onNavigateDate}
+          onInitiateConsent={onInitiateConsent}
+          onRemindConsent={onRemindConsent}
+          consentActionLoading={consentActionLoading}
+        />
 
         <PrescriptionsSection
           appointment={appointment}

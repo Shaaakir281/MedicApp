@@ -18,6 +18,10 @@ const mapProcedureToFormValues = (procedure) => ({
   parent1_email: procedure?.parent1_email ?? '',
   parent2_name: procedure?.parent2_name ?? '',
   parent2_email: procedure?.parent2_email ?? '',
+  parent1_phone: procedure?.parent1_phone ?? '',
+  parent2_phone: procedure?.parent2_phone ?? '',
+  parent1_sms_optin: Boolean(procedure?.parent1_sms_optin),
+  parent2_sms_optin: Boolean(procedure?.parent2_sms_optin),
   parental_authority_ack: Boolean(procedure?.parental_authority_ack),
   notes: procedure?.notes ?? '',
 });

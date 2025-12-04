@@ -18,6 +18,7 @@ import { StepsCard } from '../components/patient/StepsCard.jsx';
 import { usePatientProcedure } from '../hooks/usePatientProcedure.js';
 import { usePatientAppointments } from '../hooks/usePatientAppointments.js';
 import { formatChildAge } from '../utils/child.js';
+import { requestPhoneOtp, verifyPhoneOtp } from '../lib/api.js';
 
 const previewInitialState = { open: false, url: null, downloadUrl: null, title: null, type: null };
 
@@ -46,6 +47,9 @@ const Patient = () => {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [previewState, setPreviewState] = useState(previewInitialState);
+  const [otpCodes, setOtpCodes] = useState({ parent1: '', parent2: '' });
+  const [otpSending, setOtpSending] = useState({ parent1: false, parent2: false });
+  const [otpVerifying, setOtpVerifying] = useState({ parent1: false, parent2: false });
 
   const {
     procedureInfo,
@@ -166,6 +170,8 @@ const Patient = () => {
     showProcedureForm && canSchedule && (!bothAppointmentsBooked || editingAppointmentId);
   const showConsentDownload = showProcedureForm && Boolean(consentLink);
   const showConsentPending = showProcedureForm && !consentLink && Boolean(procedureCase);
+  const parent1Verified = Boolean(procedureCase?.parent1_phone_verified_at);
+  const parent2Verified = Boolean(procedureCase?.parent2_phone_verified_at);
 
   const handleSendByEmail = (url) => {
     if (!url) {
@@ -192,6 +198,44 @@ const Patient = () => {
       title: appt.appointment_type === 'act' ? 'Ordonnance acte' : 'Ordonnance pre-consultation',
       type: 'ordonnance',
     });
+  };
+
+  const handleRequestOtp = async (parent) => {
+    if (!token) return;
+    setError(null);
+    setSuccessMessage(null);
+    setOtpSending((prev) => ({ ...prev, [parent]: true }));
+    try {
+      await requestPhoneOtp(token, { parent });
+      setSuccessMessage('Code SMS envoye.');
+      await loadProcedureCase();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setOtpSending((prev) => ({ ...prev, [parent]: false }));
+    }
+  };
+
+  const handleVerifyOtp = async (parent) => {
+    if (!token) return;
+    const code = otpCodes[parent]?.trim();
+    if (!code) {
+      setError('Veuillez saisir le code SMS.');
+      return;
+    }
+    setError(null);
+    setSuccessMessage(null);
+    setOtpVerifying((prev) => ({ ...prev, [parent]: true }));
+    try {
+      await verifyPhoneOtp(token, { parent, code });
+      setSuccessMessage('Numero verifie.');
+      setOtpCodes((prev) => ({ ...prev, [parent]: '' }));
+      await loadProcedureCase();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setOtpVerifying((prev) => ({ ...prev, [parent]: false }));
+    }
   };
 
   const handleClosePreview = () => {
@@ -296,6 +340,68 @@ const Patient = () => {
             canSendConsent={Boolean(procedureCase)}
           />
         </FormProvider>
+      )}
+
+      {showProcedureForm && procedureCase && (
+        <section className="p-6 border rounded-xl bg-white shadow-sm space-y-3">
+          <h3 className="text-xl font-semibold">Verification des numéros par SMS</h3>
+          <p className="text-sm text-slate-600">
+            Validez chaque numero pour recevoir les codes de signature du consentement.
+          </p>
+          <div className="grid md:grid-cols-2 gap-4">
+            {['parent1', 'parent2'].map((parentKey) => {
+              const isParent1 = parentKey === 'parent1';
+              const phone = procedureCase?.[`${parentKey}_phone`] || 'Non renseigne';
+              const verified = parentKey === 'parent1' ? parent1Verified : parent2Verified;
+              const canSend = procedureCase?.[`${parentKey}_phone`];
+              return (
+                <div key={parentKey} className="border rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold">{isParent1 ? 'Parent 1' : 'Parent 2'}</p>
+                      <p className="text-sm text-slate-600">Tel: {phone}</p>
+                    </div>
+                    <span className={`badge ${verified ? 'badge-success' : 'badge-warning'}`}>
+                      {verified ? 'Verifie' : 'A verifier'}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline"
+                      onClick={() => handleRequestOtp(parentKey)}
+                      disabled={!canSend || otpSending[parentKey]}
+                    >
+                      {otpSending[parentKey] ? 'Envoi...' : 'Envoyer le code'}
+                    </button>
+                    <input
+                      type="text"
+                      className="input input-bordered input-sm"
+                      placeholder="Code SMS"
+                      value={otpCodes[parentKey]}
+                      onChange={(e) =>
+                        setOtpCodes((prev) => ({ ...prev, [parentKey]: e.target.value }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={() => handleVerifyOtp(parentKey)}
+                      disabled={otpVerifying[parentKey]}
+                    >
+                      {otpVerifying[parentKey] ? 'Verification...' : 'Valider'}
+                    </button>
+                  </div>
+                  {!canSend && (
+                    <p className="text-xs text-red-500">
+                      Renseignez et enregistrez le numero de telephone pour ce parent.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {procedureCase?.appointments?.length ? (

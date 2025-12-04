@@ -130,7 +130,7 @@ def create_patient(db: Session, index: int) -> models.User:
     return patient
 
 
-def case_payload(index: int, profile: CaseProfile) -> object:
+def case_payload(index: int, profile: CaseProfile, preconsult_date: dt.date) -> object:
     child_birthdate = dt.date(2024, 6, 1) + dt.timedelta(days=index * 9)
     return type(
         "CaseData",
@@ -144,8 +144,13 @@ def case_payload(index: int, profile: CaseProfile) -> object:
             "parent1_email": parent_email(index, "a"),
             "parent2_name": f"Parent B Demo {index:03d}",
             "parent2_email": parent_email(index, "b"),
+            "parent1_phone": f"+3360000{index:04d}",
+            "parent2_phone": f"+3361000{index:04d}",
+            "parent1_sms_optin": True,
+            "parent2_sms_optin": True,
             "parental_authority_ack": True,
             "notes": f"{DEMO_TAG} Profil {profile.label}",
+            "preconsultation_date": preconsult_date,
         },
     )()
 
@@ -232,7 +237,7 @@ def seed_for_day(
         patient_idx = next(patient_counter)
         patient = create_patient(db, patient_idx)
 
-        payload = case_payload(patient_idx, profile)
+        payload = case_payload(patient_idx, profile, preconsult_date=day)
         case = crud.create_procedure_case(db=db, patient_id=patient.id, case_data=payload)
 
         pre_time = PRECONSULT_TIMES[(day_index + slot) % len(PRECONSULT_TIMES)]

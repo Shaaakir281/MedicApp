@@ -6,6 +6,8 @@ import {
   updatePatientCase,
   rescheduleAppointment,
   createPractitionerAppointment,
+  initiateConsentProcedure,
+  remindConsent,
 } from '../lib/api.js';
 import {
   PractitionerLogin,
@@ -75,6 +77,18 @@ const Praticien = () => {
     open: false,
     appointment: null,
   });
+  const updateDrawerProcedure = (updatedProcedure) => {
+    setPatientDrawer((prev) => {
+      if (!prev.appointment) return prev;
+      return {
+        ...prev,
+        appointment: {
+          ...prev.appointment,
+          procedure: updatedProcedure,
+        },
+      };
+    });
+  };
   const {
     startDate,
     setStartDate,
@@ -145,6 +159,14 @@ const Praticien = () => {
 
   const createAppointmentMutation = useMutation({
     mutationFn: (payload) => createPractitionerAppointment(token, payload),
+  });
+
+  const initiateConsentMutation = useMutation({
+    mutationFn: (caseId) => initiateConsentProcedure(token, caseId),
+  });
+
+  const remindConsentMutation = useMutation({
+    mutationFn: (caseId) => remindConsent(token, caseId),
   });
 
   const handleLogin = async (credentials) => {
@@ -277,18 +299,7 @@ const Praticien = () => {
     setSuccessMessage(null);
     try {
       const updatedCase = await updateCaseMutation.mutateAsync({ caseId, payload: normalizedPayload });
-      setPatientDrawer((prev) => {
-        if (!prev.appointment) {
-          return prev;
-        }
-        return {
-          ...prev,
-          appointment: {
-            ...prev.appointment,
-            procedure: updatedCase,
-          },
-        };
-      });
+      updateDrawerProcedure(updatedCase);
       setSuccessMessage('Dossier patient mis a jour.');
       handleRefresh();
     } catch (err) {
@@ -330,6 +341,33 @@ const Praticien = () => {
     }
   };
 
+  const handleInitiateConsent = async (caseId) => {
+    if (!caseId) return;
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const updatedCase = await initiateConsentMutation.mutateAsync(caseId);
+      updateDrawerProcedure(updatedCase);
+      setSuccessMessage('Consentement envoye (Yousign + SMS).');
+      handleRefresh();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleRemindConsent = async (caseId) => {
+    if (!caseId) return;
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const updatedCase = await remindConsentMutation.mutateAsync(caseId);
+      updateDrawerProcedure(updatedCase);
+      setSuccessMessage('Rappel de consentement renvoye.');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleNavigateToDate = (dateValue) => {
     const isoDate = normalizeISODate(dateValue);
     if (!isoDate) return;
@@ -348,6 +386,7 @@ const Praticien = () => {
   }
 
   const stats = statsQuery.data;
+  const consentActionLoading = initiateConsentMutation.isLoading || remindConsentMutation.isLoading;
   return (
     <div className="max-w-6xl mx-auto py-10 space-y-10">
       <PractitionerHeader userEmail={user?.email} onLogout={logout} />
@@ -423,12 +462,15 @@ const Praticien = () => {
         onEdit={handleOpenEditor}
         onSend={handleSendPrescription}
         onNavigateDate={handleNavigateToDate}
+        onInitiateConsent={handleInitiateConsent}
+        onRemindConsent={handleRemindConsent}
         previewingId={previewingId}
         signingId={signingId}
         sendingId={activeSendId}
         updatingCase={updateCaseMutation.isLoading}
         updatingAppointment={rescheduleMutation.isLoading}
         creatingAppointment={createAppointmentMutation.isLoading}
+        consentActionLoading={consentActionLoading}
         prescriptionHistory={prescriptionHistory}
         historyLoading={historyLoading}
         historyError={historyError}

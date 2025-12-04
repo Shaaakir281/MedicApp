@@ -66,6 +66,27 @@ export const CaseForm = ({ caseForm, onChange }) => {
         />
       </label>
       <label className="form-control">
+        <span className="label-text">Telephone parent 1</span>
+        <input
+          type="tel"
+          name="parent1_phone"
+          className="input input-bordered"
+          value={caseForm.parent1_phone}
+          onChange={onChange}
+          placeholder="+33700000000"
+        />
+      </label>
+      <label className="form-control">
+        <span className="label-text">SMS parent 1</span>
+        <input
+          type="checkbox"
+          name="parent1_sms_optin"
+          className="toggle toggle-primary"
+          checked={caseForm.parent1_sms_optin}
+          onChange={onChange}
+        />
+      </label>
+      <label className="form-control">
         <span className="label-text">Parent 2</span>
         <input
           type="text"
@@ -82,6 +103,27 @@ export const CaseForm = ({ caseForm, onChange }) => {
           name="parent2_email"
           className="input input-bordered"
           value={caseForm.parent2_email}
+          onChange={onChange}
+        />
+      </label>
+      <label className="form-control">
+        <span className="label-text">Telephone parent 2</span>
+        <input
+          type="tel"
+          name="parent2_phone"
+          className="input input-bordered"
+          value={caseForm.parent2_phone}
+          onChange={onChange}
+          placeholder="+33700000000"
+        />
+      </label>
+      <label className="form-control">
+        <span className="label-text">SMS parent 2</span>
+        <input
+          type="checkbox"
+          name="parent2_sms_optin"
+          className="toggle toggle-primary"
+          checked={caseForm.parent2_sms_optin}
           onChange={onChange}
         />
       </label>
