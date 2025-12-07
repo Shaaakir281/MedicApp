@@ -77,7 +77,7 @@ def update_patient_case(
     _: models.User = Depends(require_practitioner),
     db: Session = Depends(get_db),
 ) -> schemas.PractitionerCaseStatus:
-    return appointments_service.update_case(db=db, case_id=case_id, payload=payload)
+    return appointments_service.update_case(db=db, case_id=case_id, updates=payload)
 
 
 @router.patch(

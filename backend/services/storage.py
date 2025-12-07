@@ -48,6 +48,9 @@ class StorageBackend(Protocol):
     ) -> str:
         """Return a temporary URL pointing to the stored PDF."""
 
+    def get_local_path(self, category: str, identifier: str) -> Path:
+        """Return a local filesystem path for the document when available (may raise StorageError)."""
+
 
 class LocalStorageBackend:
     """Store files on the local filesystem (default development mode)."""
@@ -100,6 +103,12 @@ class LocalStorageBackend:
         inline: bool = False,
     ) -> str:
         raise StorageError("Presigned URLs are not supported with local storage.")
+
+    def get_local_path(self, category: str, identifier: str) -> Path:
+        path = self._dir(category) / identifier
+        if not path.exists():
+            raise StorageError(f"Document {identifier} not found in {category}")
+        return path.resolve()
 
 
 class AzureBlobStorageBackend:
@@ -195,6 +204,9 @@ class AzureBlobStorageBackend:
             content_type="application/pdf",
         )
         return f"{self._container.url}/{blob_name}?{sas}"
+
+    def get_local_path(self, category: str, identifier: str) -> Path:
+        raise StorageError("Local path is not available for Azure storage.")
 
 
 def _default_local_root() -> Path:

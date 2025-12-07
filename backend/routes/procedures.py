@@ -6,13 +6,13 @@ from datetime import date as date_cls, datetime, timedelta
 import random
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 import crud
 import schemas
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from database import get_db
 from dependencies.auth import get_current_user
 from core.config import get_settings
@@ -21,6 +21,7 @@ from services import email as email_service
 from services import download_links
 from services.storage import StorageError, get_storage_backend
 from services.sms import send_sms
+from services import consents as consents_service
 
 
 router = APIRouter(prefix="/procedures", tags=["procedures"])
@@ -64,6 +65,11 @@ class PhoneOtpRequest(BaseModel):
 class PhoneOtpVerify(BaseModel):
     parent: str = Field(pattern="^(parent1|parent2)$")
     code: str
+
+
+class ConsentSendCustom(BaseModel):
+    email: EmailStr
+    parent: str | None = Field(default=None, pattern="^(parent1|parent2)?$")
 
 
 def _serialize_case(case) -> schemas.ProcedureCase:
@@ -311,6 +317,7 @@ def send_consent_link(
 @router.get("/{token}/consent.pdf")
 def download_consent_pdf(
     token: str,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> Response:
     case = crud.get_procedure_case_by_token(db, token)
@@ -322,6 +329,7 @@ def download_consent_pdf(
 
     storage = get_storage_backend()
     filename = f"consentement-{case.child_full_name.replace(' ', '_')}.pdf"
+    inline = request.query_params.get("mode") == "inline"
     if storage.supports_presigned_urls:
         try:
             url = storage.generate_presigned_url(
@@ -329,7 +337,7 @@ def download_consent_pdf(
                 case.consent_pdf_path,
                 download_name=filename,
                 expires_in_seconds=600,
-                inline=False,
+                inline=inline,
             )
             return RedirectResponse(url, status_code=307)
         except StorageError:
@@ -341,13 +349,42 @@ def download_consent_pdf(
             pdf_service.CONSENT_CATEGORY,
             case.consent_pdf_path,
             filename,
-            inline=False,
+            inline=inline,
         )
     except StorageError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Fichier manquant sur le serveur.",
         ) from exc
+
+
+@router.post("/send-consent-link-custom", response_model=schemas.Message)
+def send_consent_link_custom(
+    payload: ConsentSendCustom,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> schemas.Message:
+    """Envoyer le lien de consentement à un email cible (parent ou autre)."""
+    case = _get_case_for_user(db, current_user.id)
+    if not case.consent_download_token or not case.consent_pdf_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Consentement indisponible pour ce dossier.",
+        )
+    base_url = get_settings().app_base_url.rstrip("/")
+    download_url = f"{base_url}/procedures/{case.consent_download_token}/consent.pdf"
+    try:
+        email_service.send_consent_download_email(
+          payload.email,
+          case.child_full_name,
+          download_url,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Echec d'envoi du lien de consentement.",
+        ) from exc
+    return schemas.Message(detail="Lien de consentement envoye.")
 
 
 @router.post("/phone-otp/request", response_model=schemas.ProcedureCase)
@@ -408,4 +445,15 @@ def verify_phone_otp(
     db.add(case)
     db.commit()
     db.refresh(case)
+    return _serialize_case(case)
+
+
+@router.post("/start-signature", response_model=schemas.ProcedureCase)
+def start_signature(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> schemas.ProcedureCase:
+    """Initie la procedure Yousign pour le dossier patient courant (parents) sans bloquer sur le délai."""
+    case = _get_case_for_user(db, current_user.id)
+    case = consents_service.initiate_consent(db, case)
     return _serialize_case(case)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any, Dict
 
+import json
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
@@ -112,33 +113,50 @@ async def yousign_webhook(
     request: Request,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Consume Yousign webhook events (simplified placeholder)."""
-    payload = await request.json()
-    # Try to identify the case by procedure_id
-    procedure_id = payload.get("procedure_id") or payload.get("procedureId")
-    signer_external_id = payload.get("signer_external_id") or payload.get("signerExternalId")
-    signed_file_url = payload.get("signed_file_url")
-    evidence_url = payload.get("evidence_url")
-    status_value = payload.get("status") or "signed"
+    """Consume Yousign webhook events (v3) and always return 200 to avoid retries."""
+    raw_body = await request.body()
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+    except Exception:
+        payload = {}
 
-    if not procedure_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="procedure_id manquant dans le webhook.")
+    data = payload.get("data", {}) if isinstance(payload, dict) else {}
+    sr = data.get("signature_request") or {}
+    signer = data.get("signer") or {}
+    procedure_id = sr.get("id") or payload.get("procedure_id") or payload.get("procedureId")
+    signer_id = signer.get("id") or payload.get("signer_id") or payload.get("signerId")
+    event_name = payload.get("event_name") or payload.get("eventName")
+    signed_file_url = payload.get("signed_file_url") or sr.get("signed_file_url")
+    evidence_url = payload.get("evidence_url") or sr.get("evidence_url")
 
     from models import ProcedureCase  # imported lazily to avoid circular import in autoloaders
 
-    case = db.query(ProcedureCase).filter(ProcedureCase.yousign_procedure_id == procedure_id).first()
-    if case is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Procedure Yousign inconnue.")
+    if procedure_id:
+        case = db.query(ProcedureCase).filter(ProcedureCase.yousign_procedure_id == procedure_id).first()
+    else:
+        case = None
 
-    parent_label = "parent1" if signer_external_id and "parent1" in signer_external_id else "parent2"
-    update_signature_status(
-        db,
-        case,
-        parent_label=parent_label,
-        status_value=status_value,
-        signed_at=dt.datetime.utcnow(),
-        method="yousign",
-        signed_file_url=signed_file_url,
-        evidence_url=evidence_url,
-    )
+    if case:
+        parent_label = None
+        if signer_id:
+            if signer_id == case.parent1_yousign_signer_id:
+                parent_label = "parent1"
+            elif signer_id == case.parent2_yousign_signer_id:
+                parent_label = "parent2"
+        if parent_label is None:
+            parent_label = "parent1"
+
+        status_value = "signed" if event_name and "signed" in event_name else "ongoing"
+
+        update_signature_status(
+            db,
+            case,
+            parent_label=parent_label,
+            status_value=status_value,
+            signed_at=dt.datetime.utcnow(),
+            method="yousign",
+            signed_file_url=signed_file_url,
+            evidence_url=evidence_url,
+        )
+
     return {"detail": "ok"}

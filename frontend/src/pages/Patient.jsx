@@ -15,10 +15,11 @@ import { PatientHeader } from '../components/patient/PatientHeader.jsx';
 import { ProcedureChoice } from '../components/patient/ProcedureChoice.jsx';
 import { ProcedureSummary } from '../components/patient/ProcedureSummary.jsx';
 import { StepsCard } from '../components/patient/StepsCard.jsx';
+import { ConsentSection } from '../components/patient/ConsentSection.jsx';
 import { usePatientProcedure } from '../hooks/usePatientProcedure.js';
 import { usePatientAppointments } from '../hooks/usePatientAppointments.js';
 import { formatChildAge } from '../utils/child.js';
-import { requestPhoneOtp, verifyPhoneOtp } from '../lib/api.js';
+import { requestPhoneOtp, verifyPhoneOtp, sendConsentLinkCustom, startConsentSignature } from '../lib/api.js';
 
 const previewInitialState = { open: false, url: null, downloadUrl: null, title: null, type: null };
 
@@ -50,6 +51,10 @@ const Patient = () => {
   const [otpCodes, setOtpCodes] = useState({ parent1: '', parent2: '' });
   const [otpSending, setOtpSending] = useState({ parent1: false, parent2: false });
   const [otpVerifying, setOtpVerifying] = useState({ parent1: false, parent2: false });
+  const [consentSendEmail, setConsentSendEmail] = useState('');
+  const [consentSendLoading, setConsentSendLoading] = useState(false);
+  const [consentSendRecipient, setConsentSendRecipient] = useState(null);
+  const [signatureLoading, setSignatureLoading] = useState({ parent1: false, parent2: false });
 
   const {
     procedureInfo,
@@ -172,6 +177,7 @@ const Patient = () => {
   const showConsentPending = showProcedureForm && !consentLink && Boolean(procedureCase);
   const parent1Verified = Boolean(procedureCase?.parent1_phone_verified_at);
   const parent2Verified = Boolean(procedureCase?.parent2_phone_verified_at);
+  const consentSignedUrl = procedureCase?.consent_signed_pdf_url || procedureCase?.consent_download_url || null;
 
   const handleSendByEmail = (url) => {
     if (!url) {
@@ -238,6 +244,63 @@ const Patient = () => {
     }
   };
 
+  const handlePreviewConsent = () => {
+    if (!consentSignedUrl) {
+      setError("Consentement indisponible.");
+      return;
+    }
+    const inlineUrl = `${consentSignedUrl}${consentSignedUrl.includes('?') ? '&' : '?'}mode=inline`;
+    setPreviewState({
+      open: true,
+      url: inlineUrl,
+      downloadUrl: consentSignedUrl,
+      title: 'Consentement',
+      type: 'consent',
+    });
+  };
+
+  const handleSendConsentLinkCustom = async (email) => {
+    if (!token || !email) return;
+    setError(null);
+    setSuccessMessage(null);
+    setConsentSendLoading(true);
+    try {
+      await sendConsentLinkCustom(token, { email });
+      setConsentSendRecipient(email);
+      setSuccessMessage('Lien de consentement envoyé.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setConsentSendLoading(false);
+    }
+  };
+
+  const handleStartSignature = async (parentKey) => {
+    if (!token) return;
+    const isVerified = parentKey === 'parent1' ? parent1Verified : parent2Verified;
+    if (!isVerified) {
+      setError('Numero non verifie pour ce parent.');
+      return;
+    }
+    setError(null);
+    setSuccessMessage(null);
+    setSignatureLoading((prev) => ({ ...prev, [parentKey]: true }));
+    try {
+      const updatedCase = await startConsentSignature(token);
+      await loadProcedureCase();
+      const link = updatedCase?.[`${parentKey}_signature_link`];
+      if (link) {
+        window.open(link, '_blank', 'noopener');
+      } else {
+        setError("Lien Yousign non disponible pour ce parent.");
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSignatureLoading((prev) => ({ ...prev, [parentKey]: false }));
+    }
+  };
+
   const handleClosePreview = () => {
     setPreviewState(previewInitialState);
   };
@@ -252,6 +315,19 @@ const Patient = () => {
           rel="noopener noreferrer"
         >
           Telecharger le PDF
+        </a>,
+      ];
+    }
+    if (previewState.type === 'consent' && previewState.url) {
+      return [
+        <a
+          key="download-consent"
+          className="btn btn-primary btn-sm"
+          href={previewState.url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Telecharger le consentement
         </a>,
       ];
     }
@@ -332,12 +408,6 @@ const Patient = () => {
             childAgeDisplay={childAgeDisplay}
             loading={procedureLoading}
             onSubmit={handleProcedureSubmit}
-            showConsentDownload={showConsentDownload}
-            showConsentPending={showConsentPending}
-            consentLink={consentLink}
-            onSendConsent={handleSendConsentEmail}
-            sendingConsentEmail={sendingConsentEmail}
-            canSendConsent={Boolean(procedureCase)}
           />
         </FormProvider>
       )}
@@ -435,6 +505,22 @@ const Patient = () => {
           </div>
         </section>
       ) : null}
+
+      {showProcedureForm && procedureCase && (
+        <ConsentSection
+          procedureCase={procedureCase}
+          onPreview={handlePreviewConsent}
+          parent1Verified={parent1Verified}
+          parent2Verified={parent2Verified}
+          onSendLink={handleSendConsentLinkCustom}
+          customEmail={consentSendEmail}
+          setCustomEmail={setConsentSendEmail}
+          sendInProgress={consentSendLoading}
+          lastRecipient={consentSendRecipient}
+          onSign={handleStartSignature}
+          signatureLoading={signatureLoading}
+        />
+      )}
 
 
       {showScheduling && (

@@ -252,4 +252,12 @@ export async function verifyPhoneOtp(token, payload) {
   return apiRequest('/procedures/phone-otp/verify', { method: 'POST', body: payload, token });
 }
 
+export async function sendConsentLinkCustom(token, payload) {
+  return apiRequest('/procedures/send-consent-link-custom', { method: 'POST', body: payload, token });
+}
+
+export async function startConsentSignature(token) {
+  return apiRequest('/procedures/start-signature', { method: 'POST', token });
+}
+
 export { API_BASE_URL };

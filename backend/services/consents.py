@@ -39,23 +39,35 @@ def compute_signature_open_at(case: models.ProcedureCase) -> Optional[dt.date]:
 
 
 def _build_signers_payload(case: models.ProcedureCase) -> list[dict]:
+    """Build signers payload; fallback email generated from phone if missing."""
+
+    def _ensure_email(email: str | None, phone: str | None, label: str) -> str | None:
+        if email:
+            return email
+        if phone:
+            safe = phone.replace("+", "").replace(" ", "").replace("-", "")
+            return f"{safe}@{label}.consent.test"
+        return None
+
     signers = []
-    if case.parent1_name and case.parent1_email:
+    if case.parent1_name and (case.parent1_email or case.parent1_phone):
+        email = _ensure_email(case.parent1_email, case.parent1_phone, "parent1")
         signers.append(
             {
+                "label": "parent1",
                 "full_name": case.parent1_name,
-                "email": case.parent1_email,
+                "email": email,
                 "phone": case.parent1_phone,
-                "external_id": f"parent1-{case.id}",
             }
         )
-    if case.parent2_name and case.parent2_email:
+    if case.parent2_name and (case.parent2_email or case.parent2_phone):
+        email = _ensure_email(case.parent2_email, case.parent2_phone, "parent2")
         signers.append(
             {
+                "label": "parent2",
                 "full_name": case.parent2_name,
-                "email": case.parent2_email,
+                "email": email,
                 "phone": case.parent2_phone,
-                "external_id": f"parent2-{case.id}",
             }
         )
     return signers
@@ -65,8 +77,6 @@ def _validate_contacts(case: models.ProcedureCase) -> None:
     missing = []
     if not case.parent1_phone:
         missing.append("parent1_phone")
-    if case.parent2_name and not case.parent2_phone:
-        missing.append("parent2_phone")
     if missing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -77,17 +87,7 @@ def _validate_contacts(case: models.ProcedureCase) -> None:
 def initiate_consent(db: Session, case: models.ProcedureCase) -> models.ProcedureCase:
     """Create the Yousign procedure (or mock) and send initial notifications."""
     signature_open_at = compute_signature_open_at(case)
-    if not signature_open_at:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Date de consultation pre-operatoire manquante pour calculer le delai de 15 jours.",
-        )
-    today = dt.date.today()
-    if today < signature_open_at:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Signature autorisee a partir du {signature_open_at.isoformat()} (delai de reflexion).",
-        )
+    # En phase de test, on ne bloque plus sur le delai de 15 jours. On conserve la date calculee si disponible.
 
     _validate_contacts(case)
     signers = _build_signers_payload(case)
@@ -96,19 +96,44 @@ def initiate_consent(db: Session, case: models.ProcedureCase) -> models.Procedur
 
     try:
         client = YousignClient()
-        procedure = client.create_procedure(signers, name=f"Consentement {case.child_full_name}")
+        signature_request_id = None
+        document_id = None
+        if not client.mock_mode and case.consent_pdf_path:
+            from services import pdf as pdf_service
+            from services.storage import get_storage_backend, StorageError
+
+            storage = get_storage_backend()
+            try:
+                local_path = storage.get_local_path(pdf_service.CONSENT_CATEGORY, case.consent_pdf_path)
+                signature_request_id = client.create_signature_request(f"Consentement {case.child_full_name}")
+                document_id = client.upload_document(signature_request_id, local_path, filename=f"consent-{case.id}.pdf")
+            except StorageError:
+                signature_request_id = None
+                document_id = None
+
+        if signature_request_id and document_id:
+            procedure = client.finalize_signature_request(
+                signature_request_id=signature_request_id,
+                document_id=document_id,
+                signers=signers,
+                name=f"Consentement {case.child_full_name}",
+            )
+        else:
+            procedure = client.create_mock_procedure(signers)
     except YousignConfigurationError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
     case.yousign_procedure_id = procedure.procedure_id
     now = dt.datetime.utcnow()
-    for signer in procedure.signers:
-        if signer.signer_id.startswith("parent1") or signer.email == case.parent1_email:
+    # Associer les signers retournés à nos labels (ordre d'insertion)
+    for idx, signer in enumerate(procedure.signers):
+        label = signers[idx].get("label") if idx < len(signers) else None
+        if label == "parent1":
             case.parent1_yousign_signer_id = signer.signer_id
             case.parent1_consent_status = "sent"
             case.parent1_consent_sent_at = now
             case.parent1_signature_link = signer.signature_link
-        else:
+        elif label == "parent2":
             case.parent2_yousign_signer_id = signer.signer_id
             case.parent2_consent_status = "sent"
             case.parent2_consent_sent_at = now

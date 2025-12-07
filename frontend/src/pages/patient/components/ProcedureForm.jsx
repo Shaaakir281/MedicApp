@@ -3,17 +3,7 @@ import { useFormContext } from 'react-hook-form';
 
 import { Button, Card, InputField, SectionHeading } from '../../../components/ui';
 
-export function ProcedureForm({
-  childAgeDisplay,
-  loading,
-  onSubmit,
-  showConsentDownload,
-  showConsentPending,
-  consentLink,
-  sendingConsentEmail,
-  onSendConsent,
-  canSendConsent,
-}) {
+export function ProcedureForm({ childAgeDisplay, loading, onSubmit }) {
   const {
     register,
     handleSubmit,
@@ -138,37 +128,6 @@ export function ProcedureForm({
           </div>
         </form>
       </Card>
-
-      {showConsentDownload && (
-        <Card className="space-y-3">
-          <h3 className="font-semibold">Consentement pre-rempli</h3>
-          <p className="text-sm text-slate-600">
-            Telechargez le document, faites-le signer par les deux parents, puis apportez-le le jour de l&apos;intervention.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <a className="btn btn-outline btn-sm" href={consentLink}>
-              Telecharger le consentement
-            </a>
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={onSendConsent}
-              disabled={sendingConsentEmail || !canSendConsent}
-            >
-              {sendingConsentEmail ? 'Envoi en cours...' : 'Envoyer le lien par e-mail'}
-            </button>
-          </div>
-        </Card>
-      )}
-
-      {showConsentPending && (
-        <Card className="space-y-2">
-          <h3 className="font-semibold">Consentement en preparation</h3>
-          <p className="text-sm text-slate-600">
-            Le document de consentement est en cours de generation. Vous recevrez un lien par e-mail des qu&apos;il sera pret.
-          </p>
-        </Card>
-      )}
     </section>
   );
 }
