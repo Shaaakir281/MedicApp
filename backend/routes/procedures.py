@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, EmailStr
 from database import get_db
 from dependencies.auth import get_current_user
 from core.config import get_settings
+import logging
 from services import pdf as pdf_service
 from services import email as email_service
 from services import download_links
@@ -25,6 +26,8 @@ from services import consents as consents_service
 
 
 router = APIRouter(prefix="/procedures", tags=["procedures"])
+# Utilise le logger uvicorn pour garantir l'affichage
+logger = logging.getLogger("uvicorn.error")
 
 PATIENT_INFO: Dict[str, Any] = {
     "title": "Circoncision rituelle - informations patients",
@@ -224,7 +227,14 @@ def get_current_procedure(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Aucune procedure en cours.",
         )
-    return _serialize_case(case)
+    serialized = _serialize_case(case)
+    logger.info(
+        "/procedures/current -> user=%s parent1_link=%s parent2_link=%s",
+        current_user.id,
+        serialized.parent1_signature_link,
+        serialized.parent2_signature_link,
+    )
+    return serialized
 
 
 @router.post("", response_model=schemas.ProcedureCase, status_code=status.HTTP_201_CREATED)

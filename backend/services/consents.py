@@ -11,11 +11,14 @@ from sqlalchemy.orm import Session
 
 import models
 from core.config import get_settings
+from services import consent_pdf
 from services import email as email_service
 from services.sms import send_sms
-from services.yousign import YousignClient, YousignConfigurationError
+from services.yousign import YousignClient, YousignConfigurationError, start_neutral_signature_request
+from services.yousign.models import YousignSigner
 
-logger = logging.getLogger(__name__)
+# Utilise le logger uvicorn pour garantir l'affichage dans les logs du conteneur
+logger = logging.getLogger("uvicorn.error")
 
 
 def _get_preconsultation_date(case: models.ProcedureCase) -> Optional[dt.date]:
@@ -55,7 +58,6 @@ def _build_signers_payload(case: models.ProcedureCase) -> list[dict]:
         signers.append(
             {
                 "label": "parent1",
-                "full_name": case.parent1_name,
                 "email": email,
                 "phone": case.parent1_phone,
             }
@@ -65,7 +67,6 @@ def _build_signers_payload(case: models.ProcedureCase) -> list[dict]:
         signers.append(
             {
                 "label": "parent2",
-                "full_name": case.parent2_name,
                 "email": email,
                 "phone": case.parent2_phone,
             }
@@ -96,32 +97,72 @@ def initiate_consent(db: Session, case: models.ProcedureCase) -> models.Procedur
 
     try:
         client = YousignClient()
-        signature_request_id = None
-        document_id = None
-        if not client.mock_mode and case.consent_pdf_path:
+        consent_hash = None
+        if case.consent_pdf_path:
             from services import pdf as pdf_service
-            from services.storage import get_storage_backend, StorageError
 
-            storage = get_storage_backend()
-            try:
-                local_path = storage.get_local_path(pdf_service.CONSENT_CATEGORY, case.consent_pdf_path)
-                signature_request_id = client.create_signature_request(f"Consentement {case.child_full_name}")
-                document_id = client.upload_document(signature_request_id, local_path, filename=f"consent-{case.id}.pdf")
-            except StorageError:
-                signature_request_id = None
-                document_id = None
+            pdf_bytes = consent_pdf.load_pdf_bytes(pdf_service.CONSENT_CATEGORY, case.consent_pdf_path)
+            if pdf_bytes:
+                consent_hash = consent_pdf.compute_pdf_sha256(pdf_bytes)
 
-        if signature_request_id and document_id:
-            procedure = client.finalize_signature_request(
-                signature_request_id=signature_request_id,
-                document_id=document_id,
-                signers=signers,
-                name=f"Consentement {case.child_full_name}",
-            )
-        else:
-            procedure = client.create_mock_procedure(signers)
+        neutral_pdf_path = consent_pdf.render_neutral_consent_pdf(consent_id=str(case.id), consent_hash=consent_hash)
+        procedure = start_neutral_signature_request(
+            client=client,
+            neutral_pdf_path=str(neutral_pdf_path),
+            signers=signers,
+            procedure_label="Consentement electronique MedScript",
+        )
     except YousignConfigurationError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+    logger.info("initiate_consent -> Yousign procedure=%s signers=%s", procedure.procedure_id, procedure.signers)
+
+    # Fallback : si des liens de signature manquent, tenter une recuperation immediate.
+    if not client.mock_mode and any(not s.signature_link for s in procedure.signers):
+        def _sig_link(data: dict) -> str:
+            links = data.get("signature_links") or {}
+            return (
+                data.get("signature_url")
+                or data.get("signature_link")
+                or data.get("url")
+                or links.get("iframe")
+                or links.get("short")
+                or links.get("long")
+                or ""
+            )
+
+        refreshed: list[YousignSigner] = []
+        try:
+            signers_data = client.fetch_signers(procedure.procedure_id)
+            mapping = {str(s.get("id")): _sig_link(s) for s in signers_data if isinstance(s, dict)}
+        except Exception:
+            mapping = {}
+
+        for signer in procedure.signers:
+            link = signer.signature_link or mapping.get(str(signer.signer_id)) or ""
+            if not link:
+                try:
+                    payload = client.fetch_signer(str(signer.signer_id))
+                    link = _sig_link(payload)
+                    email = (payload.get("info") or {}).get("email") or payload.get("email") or signer.email
+                    phone = (payload.get("info") or {}).get("phone_number") or payload.get("phone") or signer.phone
+                except Exception:
+                    email = signer.email
+                    phone = signer.phone
+                refreshed.append(
+                    YousignSigner(
+                        signer_id=signer.signer_id,
+                        signature_link=link,
+                        email=email,
+                        phone=phone,
+                    )
+                )
+            else:
+                refreshed.append(signer)
+
+        procedure.signers = refreshed
 
     case.yousign_procedure_id = procedure.procedure_id
     now = dt.datetime.utcnow()
@@ -133,11 +174,13 @@ def initiate_consent(db: Session, case: models.ProcedureCase) -> models.Procedur
             case.parent1_consent_status = "sent"
             case.parent1_consent_sent_at = now
             case.parent1_signature_link = signer.signature_link
+            logger.info("Persisting Yousign links for parent1: %s", signer)
         elif label == "parent2":
             case.parent2_yousign_signer_id = signer.signer_id
             case.parent2_consent_status = "sent"
             case.parent2_consent_sent_at = now
             case.parent2_signature_link = signer.signature_link
+            logger.info("Persisting Yousign links for parent2: %s", signer)
 
     case.signature_open_at = signature_open_at
     case.consent_last_status = "procedure_created"
@@ -199,6 +242,51 @@ def remind_pending(db: Session, case: models.ProcedureCase) -> models.ProcedureC
     return case
 
 
+def _download_and_store_artifacts(
+    case: models.ProcedureCase,
+    signed_url: Optional[str] = None,
+    evidence_url: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str]]:
+    """Download signed/evidence PDFs from Yousign and persist them in HDS storage."""
+    client = YousignClient()
+    if client.mock_mode or not case.yousign_procedure_id:
+        return None, None
+
+    signed_identifier = None
+    evidence_identifier = None
+
+    try:
+        if signed_url:
+            signed_bytes = client.download_with_auth(signed_url)
+        else:
+            signed_bytes = client.download_signed_documents(case.yousign_procedure_id)
+        if signed_bytes:
+            signed_identifier = consent_pdf.store_signed_pdf(signed_bytes, prefix=str(case.id))
+    except Exception:
+        logger.exception("Failed to download or store signed document for case %s", case.id)
+
+    if evidence_url:
+        try:
+            evidence_bytes = client.download_with_auth(evidence_url)
+            if evidence_bytes:
+                evidence_identifier = consent_pdf.store_evidence_pdf(evidence_bytes, prefix=str(case.id))
+        except Exception:
+            logger.exception("Failed to download or store evidence PDF for case %s", case.id)
+
+    return signed_identifier, evidence_identifier
+
+
+def purge_yousign_signature(case: models.ProcedureCase) -> None:
+    """Best-effort cleanup of the Yousign signature request (no PHI retained externally)."""
+    client = YousignClient()
+    if client.mock_mode or not case.yousign_procedure_id:
+        return
+    try:
+        client.delete_signature_request(case.yousign_procedure_id, permanent_delete=True)
+    except Exception:
+        logger.exception("Failed to purge Yousign signature_request %s", case.yousign_procedure_id)
+
+
 def update_signature_status(
     db: Session,
     case: models.ProcedureCase,
@@ -226,9 +314,38 @@ def update_signature_status(
     if evidence_url:
         case.consent_evidence_pdf_url = evidence_url
 
+    if status_value == "signed" and case.yousign_procedure_id:
+        stored_signed, stored_evidence = _download_and_store_artifacts(
+            case,
+            signed_url=signed_file_url,
+            evidence_url=evidence_url,
+        )
+        if stored_signed:
+            case.consent_signed_pdf_url = stored_signed
+        if stored_evidence:
+            case.consent_evidence_pdf_url = stored_evidence
+
     if case.parent1_consent_status == "signed" and case.parent2_consent_status == "signed":
+        # Assembler le PDF final (consentement complet + audit + PDF signé neutre)
+        if case.consent_pdf_path and case.consent_signed_pdf_url:
+            try:
+                final_path = consent_pdf.compose_final_consent(
+                    full_consent_id=case.consent_pdf_path,
+                    signed_id=case.consent_signed_pdf_url,
+                    evidence_id=case.consent_evidence_pdf_url,
+                )
+                if final_path:
+                    case.consent_signed_pdf_url = final_path
+            except Exception:
+                logger.exception("Echec d'assemblage du PDF final pour le dossier %s", case.id)
+
         case.consent_ready_at = signed_at
         case.consent_last_status = "completed"
+        # Purge Yousign apres recuperation locale (best-effort)
+        try:
+            purge_yousign_signature(case)
+        except Exception:
+            logger.exception("Echec de purge Yousign pour le dossier %s", case.id)
     else:
         case.consent_last_status = status_value
 

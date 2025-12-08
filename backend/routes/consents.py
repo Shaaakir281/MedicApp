@@ -146,7 +146,11 @@ async def yousign_webhook(
         if parent_label is None:
             parent_label = "parent1"
 
-        status_value = "signed" if event_name and "signed" in event_name else "ongoing"
+        status_value = "ongoing"
+        if event_name:
+            lowered = event_name.lower()
+            if "signed" in lowered or "done" in lowered or "completed" in lowered:
+                status_value = "signed"
 
         update_signature_status(
             db,

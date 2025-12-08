@@ -20,3 +20,4 @@ azure-storage-blob==12.19.1
 segno==1.6.1
 requests>=2.31.0
 twilio>=9.0.0
+PyPDF2>=3.0.1
