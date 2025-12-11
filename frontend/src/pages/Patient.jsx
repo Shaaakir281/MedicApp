@@ -311,7 +311,7 @@ const Patient = () => {
     }
   };
 
-  const handleStartSignature = async (parentKey) => {
+  const handleStartSignature = async (parentKey, { inPerson = false } = {}) => {
     if (!token) return;
     const isVerified = parentKey === 'parent1' ? parent1Verified : parent2Verified;
     if (!isVerified) {
@@ -322,7 +322,7 @@ const Patient = () => {
     setSuccessMessage(null);
     setSignatureLoading((prev) => ({ ...prev, [parentKey]: true }));
     try {
-      const updatedCase = await startConsentSignature(token);
+      const updatedCase = await startConsentSignature(token, { in_person: inPerson });
       await loadProcedureCase();
       const link = updatedCase?.[`${parentKey}_signature_link`];
       if (link) {
@@ -555,11 +555,11 @@ const Patient = () => {
           onSendLink={handleSendConsentLinkCustom}
           customEmail={consentSendEmail}
           setCustomEmail={setConsentSendEmail}
-          sendInProgress={consentSendLoading}
-          lastRecipient={consentSendRecipient}
-          onSign={handleStartSignature}
-          signatureLoading={signatureLoading}
-        />
+      sendInProgress={consentSendLoading}
+      lastRecipient={consentSendRecipient}
+      onSign={handleStartSignature}
+      signatureLoading={signatureLoading}
+    />
       )}
 
 

@@ -119,6 +119,14 @@ export async function sendConsentLink(token) {
   return apiRequest('/procedures/send-consent-link', { method: 'POST', token });
 }
 
+export async function startSignature(token, { in_person = false } = {}) {
+  return apiRequest('/procedures/start-signature', {
+    method: 'POST',
+    token,
+    body: { in_person },
+  });
+}
+
 export async function acknowledgeProcedureSteps(token) {
   return apiRequest('/procedures/acknowledge-steps', {
     method: 'POST',
@@ -256,8 +264,8 @@ export async function sendConsentLinkCustom(token, payload) {
   return apiRequest('/procedures/send-consent-link-custom', { method: 'POST', body: payload, token });
 }
 
-export async function startConsentSignature(token) {
-  return apiRequest('/procedures/start-signature', { method: 'POST', token });
+export async function startConsentSignature(token, { in_person = false } = {}) {
+  return apiRequest('/procedures/start-signature', { method: 'POST', token, body: { in_person } });
 }
 
 export async function downloadSignedConsent(token) {

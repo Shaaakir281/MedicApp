@@ -41,7 +41,7 @@ def compute_signature_open_at(case: models.ProcedureCase) -> Optional[dt.date]:
     return pre_date + dt.timedelta(days=15)
 
 
-def _build_signers_payload(case: models.ProcedureCase) -> list[dict]:
+def _build_signers_payload(case: models.ProcedureCase, auth_mode: str = "otp_sms") -> list[dict]:
     """Build signers payload; fallback email generated from phone if missing."""
 
     def _ensure_email(email: str | None, phone: str | None, label: str) -> str | None:
@@ -60,6 +60,7 @@ def _build_signers_payload(case: models.ProcedureCase) -> list[dict]:
                 "label": "parent1",
                 "email": email,
                 "phone": case.parent1_phone,
+                "auth_mode": auth_mode,
             }
         )
     if case.parent2_name and (case.parent2_email or case.parent2_phone):
@@ -69,6 +70,7 @@ def _build_signers_payload(case: models.ProcedureCase) -> list[dict]:
                 "label": "parent2",
                 "email": email,
                 "phone": case.parent2_phone,
+                "auth_mode": auth_mode,
             }
         )
     return signers
@@ -85,11 +87,13 @@ def _validate_contacts(case: models.ProcedureCase) -> None:
         )
 
 
-def initiate_consent(db: Session, case: models.ProcedureCase) -> models.ProcedureCase:
+def initiate_consent(db: Session, case: models.ProcedureCase, *, in_person: bool = False) -> models.ProcedureCase:
     """Create the Yousign procedure (or mock) and send initial notifications."""
     signature_open_at = compute_signature_open_at(case)
     _validate_contacts(case)
-    signers = _build_signers_payload(case)
+    # Yousign v3 accepte : otp_sms, otp_email, no_otp. En face à face on supprime l'OTP.
+    auth_mode = "no_otp" if in_person else "otp_sms"
+    signers = _build_signers_payload(case, auth_mode=auth_mode)
     if not signers:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Aucun parent n'est renseigne.")
 
@@ -109,6 +113,7 @@ def initiate_consent(db: Session, case: models.ProcedureCase) -> models.Procedur
             neutral_pdf_path=str(neutral_pdf_path),
             signers=signers,
             procedure_label="Consentement electronique MedScript",
+            delivery_mode="none" if in_person else "email",
         )
     except YousignConfigurationError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc

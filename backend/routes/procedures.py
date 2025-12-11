@@ -6,7 +6,7 @@ from datetime import date as date_cls, datetime, timedelta
 import random
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Body
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -74,6 +74,10 @@ class PhoneOtpVerify(BaseModel):
 class ConsentSendCustom(BaseModel):
     email: EmailStr
     parent: str | None = Field(default=None, pattern="^(parent1|parent2)?$")
+
+
+class StartSignaturePayload(BaseModel):
+    in_person: bool = False
 
 
 def _serialize_case(case) -> schemas.ProcedureCase:
@@ -536,10 +540,11 @@ def verify_phone_otp(
 
 @router.post("/start-signature", response_model=schemas.ProcedureCase)
 def start_signature(
+    payload: StartSignaturePayload = Body(default=StartSignaturePayload()),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> schemas.ProcedureCase:
-    """Initie la procedure Yousign pour le dossier patient courant (parents) sans bloquer sur le délai."""
+    """Initie la procedure Yousign pour le dossier patient courant (parents) avec option face-à-face."""
     case = _get_case_for_user(db, current_user.id)
-    case = consents_service.initiate_consent(db, case)
+    case = consents_service.initiate_consent(db, case, in_person=payload.in_person)
     return _serialize_case(case)

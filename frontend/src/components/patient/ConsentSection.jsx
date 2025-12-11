@@ -39,7 +39,6 @@ export const ConsentSection = ({
 
   const renderParentRow = (label, data, displayName) => {
     const canSign = signatureOpen && data.verified;
-    const disabledReason = !data.verified ? 'Numero non verifie' : !signatureOpen ? 'Signature non ouverte' : 'Lien non disponible';
     return (
       <div className="flex items-center justify-between border rounded-lg p-3">
         <div className="space-y-1">
@@ -51,25 +50,29 @@ export const ConsentSection = ({
             Numero verifie : {data.verified ? 'Oui' : 'Non'} {data.verified ? '' : '(obligatoire pour signer)'}
           </p>
           {!data.link && (
-            <p className="text-xs text-slate-500">Lien de signature non disponible pour le moment (il sera genere au clic).</p>
+            <p className="text-xs text-slate-500">
+              Lien de signature non disponible pour le moment (il sera genere au clic).
+            </p>
           )}
         </div>
         <div className="flex gap-2 flex-wrap justify-end">
           <button
             type="button"
             className={`btn btn-sm ${canSign ? 'btn-primary' : 'btn-disabled'}`}
-            onClick={() => onSign?.(label)}
+            onClick={() => onSign?.(label, { inPerson: true })}
             disabled={!canSign || signatureLoading[label]}
           >
-            {signatureLoading[label]
-              ? 'Ouverture...'
-              : canSign
-              ? `Signer (${displayName})`
-              : disabledReason || 'Signer'}
+            {signatureLoading[label] ? 'Ouverture...' : 'Signer en cabinet'}
           </button>
-          {!signatureOpen && (
-            <span className="badge badge-warning">Signature dans {daysUntilOpen} j</span>
-          )}
+          <button
+            type="button"
+            className={`btn btn-sm ${canSign ? 'btn-outline' : 'btn-disabled'}`}
+            onClick={() => onSign?.(label, { inPerson: false })}
+            disabled={!canSign || signatureLoading[label]}
+          >
+            {signatureLoading[label] ? 'Ouverture...' : 'Signer a distance (OTP SMS)'}
+          </button>
+          {!signatureOpen && <span className="badge badge-warning">Signature dans {daysUntilOpen} j</span>}
         </div>
       </div>
     );
@@ -97,14 +100,14 @@ export const ConsentSection = ({
             onClick={() => (consentAvailable ? onDownloadSigned?.() : onPreview?.(null))}
             disabled={consentLoading || (!consentAvailable && !onPreview)}
           >
-            {consentLoading ? 'Chargement...' : 'Télécharger'}
+            {consentLoading ? 'Chargement...' : 'Telecharger'}
           </button>
         </div>
       </div>
 
       {!signatureOpen && (
         <div className="alert alert-warning">
-          Signature autorisée dans {daysUntilOpen} jour{daysUntilOpen > 1 ? 's' : ''} (délai légal).
+          Signature autorisee dans {daysUntilOpen} jour{daysUntilOpen > 1 ? 's' : ''} (delai legal).
         </div>
       )}
 
@@ -148,7 +151,7 @@ export const ConsentSection = ({
             {sendInProgress ? 'Envoi...' : 'Envoyer'}
           </button>
         </div>
-        {lastRecipient && <p className="text-xs text-slate-500">Lien envoyé à {lastRecipient}</p>}
+        {lastRecipient && <p className="text-xs text-slate-500">Lien envoye a {lastRecipient}</p>}
       </div>
 
       {procedureCase.consent_evidence_pdf_url && (
@@ -159,7 +162,7 @@ export const ConsentSection = ({
             target="_blank"
             rel="noopener noreferrer"
           >
-            Télécharger le fichier de preuve
+            Telecharger le fichier de preuve
           </a>
         </div>
       )}

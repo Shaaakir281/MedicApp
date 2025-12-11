@@ -39,6 +39,7 @@ def _normalize_signers(signers: List[dict]) -> List[dict]:
                 "page": s.get("page", 1),
                 "x": s.get("x", 200),
                 "y": s.get("y", 500),
+                "auth_mode": s.get("auth_mode"),
             }
         )
     return normalized
@@ -88,6 +89,7 @@ def start_neutral_signature_request(
     signers: List[dict],
     *,
     procedure_label: str = "Consentement electronique",
+    delivery_mode: str = "email",
 ) -> YousignProcedure:
     """Create SR, upload neutral PDF, add signers, activate, and return links."""
     normalized_signers = _normalize_signers(signers)
@@ -97,7 +99,7 @@ def start_neutral_signature_request(
         logger.info("Yousign finalize_signature_request (mock) -> procedure_id=%s, signers=%s", procedure.procedure_id, procedure.signers)
         return procedure
 
-    signature_request_id = client.create_signature_request(procedure_label)
+    signature_request_id = client.create_signature_request(procedure_label, delivery_mode=delivery_mode)
     filename = f"yousign-neutral-consent-{uuid.uuid4().hex}.pdf"
     document_id = client.upload_document(signature_request_id, neutral_pdf_path, filename=filename)
     created_signers = client.add_signers(signature_request_id, document_id, normalized_signers)

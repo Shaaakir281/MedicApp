@@ -61,7 +61,12 @@ class YousignClient:
 
     # === Signature Request lifecycle ===
     def create_signature_request(self, name: str, delivery_mode: str = "email") -> str:
-        """Create a signature request and return its ID."""
+        """Create a signature request and return its ID.
+
+        delivery_mode:
+            - "email": Yousign envoie les emails (par défaut).
+            - "none": MedScript gère les liens (face-à-face/tablette).
+        """
         if self.mock_mode:
             return f"sr-mock-{uuid.uuid4().hex}"
         payload = {"name": name, "delivery_mode": delivery_mode, "timezone": "Europe/Paris"}
@@ -97,7 +102,8 @@ class YousignClient:
         document_id: str,
         signers: List[dict],
     ) -> List[YousignSigner]:
-        """Add signers with OTP SMS and a basic signature field (v3)."""
+        """Add signers with configurable auth mode (v3)."""
+        allowed_auth_modes = {"otp_sms", "otp_email", "no_otp", None}
         if self.mock_mode:
             base = get_settings().app_base_url.rstrip("/")
             return [
@@ -120,7 +126,7 @@ class YousignClient:
                     "locale": "fr",
                 },
                 "signature_level": "electronic_signature",
-                "signature_authentication_mode": "otp_sms",
+                "signature_authentication_mode": s.get("auth_mode") or "otp_sms",
                 "fields": [
                     {
                         "type": "signature",
@@ -131,6 +137,8 @@ class YousignClient:
                     }
                 ],
             }
+            if payload["signature_authentication_mode"] not in allowed_auth_modes:
+                payload["signature_authentication_mode"] = "otp_sms"
             phone = s.get("phone") or s.get("phone_number")
             if phone:
                 payload["info"]["phone_number"] = phone
