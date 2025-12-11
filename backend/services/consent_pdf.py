@@ -86,13 +86,56 @@ def store_evidence_pdf(data: bytes, prefix: str) -> str:
     return store_pdf_bytes(EVIDENCE_CATEGORY, prefix, data)
 
 
+def list_local_files_for_case(category: str, case_id: int) -> list[str]:
+    """Return the list of stored identifiers for a given case (local storage only)."""
+    storage = get_storage_backend()
+    if not isinstance(storage, type(get_storage_backend())):  # just to satisfy type checkers
+        pass
+    # Only implemented for LocalStorageBackend
+    if storage.__class__.__name__ != "LocalStorageBackend":
+        return []
+    try:
+        dir_path = storage._dir(category)  # type: ignore[attr-defined]
+    except Exception:
+        return []
+    try:
+        return [
+            entry.name
+            for entry in dir_path.iterdir()
+            if entry.is_file() and entry.name.startswith(f"{case_id}-")
+        ]
+    except Exception:
+        return []
+
+
+def prune_case_files(category: str, case_id: int, keep_latest: int = 2) -> None:
+    """Keep only the N most recent files for a case (local storage only)."""
+    storage = get_storage_backend()
+    if storage.__class__.__name__ != "LocalStorageBackend":  # pragma: no cover - safety
+        return
+    try:
+        dir_path = storage._dir(category)  # type: ignore[attr-defined]
+        files = [
+            entry for entry in dir_path.iterdir() if entry.is_file() and entry.name.startswith(f"{case_id}-")
+        ]
+        files_sorted = sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)
+        for entry in files_sorted[keep_latest:]:
+            try:
+                entry.unlink()
+            except Exception:
+                continue
+    except Exception:
+        return
+
+
 def compose_final_consent(
     *,
     full_consent_id: str,
-    signed_id: Optional[str],
-    evidence_id: Optional[str],
+    case_id: int,
+    signed_ids: list[str] | None = None,
+    evidence_ids: list[str] | None = None,
 ) -> Optional[str]:
-    """Merge consent + audit + signed neutral PDF into a single final PDF (local storage only)."""
+    """Merge consent + audits + signed neutral PDFs into a single PDF (local storage only)."""
     try:
         from PyPDF2 import PdfMerger
     except Exception as exc:  # pragma: no cover - optional dependency
@@ -105,30 +148,28 @@ def compose_final_consent(
         return None
 
     merger = PdfMerger()
-    try:
-        merger.append(str(full_path))
-        if evidence_id:
-            try:
-                evidence_path = storage.get_local_path(EVIDENCE_CATEGORY, evidence_id)
-                merger.append(str(evidence_path))
-            except StorageError:
-                pass
-        if signed_id:
-            try:
-                signed_path = storage.get_local_path(SIGNED_CONSENT_CATEGORY, signed_id)
-                merger.append(str(signed_path))
-            except StorageError:
-                pass
+    merger.append(str(full_path))
 
-        temp_dir = Path(tempfile.mkdtemp(prefix="consent-final-"))
-        filename = f"consent-final-{uuid.uuid4().hex}.pdf"
-        output_path = temp_dir / filename
-        with output_path.open("wb") as f:
-            merger.write(f)
-        merger.close()
-        return store_pdf_bytes(FINAL_CONSENT_CATEGORY, "final-consent", output_path.read_bytes())
-    finally:
+    for evid in evidence_ids or []:
         try:
-            merger.close()
-        except Exception:
-            pass
+            evidence_path = storage.get_local_path(EVIDENCE_CATEGORY, evid)
+            merger.append(str(evidence_path))
+        except StorageError:
+            continue
+
+    for signed in signed_ids or []:
+        try:
+            signed_path = storage.get_local_path(SIGNED_CONSENT_CATEGORY, signed)
+            merger.append(str(signed_path))
+        except StorageError:
+            continue
+
+    temp_dir = Path(tempfile.mkdtemp(prefix="consent-final-"))
+    filename = f"consent-final-{uuid.uuid4().hex}.pdf"
+    output_path = temp_dir / filename
+    with output_path.open("wb") as f:
+        merger.write(f)
+    merger.close()
+    stored_id = store_pdf_bytes(FINAL_CONSENT_CATEGORY, f"{case_id}-final-consent", output_path.read_bytes())
+    prune_case_files(FINAL_CONSENT_CATEGORY, case_id, keep_latest=1)
+    return stored_id

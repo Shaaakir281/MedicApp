@@ -19,7 +19,7 @@ import { ConsentSection } from '../components/patient/ConsentSection.jsx';
 import { usePatientProcedure } from '../hooks/usePatientProcedure.js';
 import { usePatientAppointments } from '../hooks/usePatientAppointments.js';
 import { formatChildAge } from '../utils/child.js';
-import { requestPhoneOtp, verifyPhoneOtp, sendConsentLinkCustom, startConsentSignature } from '../lib/api.js';
+import { requestPhoneOtp, verifyPhoneOtp, sendConsentLinkCustom, startConsentSignature, downloadSignedConsent } from '../lib/api.js';
 
 const previewInitialState = { open: false, url: null, downloadUrl: null, title: null, type: null };
 
@@ -177,7 +177,8 @@ const Patient = () => {
   const showConsentPending = showProcedureForm && !consentLink && Boolean(procedureCase);
   const parent1Verified = Boolean(procedureCase?.parent1_phone_verified_at);
   const parent2Verified = Boolean(procedureCase?.parent2_phone_verified_at);
-  const consentSignedUrl = procedureCase?.consent_signed_pdf_url || procedureCase?.consent_download_url || null;
+  const consentSignedUrl = procedureCase?.consent_signed_pdf_url || null;
+  const [consentFetching, setConsentFetching] = useState(false);
 
   const handleSendByEmail = (url) => {
     if (!url) {
@@ -244,19 +245,54 @@ const Patient = () => {
     }
   };
 
-  const handlePreviewConsent = () => {
-    if (!consentSignedUrl) {
-      setError("Consentement indisponible.");
-      return;
+  const fetchSignedConsentBlob = async () => {
+    if (!token) throw new Error('Utilisateur non authentifié');
+    setConsentFetching(true);
+    try {
+      return await downloadSignedConsent(token);
+    } finally {
+      setConsentFetching(false);
     }
-    const inlineUrl = `${consentSignedUrl}${consentSignedUrl.includes('?') ? '&' : '?'}mode=inline`;
-    setPreviewState({
-      open: true,
-      url: inlineUrl,
-      downloadUrl: consentSignedUrl,
-      title: 'Consentement',
-      type: 'consent',
-    });
+  };
+
+  const handlePreviewConsent = async () => {
+    try {
+      const blob = await fetchSignedConsentBlob();
+      if (!blob) {
+        setError("Consentement indisponible.");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      setPreviewState({
+        open: true,
+        url,
+        downloadUrl: url,
+        title: 'Consentement signé',
+        type: 'consent',
+      });
+    } catch (err) {
+      setError(err.message || "Consentement indisponible.");
+    }
+  };
+
+  const handleDownloadConsent = async () => {
+    try {
+      const blob = await fetchSignedConsentBlob();
+      if (!blob) {
+        setError("Consentement indisponible.");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'consentement-signe.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message || "Consentement indisponible.");
+    }
   };
 
   const handleSendConsentLinkCustom = async (email) => {
@@ -510,6 +546,10 @@ const Patient = () => {
         <ConsentSection
           procedureCase={procedureCase}
           onPreview={handlePreviewConsent}
+          onPreviewSigned={handlePreviewConsent}
+          onDownloadSigned={handleDownloadConsent}
+          consentAvailable={Boolean(consentSignedUrl)}
+          consentLoading={consentFetching}
           parent1Verified={parent1Verified}
           parent2Verified={parent2Verified}
           onSendLink={handleSendConsentLinkCustom}

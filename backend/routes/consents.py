@@ -6,6 +6,7 @@ import datetime as dt
 from typing import Any, Dict
 
 import json
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
@@ -120,12 +121,15 @@ async def yousign_webhook(
     except Exception:
         payload = {}
 
+    logger = logging.getLogger("uvicorn.error")
+    logger.info("Webhook Yousign payload: %s", payload)
+
     data = payload.get("data", {}) if isinstance(payload, dict) else {}
     sr = data.get("signature_request") or {}
     signer = data.get("signer") or {}
     procedure_id = sr.get("id") or payload.get("procedure_id") or payload.get("procedureId")
     signer_id = signer.get("id") or payload.get("signer_id") or payload.get("signerId")
-    event_name = payload.get("event_name") or payload.get("eventName")
+    event_name = (payload.get("event_name") or payload.get("eventName") or "").lower()
     signed_file_url = payload.get("signed_file_url") or sr.get("signed_file_url")
     evidence_url = payload.get("evidence_url") or sr.get("evidence_url")
 
@@ -148,11 +152,11 @@ async def yousign_webhook(
 
         status_value = "ongoing"
         if event_name:
-            lowered = event_name.lower()
-            if "signed" in lowered or "done" in lowered or "completed" in lowered:
+            if "signed" in event_name or "done" in event_name or "completed" in event_name:
                 status_value = "signed"
 
-        update_signature_status(
+        # Forcer le téléchargement/assemblage même si les URLs ne sont pas dans le webhook
+        updated_case = update_signature_status(
             db,
             case,
             parent_label=parent_label,
@@ -161,6 +165,14 @@ async def yousign_webhook(
             method="yousign",
             signed_file_url=signed_file_url,
             evidence_url=evidence_url,
+        )
+        logger.info(
+            "Webhook Yousign update -> case=%s status=%s signed_url=%s evidence_url=%s final_url=%s",
+            updated_case.id,
+            status_value,
+            updated_case.consent_signed_pdf_url,
+            updated_case.consent_evidence_pdf_url,
+            updated_case.consent_signed_pdf_url,
         )
 
     return {"detail": "ok"}

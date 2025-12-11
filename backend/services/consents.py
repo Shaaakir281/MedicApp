@@ -88,8 +88,6 @@ def _validate_contacts(case: models.ProcedureCase) -> None:
 def initiate_consent(db: Session, case: models.ProcedureCase) -> models.ProcedureCase:
     """Create the Yousign procedure (or mock) and send initial notifications."""
     signature_open_at = compute_signature_open_at(case)
-    # En phase de test, on ne bloque plus sur le delai de 15 jours. On conserve la date calculee si disponible.
-
     _validate_contacts(case)
     signers = _build_signers_payload(case)
     if not signers:
@@ -246,6 +244,7 @@ def _download_and_store_artifacts(
     case: models.ProcedureCase,
     signed_url: Optional[str] = None,
     evidence_url: Optional[str] = None,
+    signer_id: Optional[str] = None,
 ) -> tuple[Optional[str], Optional[str]]:
     """Download signed/evidence PDFs from Yousign and persist them in HDS storage."""
     client = YousignClient()
@@ -262,18 +261,98 @@ def _download_and_store_artifacts(
             signed_bytes = client.download_signed_documents(case.yousign_procedure_id)
         if signed_bytes:
             signed_identifier = consent_pdf.store_signed_pdf(signed_bytes, prefix=str(case.id))
+            consent_pdf.prune_case_files(consent_pdf.SIGNED_CONSENT_CATEGORY, case.id, keep_latest=2)
     except Exception:
         logger.exception("Failed to download or store signed document for case %s", case.id)
 
-    if evidence_url:
-        try:
+    try:
+        if evidence_url:
             evidence_bytes = client.download_with_auth(evidence_url)
-            if evidence_bytes:
-                evidence_identifier = consent_pdf.store_evidence_pdf(evidence_bytes, prefix=str(case.id))
-        except Exception:
-            logger.exception("Failed to download or store evidence PDF for case %s", case.id)
+        else:
+            # En v3, l'audit trail est exposé via /audit_trails (global ou par signer)
+            evidence_bytes = client.download_evidence(case.yousign_procedure_id, signer_id=signer_id)
+        if evidence_bytes:
+            evidence_identifier = consent_pdf.store_evidence_pdf(evidence_bytes, prefix=str(case.id))
+            consent_pdf.prune_case_files(consent_pdf.EVIDENCE_CATEGORY, case.id, keep_latest=2)
+    except Exception:
+        logger.exception("Failed to download or store evidence PDF for case %s", case.id)
 
     return signed_identifier, evidence_identifier
+
+
+def _assemble_signed_package(case: models.ProcedureCase) -> Optional[str]:
+    """Assemble consent complet + evidences + PDF(s) signés disponibles."""
+    if not case.consent_pdf_path:
+        return None
+
+    signed_ids: list[str] = []
+    evid_ids: list[str] = []
+    # Récupère tous les fichiers locaux commençant par case.id-
+    signed_ids.extend(consent_pdf.list_local_files_for_case(consent_pdf.SIGNED_CONSENT_CATEGORY, case.id))
+    evid_ids.extend(consent_pdf.list_local_files_for_case(consent_pdf.EVIDENCE_CATEGORY, case.id))
+    # Ajout des derniers identifiants connus
+    if case.consent_signed_pdf_url and case.consent_signed_pdf_url not in signed_ids:
+        signed_ids.append(case.consent_signed_pdf_url)
+    if case.consent_evidence_pdf_url and case.consent_evidence_pdf_url not in evid_ids:
+        evid_ids.append(case.consent_evidence_pdf_url)
+
+    if not signed_ids and not evid_ids:
+        return None
+
+    try:
+        logger.info("Assemblage consentement case=%s signed=%s evidences=%s", case.id, signed_ids, evid_ids)
+        return consent_pdf.compose_final_consent(
+            full_consent_id=case.consent_pdf_path,
+            case_id=case.id,
+            signed_ids=signed_ids,
+            evidence_ids=evid_ids,
+        )
+    except Exception:
+        logger.exception("Echec d'assemblage du consentement signe pour le dossier %s", case.id)
+        return None
+
+
+def poll_and_fetch_signed(db: Session, case: models.ProcedureCase) -> models.ProcedureCase:
+    """Fallback polling: récupère l'état SR, télécharge artefacts, assemble."""
+    client = YousignClient()
+    if client.mock_mode or not case.yousign_procedure_id:
+        return case
+    try:
+        sr = client.fetch_signature_request(case.yousign_procedure_id)
+    except Exception:
+        logger.exception("Poll Yousign SR failed for case %s", case.id)
+        return case
+
+    now = dt.datetime.utcnow()
+    for s in sr.get("signers") or []:
+        if (s.get("status") or "").lower() != "signed":
+            continue
+        sid = str(s.get("id"))
+        if sid == case.parent1_yousign_signer_id:
+            case.parent1_consent_status = "signed"
+            case.parent1_consent_signed_at = now
+            case.parent1_consent_method = "yousign"
+        if sid == case.parent2_yousign_signer_id:
+            case.parent2_consent_status = "signed"
+            case.parent2_consent_signed_at = now
+            case.parent2_consent_method = "yousign"
+
+    signed_url = sr.get("signed_file_url")
+    evidence_url = sr.get("evidence_url")
+    stored_signed, stored_evidence = _download_and_store_artifacts(case, signed_url=signed_url, evidence_url=evidence_url)
+    if stored_signed:
+        case.consent_signed_pdf_url = stored_signed
+    if stored_evidence:
+        case.consent_evidence_pdf_url = stored_evidence
+
+    assembled = _assemble_signed_package(case)
+    if assembled:
+        case.consent_signed_pdf_url = assembled
+
+    db.add(case)
+    db.commit()
+    db.refresh(case)
+    return case
 
 
 def purge_yousign_signature(case: models.ProcedureCase) -> None:
@@ -283,6 +362,7 @@ def purge_yousign_signature(case: models.ProcedureCase) -> None:
         return
     try:
         client.delete_signature_request(case.yousign_procedure_id, permanent_delete=True)
+        logger.info("Yousign signature_request %s purge demandee (permanent=true)", case.yousign_procedure_id)
     except Exception:
         logger.exception("Failed to purge Yousign signature_request %s", case.yousign_procedure_id)
 
@@ -319,26 +399,31 @@ def update_signature_status(
             case,
             signed_url=signed_file_url,
             evidence_url=evidence_url,
+            signer_id=case.parent1_yousign_signer_id if parent_label == "parent1" else case.parent2_yousign_signer_id,
         )
         if stored_signed:
             case.consent_signed_pdf_url = stored_signed
         if stored_evidence:
             case.consent_evidence_pdf_url = stored_evidence
+        assembled_partial = _assemble_signed_package(case)
+        if assembled_partial:
+            case.consent_signed_pdf_url = assembled_partial
 
     if case.parent1_consent_status == "signed" and case.parent2_consent_status == "signed":
-        # Assembler le PDF final (consentement complet + audit + PDF signé neutre)
-        if case.consent_pdf_path and case.consent_signed_pdf_url:
-            try:
-                final_path = consent_pdf.compose_final_consent(
-                    full_consent_id=case.consent_pdf_path,
-                    signed_id=case.consent_signed_pdf_url,
-                    evidence_id=case.consent_evidence_pdf_url,
-                )
-                if final_path:
-                    case.consent_signed_pdf_url = final_path
-            except Exception:
-                logger.exception("Echec d'assemblage du PDF final pour le dossier %s", case.id)
-
+        # Une fois les deux signatures obtenues, récupérer l'audit complet (tous signataires)
+        stored_signed, stored_evidence = _download_and_store_artifacts(
+            case,
+            signed_url=None,
+            evidence_url=None,
+            signer_id=None,
+        )
+        if stored_signed:
+            case.consent_signed_pdf_url = stored_signed
+        if stored_evidence:
+            case.consent_evidence_pdf_url = stored_evidence
+        final_path = _assemble_signed_package(case)
+        if final_path:
+            case.consent_signed_pdf_url = final_path
         case.consent_ready_at = signed_at
         case.consent_last_status = "completed"
         # Purge Yousign apres recuperation locale (best-effort)

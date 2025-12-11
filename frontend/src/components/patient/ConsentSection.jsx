@@ -2,7 +2,11 @@ import React from 'react';
 
 export const ConsentSection = ({
   procedureCase,
-  onPreview,
+  onPreview, // fallback preview (consent non signé)
+  onPreviewSigned,
+  onDownloadSigned,
+  consentAvailable = false,
+  consentLoading = false,
   parent1Verified = false,
   parent2Verified = false,
   onSendLink,
@@ -32,9 +36,6 @@ export const ConsentSection = ({
 
   const parent1 = parentStatus('parent1');
   const parent2 = parentStatus('parent2');
-
-  const downloadUrl = procedureCase.consent_signed_pdf_url || procedureCase.consent_download_url;
-  const inlineUrl = downloadUrl ? `${downloadUrl}${downloadUrl.includes('?') ? '&' : '?'}mode=inline` : null;
 
   const renderParentRow = (label, data, displayName) => {
     const canSign = signatureOpen && data.verified;
@@ -85,21 +86,19 @@ export const ConsentSection = ({
           <button
             type="button"
             className="btn btn-outline btn-sm"
-            onClick={() => onPreview?.(inlineUrl)}
-            disabled={!inlineUrl}
+            onClick={() => (consentAvailable ? onPreviewSigned?.() : onPreview?.(null))}
+            disabled={consentLoading || (!consentAvailable && !onPreview)}
           >
-            Voir
+            {consentLoading ? 'Chargement...' : 'Voir'}
           </button>
-          <a
+          <button
+            type="button"
             className="btn btn-sm"
-            href={downloadUrl || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            download
-            aria-disabled={!downloadUrl}
+            onClick={() => (consentAvailable ? onDownloadSigned?.() : onPreview?.(null))}
+            disabled={consentLoading || (!consentAvailable && !onPreview)}
           >
-            Télécharger
-          </a>
+            {consentLoading ? 'Chargement...' : 'Télécharger'}
+          </button>
         </div>
       </div>
 

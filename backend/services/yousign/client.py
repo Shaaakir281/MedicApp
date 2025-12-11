@@ -210,6 +210,57 @@ class YousignClient:
         resp.raise_for_status()
         return resp.content
 
+    def fetch_documents(self, signature_request_id: str) -> list[dict]:
+        """List documents attached to a signature request."""
+        if self.mock_mode:
+            return []
+        url = f"{self.base_url}/signature_requests/{signature_request_id}/documents"
+        resp = requests.get(url, headers=self._auth_headers(), timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        if isinstance(data, dict) and "documents" in data:
+            return data.get("documents") or []
+        if isinstance(data, list):
+            return data
+        return []
+
+    def download_document(self, signature_request_id: str, document_id: str) -> bytes:
+        """Download a specific document by id."""
+        if self.mock_mode:
+            return b""
+        url = f"{self.base_url}/signature_requests/{signature_request_id}/documents/{document_id}/download"
+        resp = requests.get(url, headers=self._auth_headers(), timeout=60)
+        resp.raise_for_status()
+        return resp.content
+
+    def download_audit_trails_all(self, signature_request_id: str) -> bytes:
+        """Download the PDF containing all audit trails for the signature request (v3)."""
+        if self.mock_mode:
+            return b""
+        url = f"{self.base_url}/signature_requests/{signature_request_id}/audit_trails/download"
+        resp = requests.get(url, headers=self._auth_headers(), timeout=60)
+        resp.raise_for_status()
+        return resp.content
+
+    def download_audit_trail_for_signer(self, signature_request_id: str, signer_id: str) -> bytes:
+        """Download the audit trail PDF for a specific signer (v3)."""
+        if self.mock_mode:
+            return b""
+        url = f"{self.base_url}/signature_requests/{signature_request_id}/signers/{signer_id}/audit_trails/download"
+        resp = requests.get(url, headers=self._auth_headers(), timeout=60)
+        resp.raise_for_status()
+        return resp.content
+
+    def download_evidence(self, signature_request_id: str, signer_id: Optional[str] = None) -> bytes:
+        """Compatibility wrapper: in v3, use audit_trails endpoints (all signers by default)."""
+        if signer_id:
+            return self.download_audit_trail_for_signer(signature_request_id, signer_id)
+        try:
+            return self.download_audit_trails_all(signature_request_id)
+        except requests.RequestException as exc:
+            logger.exception("Failed to download audit trails: %s", getattr(exc.response, "text", exc))
+            return b""
+
     def download_with_auth(self, url: str) -> bytes:
         """Download a resource using Bearer auth (for evidence/signed_file URLs)."""
         if self.mock_mode:
@@ -227,10 +278,36 @@ class YousignClient:
         resp.raise_for_status()
 
     def delete_signature_request(self, signature_request_id: str, permanent_delete: bool = True) -> None:
-        """Delete the signature request (permanent when supported)."""
+        """Delete the signature request (permanent when supported) and log confirmation."""
         if self.mock_mode:
+            logger.info("Mock delete_signature_request(%s, permanent=%s)", signature_request_id, permanent_delete)
             return
-        suffix = "?permanent_delete=true" if permanent_delete else ""
-        url = f"{self.base_url}/signature_requests/{signature_request_id}{suffix}"
-        resp = requests.delete(url, headers=self._auth_headers(), timeout=20)
-        resp.raise_for_status()
+
+        base_url = f"{self.base_url}/signature_requests/{signature_request_id}"
+        params = {"permanent_delete": "true"} if permanent_delete else {}
+        try:
+            resp = requests.delete(base_url, headers=self._auth_headers(), params=params, timeout=30)
+            resp.raise_for_status()
+        except requests.RequestException as exc:  # pragma: no cover - network dependent
+            logger.exception(
+                "Failed to delete signature_request %s (permanent=%s): %s",
+                signature_request_id,
+                permanent_delete,
+                getattr(exc.response, "text", exc),
+            )
+            raise
+
+        # Vérification best-effort : la SR doit renvoyer 404 après suppression
+        try:
+            check = requests.get(base_url, headers=self._auth_headers(), timeout=15)
+            if check.status_code == 404:
+                logger.info("Yousign SR %s purge confirmee (404)", signature_request_id)
+            else:
+                logger.warning(
+                    "Yousign SR %s purge check status=%s body=%s",
+                    signature_request_id,
+                    check.status_code,
+                    check.text[:200],
+                )
+        except requests.RequestException as exc:  # pragma: no cover - best effort
+            logger.warning("Yousign SR %s purge check failed: %s", signature_request_id, exc)

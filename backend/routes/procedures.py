@@ -23,6 +23,7 @@ from services import download_links
 from services.storage import StorageError, get_storage_backend
 from services.sms import send_sms
 from services import consents as consents_service
+from services import consent_pdf
 
 
 router = APIRouter(prefix="/procedures", tags=["procedures"])
@@ -235,6 +236,81 @@ def get_current_procedure(
         serialized.parent2_signature_link,
     )
     return serialized
+
+
+@router.get("/current/signed-consent")
+def download_signed_consent(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> Response:
+    """Télécharge le consentement signé/assemblé actuellement disponible pour l'utilisateur."""
+    case = crud.get_active_procedure_case(db, current_user.id)
+    if case is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consentement signe indisponible.")
+
+    # Si pas de PDF connu, tenter un polling Yousign pour récupérer/assembler
+    if not case.consent_signed_pdf_url:
+        try:
+            case = consents_service.poll_and_fetch_signed(db, case)
+        except Exception:
+            pass
+        if not case.consent_signed_pdf_url:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consentement signe indisponible.")
+
+    storage = get_storage_backend()
+    download_name = f"consentement-signe-{case.id}.pdf"
+    inline = True
+    identifier = case.consent_signed_pdf_url
+    exists_final = storage.exists(consent_pdf.FINAL_CONSENT_CATEGORY, identifier)
+    exists_signed = storage.exists(consent_pdf.SIGNED_CONSENT_CATEGORY, identifier)
+    logger.info(
+        "/procedures/current/signed-consent user=%s identifier=%s final_exists=%s signed_exists=%s",
+        current_user.id,
+        identifier,
+        exists_final,
+        exists_signed,
+    )
+    try:
+        category = consent_pdf.FINAL_CONSENT_CATEGORY if exists_final else consent_pdf.SIGNED_CONSENT_CATEGORY
+        return storage.build_file_response(category, identifier, download_name, inline=inline)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fichier signe introuvable.") from exc
+
+
+@router.get("/current/audit-trail")
+def download_audit_trail(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> Response:
+    """Télécharge l'audit trail Yousign (tous signataires si disponible)."""
+    case = crud.get_active_procedure_case(db, current_user.id)
+    if case is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit indisponible.")
+
+    storage = get_storage_backend()
+    identifier = case.consent_evidence_pdf_url
+    if not identifier:
+        # Essayer de reconstituer en déclenchant un polling + download audit complet
+        try:
+            case = consents_service.poll_and_fetch_signed(db, case)
+        except Exception:
+            pass
+        identifier = case.consent_evidence_pdf_url
+    if not identifier:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit indisponible.")
+
+    download_name = f"audit-consent-{case.id}.pdf"
+    exists_evidence = storage.exists(consent_pdf.EVIDENCE_CATEGORY, identifier)
+    logger.info(
+        "/procedures/current/audit-trail user=%s identifier=%s exists=%s",
+        current_user.id,
+        identifier,
+        exists_evidence,
+    )
+    try:
+        return storage.build_file_response(consent_pdf.EVIDENCE_CATEGORY, identifier, download_name, inline=True)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit introuvable.") from exc
 
 
 @router.post("", response_model=schemas.ProcedureCase, status_code=status.HTTP_201_CREATED)

@@ -260,4 +260,20 @@ export async function startConsentSignature(token) {
   return apiRequest('/procedures/start-signature', { method: 'POST', token });
 }
 
+export async function downloadSignedConsent(token) {
+  const resolvedToken = token || authSessionManager?.getAccessToken?.();
+  const headers = resolvedToken ? { Authorization: `Bearer ${resolvedToken}` } : {};
+  const resp = await fetch(`${API_BASE_URL}/procedures/current/signed-consent`, {
+    method: 'GET',
+    headers,
+  });
+  if (!resp.ok) {
+    const message = `Echec de telechargement (${resp.status})`;
+    const error = new Error(message);
+    error.status = resp.status;
+    throw error;
+  }
+  return await resp.blob();
+}
+
 export { API_BASE_URL };
