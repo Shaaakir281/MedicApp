@@ -65,3 +65,42 @@ def require_practitioner(
             detail="Acces reserve aux praticiens.",
         )
     return user
+
+
+def get_optional_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> models.User | None:
+    """Return the current user if a Bearer token is provided, otherwise None."""
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        return None
+
+    token = credentials.credentials
+    try:
+        claims = auth_service.decode_token(token)
+    except auth_service.InvalidCredentialsError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token.",
+        )
+
+    user_id = claims.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token payload.",
+        )
+
+    user = auth_service.get_user_by_id(db, int(user_id))
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found.",
+        )
+    if user.role == models.UserRole.patient and not user.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email address not verified for patient account.",
+        )
+
+    return user

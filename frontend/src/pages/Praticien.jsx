@@ -453,6 +453,7 @@ const Praticien = () => {
       <PatientDetailsDrawer
         isOpen={patientDrawer.open}
         onClose={closePatientDrawer}
+        token={token}
         appointment={patientDrawer.appointment}
         onUpdateCase={handleUpdateCase}
         onReschedule={handleRescheduleAppointment}
@@ -502,4 +503,3 @@ const Praticien = () => {
 }
 
 export default Praticien;
-

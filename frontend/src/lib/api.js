@@ -59,7 +59,10 @@ async function apiRequest(path, options = {}) {
       }
     }
 
-    const message = (payload && payload.detail) || response.statusText;
+    let message = response.statusText;
+    if (payload && payload.detail) {
+      message = typeof payload.detail === 'string' ? payload.detail : JSON.stringify(payload.detail);
+    }
     const error = new Error(message || 'Une erreur est survenue');
     error.status = response.status;
     error.payload = payload;
@@ -119,11 +122,21 @@ export async function sendConsentLink(token) {
   return apiRequest('/procedures/send-consent-link', { method: 'POST', token });
 }
 
-export async function startSignature(token, { in_person = false } = {}) {
-  return apiRequest('/procedures/start-signature', {
+export async function startSignature(token, { appointmentId, signerRole, mode = 'remote', sessionCode } = {}) {
+  const params = new URLSearchParams();
+  if (sessionCode) {
+    params.set('session_code', sessionCode);
+  }
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest(`/signature/start${query}`, {
     method: 'POST',
     token,
-    body: { in_person },
+    skipAuth: !token && Boolean(sessionCode),
+    body: {
+      appointment_id: appointmentId,
+      signer_role: signerRole,
+      mode,
+    },
   });
 }
 
@@ -131,6 +144,74 @@ export async function acknowledgeProcedureSteps(token) {
   return apiRequest('/procedures/acknowledge-steps', {
     method: 'POST',
     token,
+  });
+}
+
+export async function fetchLegalCatalog({ appointmentId, sessionCode, token } = {}) {
+  const params = new URLSearchParams();
+  if (appointmentId) params.set('appointment_id', appointmentId);
+  if (sessionCode) params.set('session_code', sessionCode);
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest(`/legal/catalog${query}`, {
+    token,
+    skipAuth: !token && Boolean(sessionCode),
+  });
+}
+
+export async function fetchLegalStatus({ appointmentId, sessionCode, token } = {}) {
+  const params = new URLSearchParams();
+  if (appointmentId) params.set('appointment_id', appointmentId);
+  if (sessionCode) params.set('session_code', sessionCode);
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest(`/legal/status${query}`, {
+    token,
+    skipAuth: !token && Boolean(sessionCode),
+  });
+}
+
+export async function acknowledgeLegalCase({
+  appointmentId,
+  signerRole,
+  documentType,
+  caseKey,
+  sessionCode,
+  token,
+}) {
+  const params = new URLSearchParams();
+  if (sessionCode) params.set('session_code', sessionCode);
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest(`/legal/acknowledge${query}`, {
+    method: 'POST',
+    token,
+    skipAuth: !token && Boolean(sessionCode),
+    body: {
+      appointment_id: appointmentId,
+      signer_role: signerRole,
+      document_type: documentType,
+      case_key: caseKey,
+    },
+  });
+}
+
+export async function acknowledgeLegalBulk({
+  appointmentId,
+  signerRole,
+  acknowledgements,
+  sessionCode,
+  token,
+}) {
+  const params = new URLSearchParams();
+  if (sessionCode) params.set('session_code', sessionCode);
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest(`/legal/acknowledge/bulk${query}`, {
+    method: 'POST',
+    token,
+    skipAuth: !token && Boolean(sessionCode),
+    body: {
+      appointment_id: appointmentId,
+      signer_role: signerRole,
+      acknowledgements,
+    },
   });
 }
 
@@ -264,8 +345,12 @@ export async function sendConsentLinkCustom(token, payload) {
   return apiRequest('/procedures/send-consent-link-custom', { method: 'POST', body: payload, token });
 }
 
-export async function startConsentSignature(token, { in_person = false } = {}) {
-  return apiRequest('/procedures/start-signature', { method: 'POST', token, body: { in_person } });
+export async function createCabinetSession(token, payload) {
+  return apiRequest('/cabinet-sessions', { method: 'POST', token, body: payload });
+}
+
+export async function getCabinetSession(sessionCode) {
+  return apiRequest(`/cabinet-sessions/${sessionCode}`, { method: 'GET', skipAuth: true });
 }
 
 export async function downloadSignedConsent(token) {

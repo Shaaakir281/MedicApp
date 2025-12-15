@@ -6,6 +6,8 @@ from datetime import date, datetime, time as time_type
 import datetime as dt
 from typing import Any, Dict, List, Optional
 
+from domain.legal_documents.types import DocumentType, SignerRole
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
@@ -217,6 +219,97 @@ class PractitionerAppointmentCreate(BaseModel):
     date: date
     time: time_type
     mode: Optional[str] = None
+
+
+class LegalDocumentCase(BaseModel):
+    key: str
+    text: str
+    required: bool = True
+    required_roles: List[str]
+
+
+class LegalDocument(BaseModel):
+    document_type: str
+    title: str
+    version: str
+    cases: List[LegalDocumentCase] = Field(default_factory=list)
+
+
+class LegalCatalog(BaseModel):
+    version: str
+    documents: List[LegalDocument] = Field(default_factory=list)
+
+
+class LegalAcknowledgeInput(BaseModel):
+    document_type: DocumentType
+    case_key: str
+    catalog_version: Optional[str] = None
+
+
+class LegalAcknowledgeRequest(LegalAcknowledgeInput):
+    appointment_id: int
+    signer_role: SignerRole
+    source: str | None = Field(default="remote", pattern="^(remote|cabinet)$")
+
+
+class LegalAcknowledgeBulkInput(BaseModel):
+    appointment_id: int
+    signer_role: SignerRole
+    acknowledgements: List[LegalAcknowledgeInput] = Field(default_factory=list)
+    source: str | None = Field(default="remote", pattern="^(remote|cabinet)$")
+    catalog_version: Optional[str] = None
+
+
+class LegalDocumentStatus(BaseModel):
+    document_type: DocumentType
+    version: str
+    required_roles: List[SignerRole]
+    acknowledged: Dict[SignerRole, List[str]] = Field(default_factory=dict)
+    missing: Dict[SignerRole, List[str]] = Field(default_factory=dict)
+    complete: bool
+
+    model_config = ConfigDict(use_enum_values=True)
+
+
+class LegalStatusResponse(BaseModel):
+    appointment_id: int
+    documents: List[LegalDocumentStatus] = Field(default_factory=list)
+    complete: bool
+
+    model_config = ConfigDict(use_enum_values=True)
+
+
+class CabinetSessionCreate(BaseModel):
+    appointment_id: int
+    signer_role: SignerRole
+
+
+class CabinetSessionResponse(BaseModel):
+    appointment_id: int
+    signer_role: SignerRole
+    session_code: str
+    tablet_url: str
+    expires_at: datetime
+    status: str
+
+    model_config = ConfigDict(use_enum_values=True)
+
+
+class SignatureStartPayload(BaseModel):
+    appointment_id: int
+    signer_role: SignerRole
+    mode: str = Field(default="remote", pattern="^(remote|cabinet)$")
+    session_code: Optional[str] = None
+
+
+class SignatureStartResponse(BaseModel):
+    appointment_id: int
+    signer_role: SignerRole
+    signature_link: Optional[str] = None
+    yousign_procedure_id: Optional[str] = None
+    status: str
+
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class PractitionerAppointmentEntry(BaseModel):

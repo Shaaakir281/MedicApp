@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 import crud
 import schemas
+import models
 from pydantic import BaseModel, Field, EmailStr
 from database import get_db
 from dependencies.auth import get_current_user
@@ -23,6 +24,7 @@ from services import download_links
 from services.storage import StorageError, get_storage_backend
 from services.sms import send_sms
 from services import consents as consents_service
+from services import legal as legal_service
 from services import consent_pdf
 
 
@@ -546,5 +548,20 @@ def start_signature(
 ) -> schemas.ProcedureCase:
     """Initie la procedure Yousign pour le dossier patient courant (parents) avec option face-à-face."""
     case = _get_case_for_user(db, current_user.id)
+    target_appt = next(
+        (appt for appt in case.appointments if appt.appointment_type == models.AppointmentType.act),
+        None,
+    ) or (case.appointments[0] if case.appointments else None)
+    if not target_appt:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Aucun rendez-vous associé pour la signature.")
+    legal_status = legal_service.compute_status(db, target_appt.id)
+    if not legal_status.complete:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Checklist incomplète, signature indisponible.",
+                "legal_status": legal_status.model_dump(mode="json"),
+            },
+        )
     case = consents_service.initiate_consent(db, case, in_person=payload.in_person)
     return _serialize_case(case)

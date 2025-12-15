@@ -16,10 +16,11 @@ import { ProcedureChoice } from '../components/patient/ProcedureChoice.jsx';
 import { ProcedureSummary } from '../components/patient/ProcedureSummary.jsx';
 import { StepsCard } from '../components/patient/StepsCard.jsx';
 import { ConsentSection } from '../components/patient/ConsentSection.jsx';
+import { LegalChecklist } from '../components/LegalChecklist.jsx';
 import { usePatientProcedure } from '../hooks/usePatientProcedure.js';
 import { usePatientAppointments } from '../hooks/usePatientAppointments.js';
 import { formatChildAge } from '../utils/child.js';
-import { requestPhoneOtp, verifyPhoneOtp, sendConsentLinkCustom, startConsentSignature, downloadSignedConsent } from '../lib/api.js';
+import { requestPhoneOtp, verifyPhoneOtp, sendConsentLinkCustom, startSignature, downloadSignedConsent } from '../lib/api.js';
 
 const previewInitialState = { open: false, url: null, downloadUrl: null, title: null, type: null };
 
@@ -55,6 +56,7 @@ const Patient = () => {
   const [consentSendLoading, setConsentSendLoading] = useState(false);
   const [consentSendRecipient, setConsentSendRecipient] = useState(null);
   const [signatureLoading, setSignatureLoading] = useState({ parent1: false, parent2: false });
+  const [legalStatus, setLegalStatus] = useState(null);
 
   const {
     procedureInfo,
@@ -125,6 +127,12 @@ const Patient = () => {
   }, [isAuthenticated]);
 
   useEffect(() => {
+    if (!procedureCase) {
+      setLegalStatus(null);
+    }
+  }, [procedureCase]);
+
+  useEffect(() => {
     if (successMessage) {
       const timer = setTimeout(() => setSuccessMessage(null), 4000);
       return () => clearTimeout(timer);
@@ -178,6 +186,13 @@ const Patient = () => {
   const parent1Verified = Boolean(procedureCase?.parent1_phone_verified_at);
   const parent2Verified = Boolean(procedureCase?.parent2_phone_verified_at);
   const consentSignedUrl = procedureCase?.consent_signed_pdf_url || null;
+  const signatureAppointmentId = useMemo(() => {
+    if (!procedureCase?.appointments?.length) return null;
+    const actAppt = procedureCase.appointments.find((appt) => appt.appointment_type === 'act');
+    if (actAppt) return actAppt.id;
+    return procedureCase.appointments[0]?.id || null;
+  }, [procedureCase]);
+  const legalComplete = Boolean(legalStatus?.complete);
   const [consentFetching, setConsentFetching] = useState(false);
 
   const handleSendByEmail = (url) => {
@@ -313,6 +328,14 @@ const Patient = () => {
 
   const handleStartSignature = async (parentKey, { inPerson = false } = {}) => {
     if (!token) return;
+    if (!signatureAppointmentId) {
+      setError('Aucun rendez-vous cible pour la signature.');
+      return;
+    }
+    if (!legalComplete) {
+      setError('Veuillez valider les 3 documents avant de lancer la signature.');
+      return;
+    }
     const isVerified = parentKey === 'parent1' ? parent1Verified : parent2Verified;
     if (!isVerified) {
       setError('Numero non verifie pour ce parent.');
@@ -322,13 +345,17 @@ const Patient = () => {
     setSuccessMessage(null);
     setSignatureLoading((prev) => ({ ...prev, [parentKey]: true }));
     try {
-      const updatedCase = await startConsentSignature(token, { in_person: inPerson });
+      const response = await startSignature(token, {
+        appointmentId: signatureAppointmentId,
+        signerRole: parentKey,
+        mode: inPerson ? 'cabinet' : 'remote',
+      });
       await loadProcedureCase();
-      const link = updatedCase?.[`${parentKey}_signature_link`];
+      const link = response?.signature_link;
       if (link) {
         window.open(link, '_blank', 'noopener');
       } else {
-        setError("Lien Yousign non disponible pour ce parent.");
+        setError("Lien de signature indisponible pour ce parent.");
       }
     } catch (err) {
       setError(err.message);
@@ -542,6 +569,25 @@ const Patient = () => {
         </section>
       ) : null}
 
+      {showProcedureForm && procedureCase && signatureAppointmentId && (
+        <section className="p-6 border rounded-xl bg-white shadow-sm space-y-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <h3 className="text-xl font-semibold">Documents à valider avant signature</h3>
+              <p className="text-sm text-slate-600">Checklist des 3 documents (autorisation, consentement, honoraires).</p>
+            </div>
+            <span className={`badge ${legalComplete ? 'badge-success' : 'badge-warning'}`}>
+              {legalComplete ? 'Checklist complète' : 'A compléter'}
+            </span>
+          </div>
+          <LegalChecklist
+            appointmentId={signatureAppointmentId}
+            token={token}
+            onStatusChange={setLegalStatus}
+          />
+        </section>
+      )}
+
       {showProcedureForm && procedureCase && (
         <ConsentSection
           procedureCase={procedureCase}
@@ -555,11 +601,12 @@ const Patient = () => {
           onSendLink={handleSendConsentLinkCustom}
           customEmail={consentSendEmail}
           setCustomEmail={setConsentSendEmail}
-      sendInProgress={consentSendLoading}
-      lastRecipient={consentSendRecipient}
-      onSign={handleStartSignature}
-      signatureLoading={signatureLoading}
-    />
+          sendInProgress={consentSendLoading}
+          lastRecipient={consentSendRecipient}
+          onSign={handleStartSignature}
+          signatureLoading={signatureLoading}
+          legalComplete={legalComplete}
+        />
       )}
 
 

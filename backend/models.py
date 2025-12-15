@@ -20,9 +20,11 @@ from sqlalchemy import (
     JSON,
     Boolean,
     Float,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
+from domain.legal_documents.types import DocumentType, SignerRole
 from database import Base
 
 
@@ -384,6 +386,61 @@ class ProcedureCase(Base):
         back_populates="procedure_case",
         cascade="all,delete-orphan",
     )
+
+
+class SignatureCabinetSessionStatus(str, enum.Enum):
+    active = "active"
+    consumed = "consumed"
+    expired = "expired"
+
+
+class LegalAcknowledgement(Base):
+    __tablename__ = "legal_acknowledgements"
+    __table_args__ = (
+        UniqueConstraint(
+            "appointment_id",
+            "document_type",
+            "signer_role",
+            "case_key",
+            name="uq_legal_acknowledgement_case",
+        ),
+    )
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    appointment_id: int = Column(Integer, ForeignKey("appointments.id"), nullable=False, index=True)
+    document_type: DocumentType = Column(
+        Enum(DocumentType, values_callable=lambda enum_cls: [e.value for e in enum_cls]),
+        nullable=False,
+    )
+    signer_role: SignerRole = Column(Enum(SignerRole), nullable=False)
+    case_key: str = Column(String(128), nullable=False)
+    case_text: str = Column(String(2048), nullable=False)
+    catalog_version: str = Column(String(32), nullable=False, default="v1")
+    acknowledged_at: datetime.datetime = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    ip: str | None = Column(String(64), nullable=True)
+    user_agent: str | None = Column(String(255), nullable=True)
+    source: str | None = Column(String(32), nullable=True, default="remote")
+
+    appointment = relationship("Appointment")
+
+
+class SignatureCabinetSession(Base):
+    __tablename__ = "signature_cabinet_sessions"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    appointment_id: int = Column(Integer, ForeignKey("appointments.id"), nullable=False, index=True)
+    signer_role: SignerRole = Column(Enum(SignerRole), nullable=False)
+    token_hash: str = Column(String(128), nullable=False, unique=True, index=True)
+    expires_at: datetime.datetime = Column(DateTime, nullable=False)
+    consumed_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    created_by_practitioner_id: int | None = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    status: SignatureCabinetSessionStatus = Column(
+        Enum(SignatureCabinetSessionStatus), nullable=False, default=SignatureCabinetSessionStatus.active
+    )
+    created_at: datetime.datetime = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    appointment = relationship("Appointment")
+    created_by_practitioner = relationship("User", foreign_keys=[created_by_practitioner_id])
 
 
 class PharmacyContact(Base):

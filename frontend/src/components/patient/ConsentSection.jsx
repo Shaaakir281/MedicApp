@@ -16,6 +16,7 @@ export const ConsentSection = ({
   lastRecipient = null,
   onSign,
   signatureLoading = { parent1: false, parent2: false },
+  legalComplete = true,
 }) => {
   if (!procedureCase) return null;
 
@@ -38,7 +39,7 @@ export const ConsentSection = ({
   const parent2 = parentStatus('parent2');
 
   const renderParentRow = (label, data, displayName) => {
-    const canSign = signatureOpen && data.verified;
+    const canSign = signatureOpen && data.verified && legalComplete;
     return (
       <div className="flex items-center justify-between border rounded-lg p-3">
         <div className="space-y-1">
@@ -84,11 +85,11 @@ export const ConsentSection = ({
         <div>
           <h2 className="text-2xl font-semibold">Consentement</h2>
           <p className="text-sm text-slate-600">Consultez le consentement et signez en ligne.</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
             onClick={() => (consentAvailable ? onPreviewSigned?.() : onPreview?.(null))}
             disabled={consentLoading || (!consentAvailable && !onPreview)}
           >
@@ -104,6 +105,12 @@ export const ConsentSection = ({
           </button>
         </div>
       </div>
+
+      {!legalComplete && (
+        <div className="alert alert-warning text-sm">
+          Validez toutes les cases des trois documents avant de lancer la signature.
+        </div>
+      )}
 
       {!signatureOpen && (
         <div className="alert alert-warning">

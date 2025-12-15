@@ -6,6 +6,7 @@ import Praticien from './pages/Praticien.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import VerifyEmail from './pages/VerifyEmail.jsx';
+import TabletSession from './pages/TabletSession.jsx';
 
 /**
  * Top‑level component defining the navigation bar and routes for the application.
@@ -39,6 +40,7 @@ function App() {
             <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />
             <Route path="/auth/reset-password" element={<ResetPassword />} />
             <Route path="/auth/verify-email" element={<VerifyEmail />} />
+            <Route path="/tablet/:sessionCode" element={<TabletSession />} />
           </Routes>
         </main>
       </div>
