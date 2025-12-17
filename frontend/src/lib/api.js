@@ -169,6 +169,13 @@ export async function fetchLegalStatus({ appointmentId, sessionCode, token } = {
   });
 }
 
+export async function fetchPatientDashboard(appointmentId, token) {
+  if (!appointmentId) {
+    throw new Error("L'identifiant de rendez-vous est requis pour charger le dashboard patient.");
+  }
+  return apiRequest(`/patient-dashboard/${appointmentId}`, { token });
+}
+
 export async function acknowledgeLegalCase({
   appointmentId,
   signerRole,

@@ -11,6 +11,8 @@ export const AppointmentCard = ({
   onEdit,
   onCancel,
   isCanceling,
+  onSelect,
+  selected = false,
 }) => {
   const label = appt?.appointment_type === 'act' ? 'Acte' : 'Pre-consultation';
   const dateDisplay = appt?.date ? new Date(appt.date).toLocaleDateString('fr-FR') : '--';
@@ -18,7 +20,9 @@ export const AppointmentCard = ({
   const badgeClass =
     variant === 'past' ? 'bg-slate-200 text-slate-700' : 'bg-blue-100 text-blue-800';
   const containerClass =
-    variant === 'past' ? 'border rounded-lg p-3 space-y-1 bg-slate-50' : 'border rounded-lg p-3 space-y-1';
+    variant === 'past'
+      ? 'border rounded-lg p-3 space-y-1 bg-slate-50'
+      : `border rounded-lg p-3 space-y-1 ${selected ? 'border-blue-400 shadow-sm' : ''}`;
 
   return (
     <div className={containerClass}>
@@ -38,6 +42,11 @@ export const AppointmentCard = ({
       />
 
       <div className="flex flex-wrap gap-2 pt-1 border-t border-dashed border-slate-200 mt-2">
+        {onSelect && (
+          <button type="button" className="btn btn-xs btn-outline" onClick={onSelect}>
+            {selected ? 'Sélectionné' : 'Voir dans le dashboard'}
+          </button>
+        )}
         <button type="button" className="btn btn-xs btn-ghost" onClick={onEdit}>
           Modifier
         </button>

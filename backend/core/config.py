@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     twilio_account_sid: Optional[str] = Field(default=None, alias="TWILIO_ACCOUNT_SID")
     twilio_auth_token: Optional[str] = Field(default=None, alias="TWILIO_AUTH_TOKEN")
     twilio_from_number: Optional[str] = Field(default=None, alias="TWILIO_FROM_NUMBER")
+    feature_enforce_legal_checklist: bool = Field(
+        default=False, alias="FEATURE_ENFORCE_LEGAL_CHECKLIST"
+    )
 
     @field_validator("jwt_secret_key")
     @classmethod

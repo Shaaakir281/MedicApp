@@ -7,12 +7,14 @@ from sqlalchemy.orm import Session, joinedload
 
 import models
 import schemas
+from core.config import get_settings
 from database import get_db
 from dependencies.auth import get_optional_user
 from services import consents as consents_service
 from services import legal as legal_service
 
 router = APIRouter(prefix="/signature", tags=["signature"])
+settings = get_settings()
 
 
 def _get_appointment_with_case(db: Session, appointment_id: int) -> models.Appointment:
@@ -54,15 +56,16 @@ def start_signature(
     if current_user and current_user.role == models.UserRole.patient and appointment.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès refusé.")
 
-    legal_status = legal_service.compute_status(db, appointment.id)
-    if not legal_status.complete:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "message": "Checklist incomplète, signature indisponible.",
-                "legal_status": legal_status.model_dump(mode="json"),
-            },
-        )
+    if settings.feature_enforce_legal_checklist:
+        legal_status = legal_service.compute_status(db, appointment.id)
+        if not legal_status.complete:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "Checklist incomplète, signature indisponible.",
+                    "legal_status": legal_status.model_dump(mode="json"),
+                },
+            )
 
     case = appointment.procedure_case
     if not case:

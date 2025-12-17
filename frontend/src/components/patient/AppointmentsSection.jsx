@@ -13,6 +13,8 @@ export const AppointmentsSection = ({
   onEdit,
   onCancel,
   cancelingId,
+  onSelect,
+  activeAppointmentId,
 }) => {
   return (
     <div className="space-y-2">
@@ -32,6 +34,8 @@ export const AppointmentsSection = ({
             onEdit={() => onEdit?.(appt)}
             onCancel={() => onCancel?.(appt)}
             isCanceling={Boolean(cancelingId && apptId && cancelingId === apptId)}
+            onSelect={() => onSelect?.(apptId, appt)}
+            selected={Boolean(activeAppointmentId && apptId && activeAppointmentId === apptId)}
           />
         );
       })}

@@ -547,6 +547,7 @@ def start_signature(
     current_user=Depends(get_current_user),
 ) -> schemas.ProcedureCase:
     """Initie la procedure Yousign pour le dossier patient courant (parents) avec option face-à-face."""
+    settings = get_settings()
     case = _get_case_for_user(db, current_user.id)
     target_appt = next(
         (appt for appt in case.appointments if appt.appointment_type == models.AppointmentType.act),
@@ -554,14 +555,15 @@ def start_signature(
     ) or (case.appointments[0] if case.appointments else None)
     if not target_appt:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Aucun rendez-vous associé pour la signature.")
-    legal_status = legal_service.compute_status(db, target_appt.id)
-    if not legal_status.complete:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "message": "Checklist incomplète, signature indisponible.",
-                "legal_status": legal_status.model_dump(mode="json"),
-            },
-        )
+    if settings.feature_enforce_legal_checklist:
+        legal_status = legal_service.compute_status(db, target_appt.id)
+        if not legal_status.complete:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "Checklist incomplète, signature indisponible.",
+                    "legal_status": legal_status.model_dump(mode="json"),
+                },
+            )
     case = consents_service.initiate_consent(db, case, in_person=payload.in_person)
     return _serialize_case(case)
