@@ -39,7 +39,8 @@ export const ConsentSection = ({
   const parent2 = parentStatus('parent2');
 
   const renderParentRow = (label, data, displayName) => {
-    const canSign = signatureOpen && data.verified && legalComplete;
+    const canSignCabinet = signatureOpen && legalComplete;
+    const canSignRemote = signatureOpen && data.verified && legalComplete;
     return (
       <div className="flex items-center justify-between border rounded-lg p-3">
         <div className="space-y-1">
@@ -48,7 +49,7 @@ export const ConsentSection = ({
             Statut : {data.status} {data.signedAt ? `(${new Date(data.signedAt).toLocaleString('fr-FR')})` : ''}
           </p>
           <p className="text-xs text-slate-500">
-            Numero verifie : {data.verified ? 'Oui' : 'Non'} {data.verified ? '' : '(obligatoire pour signer)'}
+            Numero verifie : {data.verified ? 'Oui' : 'Non'} {data.verified ? '' : '(obligatoire pour signer a distance)'}
           </p>
           {!data.link && (
             <p className="text-xs text-slate-500">
@@ -59,17 +60,17 @@ export const ConsentSection = ({
         <div className="flex gap-2 flex-wrap justify-end">
           <button
             type="button"
-            className={`btn btn-sm ${canSign ? 'btn-primary' : 'btn-disabled'}`}
+            className={`btn btn-sm ${canSignCabinet ? 'btn-primary' : 'btn-disabled'}`}
             onClick={() => onSign?.(label, { inPerson: true })}
-            disabled={!canSign || signatureLoading[label]}
+            disabled={!canSignCabinet || signatureLoading[label]}
           >
             {signatureLoading[label] ? 'Ouverture...' : 'Signer en cabinet'}
           </button>
           <button
             type="button"
-            className={`btn btn-sm ${canSign ? 'btn-outline' : 'btn-disabled'}`}
+            className={`btn btn-sm ${canSignRemote ? 'btn-outline' : 'btn-disabled'}`}
             onClick={() => onSign?.(label, { inPerson: false })}
-            disabled={!canSign || signatureLoading[label]}
+            disabled={!canSignRemote || signatureLoading[label]}
           >
             {signatureLoading[label] ? 'Ouverture...' : 'Signer a distance (OTP SMS)'}
           </button>

@@ -207,7 +207,7 @@ export function usePatientAppointments({
       setSuccessMessage?.(null);
       try {
         await deleteAppointment(token, apptId, { cascadeAct: false });
-        setSuccessMessage?.('Rendez-vous annulǸ. Vous pouvez en planifier un nouveau.');
+        setSuccessMessage?.('Rendez-vous annulé. Vous pouvez en planifier un nouveau.');
         await loadProcedureCase?.();
       } catch (err) {
         setError?.(err.message);

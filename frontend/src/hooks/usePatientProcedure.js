@@ -9,22 +9,40 @@ import {
 } from '../lib/api.js';
 import { defaultProcedureValues } from '../lib/forms';
 
-const mapProcedureToFormValues = (procedure) => ({
-  child_full_name: procedure?.child_full_name ?? '',
-  child_birthdate: procedure?.child_birthdate ?? '',
-  child_weight_kg:
-    typeof procedure?.child_weight_kg === 'number' ? String(procedure.child_weight_kg) : '',
-  parent1_name: procedure?.parent1_name ?? '',
-  parent1_email: procedure?.parent1_email ?? '',
-  parent2_name: procedure?.parent2_name ?? '',
-  parent2_email: procedure?.parent2_email ?? '',
-  parent1_phone: procedure?.parent1_phone ?? '',
-  parent2_phone: procedure?.parent2_phone ?? '',
-  parent1_sms_optin: Boolean(procedure?.parent1_sms_optin),
-  parent2_sms_optin: Boolean(procedure?.parent2_sms_optin),
-  parental_authority_ack: Boolean(procedure?.parental_authority_ack),
-  notes: procedure?.notes ?? '',
-});
+const splitChildFullName = (fullName) => {
+  const cleaned = String(fullName || '').trim();
+  if (!cleaned) return { firstName: '', lastName: '' };
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return { firstName: parts[0], lastName: '' };
+  return { firstName: parts.slice(0, -1).join(' '), lastName: parts.at(-1) };
+};
+
+const joinChildName = (firstName, lastName) => {
+  return [String(firstName || '').trim(), String(lastName || '').trim()]
+    .filter(Boolean)
+    .join(' ');
+};
+
+const mapProcedureToFormValues = (procedure) => {
+  const { firstName, lastName } = splitChildFullName(procedure?.child_full_name);
+  return {
+    child_first_name: firstName,
+    child_last_name: lastName,
+    child_birthdate: procedure?.child_birthdate ?? '',
+    child_weight_kg:
+      typeof procedure?.child_weight_kg === 'number' ? String(procedure.child_weight_kg) : '',
+    parent1_name: procedure?.parent1_name ?? '',
+    parent1_email: procedure?.parent1_email ?? '',
+    parent2_name: procedure?.parent2_name ?? '',
+    parent2_email: procedure?.parent2_email ?? '',
+    parent1_phone: procedure?.parent1_phone ?? '',
+    parent2_phone: procedure?.parent2_phone ?? '',
+    parent1_sms_optin: Boolean(procedure?.parent1_sms_optin),
+    parent2_sms_optin: Boolean(procedure?.parent2_sms_optin),
+    parental_authority_ack: Boolean(procedure?.parental_authority_ack),
+    notes: procedure?.notes ?? '',
+  };
+};
 
 export function usePatientProcedure({
   token,
@@ -116,20 +134,26 @@ export function usePatientProcedure({
   const handleProcedureSubmit = useCallback(
     async (values) => {
       if (!token || procedureSelection !== 'circumcision') {
-        setError?.("Veuillez sǸlectionner la circoncision et vous connecter avant d'enregistrer le dossier.");
+        setError?.(
+          "Veuillez sélectionner la circoncision et vous connecter avant d'enregistrer le dossier.",
+        );
         return;
       }
       setError?.(null);
       setProcedureLoading(true);
       try {
+        const { child_first_name: firstName, child_last_name: lastName, ...rest } = values;
         const payload = {
           procedure_type: 'circumcision',
-          ...values,
+          ...rest,
+          child_full_name: joinChildName(firstName, lastName),
         };
         const caseData = await saveProcedure(token, payload);
         setProcedureCase(caseData);
         resetForm(mapProcedureToFormValues(caseData));
-        setSuccessMessage?.('Dossier mis �� jour. Un consentement prǸ-rempli est disponible au tǸlǸchargement.');
+        setSuccessMessage?.(
+          'Dossier mis à jour. Un consentement pré-rempli est disponible au téléchargement.',
+        );
         setIsEditingCase(false);
       } catch (err) {
         setError?.(err.message);
@@ -148,7 +172,7 @@ export function usePatientProcedure({
     setSendingConsentEmail(true);
     try {
       await sendConsentLink(token);
-      setSuccessMessage?.('Lien de consentement envoyǸ par e-mail.');
+      setSuccessMessage?.('Lien de consentement envoyé par e-mail.');
     } catch (err) {
       setError?.(err.message);
     } finally {
@@ -188,3 +212,4 @@ export function usePatientProcedure({
     acknowledgeSteps,
   };
 }
+

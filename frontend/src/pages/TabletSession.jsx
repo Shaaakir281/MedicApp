@@ -1,7 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
-import { LegalChecklist } from '../components/LegalChecklist.jsx';
+import { LegalDocumentCard } from '../components/patient/legal/LegalDocumentCard.jsx';
+import { buildPatientDashboardVM } from '../services/patientDashboard.mapper.js';
+import {
+  acknowledgeLegalCheckbox,
+  getLegalCatalog,
+  getLegalStatus,
+} from '../services/patientDashboard.api.js';
 import { getCabinetSession, startSignature } from '../lib/api.js';
 
 const roleLabel = (role) => {
@@ -10,25 +16,33 @@ const roleLabel = (role) => {
   return role || 'Signataire';
 };
 
-const TabletSession = () => {
+export default function TabletSession() {
   const { sessionCode } = useParams();
   const navigate = useNavigate();
+
   const [sessionInfo, setSessionInfo] = useState(null);
+  const [catalog, setCatalog] = useState(null);
   const [legalStatus, setLegalStatus] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const [signing, setSigning] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!sessionCode) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
-    getCabinetSession(sessionCode)
-      .then((payload) => {
+    Promise.all([
+      getCabinetSession(sessionCode),
+      getLegalCatalog({ sessionCode }),
+      getLegalStatus({ sessionCode }),
+    ])
+      .then(([sessionPayload, catalogPayload, statusPayload]) => {
         if (cancelled) return;
-        setSessionInfo(payload);
-        setLegalStatus(payload?.legal_status || null);
+        setSessionInfo(sessionPayload);
+        setCatalog(catalogPayload);
+        setLegalStatus(statusPayload || sessionPayload?.legal_status || null);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -42,8 +56,38 @@ const TabletSession = () => {
     };
   }, [sessionCode]);
 
+  const docsVm = useMemo(() => {
+    return buildPatientDashboardVM({
+      procedureCase: null,
+      dashboard: null,
+      legalCatalog: catalog,
+      legalStatus,
+    }).legalDocuments;
+  }, [catalog, legalStatus]);
+
+  const handleAcknowledgeCase = async ({ docType, role, caseKey }) => {
+    if (!sessionInfo?.appointment_id || !sessionCode) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const nextStatus = await acknowledgeLegalCheckbox({
+        appointmentId: sessionInfo.appointment_id,
+        signerRole: role,
+        documentType: docType,
+        caseKey,
+        sessionCode,
+        token: null,
+      });
+      setLegalStatus(nextStatus);
+    } catch (err) {
+      setError(err?.message || 'Échec de sauvegarde de la case.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleStartSignature = async () => {
-    if (!sessionInfo?.appointment_id || !sessionInfo?.signer_role) return;
+    if (!sessionInfo?.appointment_id || !sessionInfo?.signer_role || !sessionCode) return;
     setSigning(true);
     setError(null);
     try {
@@ -57,10 +101,10 @@ const TabletSession = () => {
       if (link) {
         window.open(link, '_blank', 'noopener,noreferrer');
       } else {
-        setError("Lien de signature indisponible.");
+        setError('Lien de signature indisponible.');
       }
     } catch (err) {
-      setError(err?.message || 'Echec du démarrage de la signature.');
+      setError(err?.message || 'Échec du démarrage de la signature.');
     } finally {
       setSigning(false);
     }
@@ -73,7 +117,7 @@ const TabletSession = () => {
       <div className="max-w-3xl mx-auto p-6 space-y-4">
         <div className="flex items-center gap-2">
           <span className="loading loading-spinner loading-md" />
-          <p className="text-slate-600">Chargement de la session...</p>
+          <p className="text-slate-600">Chargement de la session…</p>
         </div>
       </div>
     );
@@ -95,29 +139,48 @@ const TabletSession = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="max-w-5xl mx-auto p-6 space-y-6">
       <header className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold">Signature en cabinet</h1>
           <p className="text-sm text-slate-600">
-            Session pour {roleLabel(sessionInfo.signer_role)} —{' '}
-            {sessionInfo.child_full_name || 'Patient'}
+            Session pour {roleLabel(sessionInfo.signer_role)} • {sessionInfo.child_full_name || 'Patient'}
           </p>
         </div>
         <div className="text-sm text-slate-600">
-          <p>Code session : <span className="font-mono">{sessionCode}</span></p>
-          <p>Expiration : {sessionInfo.expires_at ? new Date(sessionInfo.expires_at).toLocaleTimeString('fr-FR') : '—'}</p>
+          <p>
+            Code session : <span className="font-mono">{sessionCode}</span>
+          </p>
+          <p>
+            Expiration :{' '}
+            {sessionInfo.expires_at
+              ? new Date(sessionInfo.expires_at).toLocaleTimeString('fr-FR')
+              : '—'}
+          </p>
         </div>
       </header>
 
-      <div className="border rounded-xl p-4 bg-white shadow-sm">
-        <LegalChecklist
-          appointmentId={sessionInfo.appointment_id}
-          sessionCode={sessionCode}
-          fixedRole={sessionInfo.signer_role}
-          onStatusChange={setLegalStatus}
-        />
-      </div>
+      {docsVm?.length ? (
+        <div className="grid gap-4">
+          {docsVm.map((doc) => (
+            <LegalDocumentCard
+              key={doc.docType}
+              doc={doc}
+              token={null}
+              appointmentId={sessionInfo.appointment_id}
+              overallLegalComplete={Boolean(legalStatus?.complete)}
+              parentVerifiedByRole={{}}
+              parentEmailByRole={{}}
+              onAcknowledgeCase={handleAcknowledgeCase}
+              submitting={submitting}
+              fixedRole={sessionInfo.signer_role}
+              showSignatureActions={false}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="alert alert-info">Documents indisponibles.</div>
+      )}
 
       <div className="flex gap-3 flex-wrap">
         <button
@@ -126,7 +189,7 @@ const TabletSession = () => {
           onClick={handleStartSignature}
           disabled={!readyToSign || signing}
         >
-          {signing ? 'Ouverture...' : 'Signer maintenant'}
+          {signing ? 'Ouverture…' : 'Signer maintenant'}
         </button>
         <button type="button" className="btn btn-ghost" onClick={() => navigate('/')}>
           Terminer
@@ -134,6 +197,5 @@ const TabletSession = () => {
       </div>
     </div>
   );
-};
+}
 
-export default TabletSession;

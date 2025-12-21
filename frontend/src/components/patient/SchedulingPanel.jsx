@@ -2,6 +2,7 @@ import React from 'react';
 
 import Calendar from '../Calendar.jsx';
 import TimeSlots from '../TimeSlots.jsx';
+import { LABELS_FR } from '../../constants/labels.fr.js';
 
 export const SchedulingPanel = ({
   title,
@@ -42,10 +43,10 @@ export const SchedulingPanel = ({
           onChange={(event) => onChangeType?.(event.target.value)}
         >
           <option value="preconsultation" disabled={hasPreconsultation}>
-            Consultation prǸ-opǸratoire
+            {LABELS_FR.patientSpace.appointments.typePreconsultation}
           </option>
           <option value="act" disabled={!hasPreconsultation || hasAct}>
-            Acte chirurgical
+            {LABELS_FR.patientSpace.appointments.typeAct}
           </option>
         </select>
       </div>
@@ -61,12 +62,12 @@ export const SchedulingPanel = ({
             value={appointmentMode}
             onChange={(event) => onChangeMode?.(event.target.value)}
           >
-            <option value="visio">Visio</option>
-            <option value="presentiel">PrǸsentiel</option>
+            <option value="visio">{LABELS_FR.patientSpace.appointments.modeVisio}</option>
+            <option value="presentiel">{LABELS_FR.patientSpace.appointments.modeInPerson}</option>
           </select>
         </div>
       ) : (
-        <p className="text-sm text-slate-600">Format : prǸsence obligatoire au cabinet.</p>
+        <p className="text-sm text-slate-600">Format : présence obligatoire au cabinet.</p>
       )}
 
       <Calendar
@@ -80,10 +81,10 @@ export const SchedulingPanel = ({
       {selectedDate && (
         <div className="space-y-3">
           <h3 className="text-lg font-medium">
-            CrǸneaux disponibles le {selectedDate.toLocaleDateString('fr-FR')}
+            Créneaux disponibles le {selectedDate.toLocaleDateString('fr-FR')}
           </h3>
           {slotsLoading ? (
-            <p className="text-sm text-slate-500">Chargement des crǸneaux...</p>
+            <p className="text-sm text-slate-500">Chargement des créneaux…</p>
           ) : (
             <TimeSlots
               availableSlots={availableSlots}
@@ -108,3 +109,4 @@ export const SchedulingPanel = ({
     </div>
   );
 };
+

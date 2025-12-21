@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 export const patientProcedureSchema = z.object({
-  child_full_name: z.string().min(2, 'Nom complet requis'),
+  child_first_name: z.string().min(1, 'Prénom requis'),
+  child_last_name: z.string().min(1, 'Nom requis'),
   child_birthdate: z.string().min(1, 'Date de naissance requise'),
   child_weight_kg: z
     .union([z.string(), z.number()])
@@ -42,7 +43,8 @@ export const patientProcedureSchema = z.object({
 });
 
 export const defaultProcedureValues = {
-  child_full_name: '',
+  child_first_name: '',
+  child_last_name: '',
   child_birthdate: '',
   child_weight_kg: '',
   parent1_name: '',
