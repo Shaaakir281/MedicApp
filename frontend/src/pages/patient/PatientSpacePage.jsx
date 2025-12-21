@@ -8,6 +8,7 @@ import { TabAppointments } from '../../components/patient/tabs/TabAppointments.j
 import { TabDossier } from '../../components/patient/tabs/TabDossier.jsx';
 import { TabLegalDocs } from '../../components/patient/tabs/TabLegalDocs.jsx';
 import { LABELS_FR } from '../../constants/labels.fr.js';
+import { PatientTabDossier as PatientTabDossierNew } from './PatientTabDossier.jsx';
 import { usePatientSpaceController } from './usePatientSpaceController.js';
 
 const TABS = {
@@ -23,6 +24,7 @@ export function PatientSpacePage({
   procedureSelection,
   onChangeProcedure,
 }) {
+  const enableNewDossier = String(import.meta.env.VITE_FEATURE_NEW_DOSSIER || '').toLowerCase() === 'true';
   const controller = usePatientSpaceController({ token, procedureSelection });
   const [activeTab, setActiveTab] = useState(TABS.file);
 
@@ -85,18 +87,24 @@ export function PatientSpacePage({
       {controller.error && <div className="alert alert-error">{controller.error}</div>}
 
       {activeTab === TABS.file && (
-        <FormProvider {...controller.formMethods}>
-          <TabDossier
-            procedure={controller.procedure}
-            childAgeDisplay={controller.childAgeDisplay}
-            token={token}
-            dashboard={controller.dashboard}
-            onReloadCase={controller.procedure.loadProcedureCase}
-            onReloadDashboard={controller.reloadDashboard}
-            setError={controller.setError}
-            setSuccessMessage={controller.setSuccessMessage}
-          />
-        </FormProvider>
+        <>
+          {enableNewDossier ? (
+            <PatientTabDossierNew token={token} />
+          ) : (
+            <FormProvider {...controller.formMethods}>
+              <TabDossier
+                procedure={controller.procedure}
+                childAgeDisplay={controller.childAgeDisplay}
+                token={token}
+                dashboard={controller.dashboard}
+                onReloadCase={controller.procedure.loadProcedureCase}
+                onReloadDashboard={controller.reloadDashboard}
+                setError={controller.setError}
+                setSuccessMessage={controller.setSuccessMessage}
+              />
+            </FormProvider>
+          )}
+        </>
       )}
 
       {activeTab === TABS.appointments && (

@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     feature_enforce_legal_checklist: bool = Field(
         default=False, alias="FEATURE_ENFORCE_LEGAL_CHECKLIST"
     )
+    require_guardian_2: bool = Field(default=False, alias="REQUIRE_GUARDIAN_2")
 
     @field_validator("jwt_secret_key")
     @classmethod
