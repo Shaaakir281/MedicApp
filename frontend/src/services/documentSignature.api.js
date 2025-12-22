@@ -9,7 +9,7 @@
  * - GET /signature/case/{caseId}/documents : Liste des signatures d'un case
  */
 
-import { apiRequest } from '../lib/api.js';
+import { apiRequest, API_BASE_URL } from '../lib/api.js';
 
 /**
  * Maps catalog document types to signature API document types.
@@ -112,4 +112,100 @@ export async function getDocumentSignatureStatus({ token, documentSignatureId })
  */
 export async function getCaseDocumentSignatures({ token, procedureCaseId }) {
   return apiRequest(`/signature/case/${procedureCaseId}/documents`, { token });
+}
+
+/**
+ * Download a document signature artifact (final, signed, evidence).
+ *
+ * @param {Object} params
+ * @param {string} params.token - JWT token
+ * @param {number} params.documentSignatureId - ID du DocumentSignature
+ * @param {string} params.fileKind - "final" | "signed" | "evidence"
+ * @param {boolean} [params.inline] - Inline response flag
+ */
+export async function downloadDocumentSignatureFile({
+  token,
+  documentSignatureId,
+  fileKind,
+  inline = false,
+}) {
+  if (!token) {
+    throw new Error('Authentification requise.');
+  }
+  const allowed = new Set(['final', 'signed', 'evidence']);
+  if (!allowed.has(fileKind)) {
+    throw new Error('Type de fichier invalide.');
+  }
+  const query = inline ? '?inline=true' : '';
+  const response = await fetch(
+    `${API_BASE_URL}/signature/document/${documentSignatureId}/file/${fileKind}${query}`,
+    {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+  if (!response.ok) {
+    let message = `Echec de telechargement (${response.status})`;
+    try {
+      const payload = await response.json();
+      if (payload?.detail) {
+        message = typeof payload.detail === 'string' ? payload.detail : JSON.stringify(payload.detail);
+      }
+    } catch (_) {
+      // ignore parsing errors for non-json responses
+    }
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+  return await response.blob();
+}
+
+/**
+ * Download the base legal document PDF for preview.
+ *
+ * @param {Object} params
+ * @param {string} params.token - JWT token
+ * @param {number} params.procedureCaseId - ID du ProcedureCase
+ * @param {string} params.documentType - catalog document type
+ * @param {boolean} [params.inline] - Inline response flag
+ */
+export async function downloadLegalDocumentPreview({
+  token,
+  procedureCaseId,
+  documentType,
+  inline = true,
+}) {
+  if (!token) {
+    throw new Error('Authentification requise.');
+  }
+  if (!procedureCaseId) {
+    throw new Error('Dossier manquant.');
+  }
+  if (!documentType) {
+    throw new Error('Type de document manquant.');
+  }
+  const query = inline ? '?inline=true' : '';
+  const response = await fetch(
+    `${API_BASE_URL}/signature/case/${procedureCaseId}/document/${encodeURIComponent(documentType)}/preview${query}`,
+    {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+  if (!response.ok) {
+    let message = `Echec de telechargement (${response.status})`;
+    try {
+      const payload = await response.json();
+      if (payload?.detail) {
+        message = typeof payload.detail === 'string' ? payload.detail : JSON.stringify(payload.detail);
+      }
+    } catch (_) {
+      // ignore parsing errors for non-json responses
+    }
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+  return await response.blob();
 }

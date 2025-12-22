@@ -15,7 +15,7 @@ import schemas
 import models
 from pydantic import BaseModel, Field, EmailStr
 from database import get_db
-from dependencies.auth import get_current_user
+from dependencies.auth import get_current_user, get_optional_user
 from core.config import get_settings
 import logging
 from services import pdf as pdf_service
@@ -418,6 +418,7 @@ def download_consent_pdf(
     token: str,
     request: Request,
     db: Session = Depends(get_db),
+    current_user=Depends(get_optional_user),
 ) -> Response:
     case = crud.get_procedure_case_by_token(db, token)
     if case is None or not case.consent_pdf_path:
@@ -425,6 +426,8 @@ def download_consent_pdf(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Consentement introuvable.",
         )
+    if current_user and current_user.role == models.UserRole.patient and case.patient_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acces refuse.")
 
     storage = get_storage_backend()
     filename = f"consentement-{case.child_full_name.replace(' ', '_')}.pdf"

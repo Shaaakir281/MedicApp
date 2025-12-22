@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 
 import { LABELS_FR } from '../../../constants/labels.fr.js';
-import { startDocumentSignature } from '../../../services/patientDashboard.api.js';
+import { downloadConsentAuditTrailBlob, startDocumentSignature } from '../../../services/patientDashboard.api.js';
+import { downloadDocumentSignatureFile } from '../../../services/documentSignature.api.js';
 import { SendLinkPanel } from './SendLinkPanel.jsx';
 import { SignedDocumentActions } from './SignedDocumentActions.jsx';
 
@@ -20,10 +21,9 @@ export function SignatureActions({
   setError,
   setSuccessMessage,
   setPreviewState,
-  preconsultationDate,
-  canSignAfterDelay,
 }) {
   const [signing, setSigning] = useState(false);
+  const [downloadingEvidence, setDownloadingEvidence] = useState(false);
 
   const parentState = doc?.byParent?.[role] || {
     completedCount: 0,
@@ -34,11 +34,16 @@ export function SignatureActions({
     signedAt: null,
   };
 
+  const hasDocFile = Boolean(
+    doc?.finalPdfAvailable || doc?.signedPdfAvailable || doc?.legacySignedAvailable,
+  );
+  const hasEvidence = Boolean(doc?.evidencePdfAvailable || doc?.legacyEvidenceAvailable);
+
   const checklistComplete = parentState.total > 0 && parentState.completedCount === parentState.total;
   const signatureSupported = Boolean(doc?.signatureSupported);
 
-  // DEMO MODE: Allow signing even if delay not met (keep warning message)
   // INDEPENDENT DOCUMENTS: Each document can be signed independently
+  // Act-only: no preconsultation delay enforced
   const canSignCabinet = Boolean(
     signatureSupported &&
       appointmentId &&
@@ -51,19 +56,10 @@ export function SignatureActions({
   const disabledReason = useMemo(() => {
     if (!signatureSupported) return LABELS_FR.patientSpace.documents.reasons.featureUnavailable;
     if (!appointmentId) return LABELS_FR.patientSpace.documents.reasons.missingAppointment;
-    if (!preconsultationDate) {
-      return "Un rendez-vous de pré-consultation est requis avant de pouvoir signer les documents.";
-    }
-    if (!canSignAfterDelay) {
-      const preconsultDate = new Date(preconsultationDate);
-      const delayEndDate = new Date(preconsultDate);
-      delayEndDate.setDate(delayEndDate.getDate() + 15);
-      return `Délai de réflexion de 15 jours requis. Vous pourrez signer à partir du ${delayEndDate.toLocaleDateString('fr-FR')}.`;
-    }
     if (!checklistComplete) return LABELS_FR.patientSpace.documents.reasons.checklistIncomplete;
     // Removed: if (!overallLegalComplete) return 'Les 3 documents doivent être validés avant la signature.';
     return null;
-  }, [appointmentId, checklistComplete, signatureSupported, preconsultationDate, canSignAfterDelay]);
+  }, [appointmentId, checklistComplete, signatureSupported]);
 
   const handleStartSignature = async (mode) => {
     if (!token) return;
@@ -95,6 +91,35 @@ export function SignatureActions({
       setError?.(err?.message || 'Erreur de signature.');
     } finally {
       setSigning(false);
+    }
+  };
+
+  const handleEvidenceDownload = async () => {
+    if (!token || !hasEvidence || downloadingEvidence) return;
+    setError?.(null);
+    setDownloadingEvidence(true);
+    try {
+      let blob = null;
+      if (doc?.documentSignatureId && doc?.evidencePdfAvailable) {
+        blob = await downloadDocumentSignatureFile({
+          token,
+          documentSignatureId: doc.documentSignatureId,
+          fileKind: 'evidence',
+        });
+      } else if (doc?.legacyEvidenceAvailable) {
+        blob = await downloadConsentAuditTrailBlob({ token });
+      }
+      if (!blob) {
+        setError?.('Document indisponible.');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) {
+      setError?.(err?.message || 'Document indisponible.');
+    } finally {
+      setDownloadingEvidence(false);
     }
   };
 
@@ -132,27 +157,31 @@ export function SignatureActions({
       </div>
 
       <div className="flex gap-3 flex-wrap text-sm">
-        {parentState.signatureLink && (
-          <a className="link link-primary" href={parentState.signatureLink} target="_blank" rel="noopener noreferrer">
-            {LABELS_FR.patientSpace.documents.signature.openLink}
-          </a>
-        )}
-        {doc?.evidencePdfUrl && (
-          <a className="link link-primary" href={doc.evidencePdfUrl} target="_blank" rel="noopener noreferrer">
-            {LABELS_FR.patientSpace.documents.signature.downloadEvidence}
-          </a>
+        {hasEvidence && (
+          <button
+            type="button"
+            className="link link-primary"
+            onClick={handleEvidenceDownload}
+            disabled={downloadingEvidence}
+          >
+            {downloadingEvidence ? LABELS_FR.common.loading : LABELS_FR.patientSpace.documents.signature.downloadEvidence}
+          </button>
         )}
       </div>
 
       {signatureSupported && (
         <SignedDocumentActions
           token={token}
-          enabled={Boolean(doc?.signedPdfUrl || parentState.signatureLink)}
+          enabled={Boolean(hasDocFile)}
           title={doc?.title}
           setError={setError}
           setPreviewState={setPreviewState}
-          signatureLink={parentState.signatureLink}
-          hasFinalPdf={Boolean(doc?.signedPdfUrl)}
+          documentSignatureId={doc?.documentSignatureId}
+          procedureCaseId={procedureCaseId}
+          documentType={doc?.docType}
+          hasFinalPdf={Boolean(doc?.finalPdfAvailable || doc?.legacySignedAvailable)}
+          hasSignedPdf={Boolean(doc?.signedPdfAvailable)}
+          previewType="document"
         />
       )}
 
@@ -175,4 +204,3 @@ export function SignatureActions({
     </div>
   );
 }
-

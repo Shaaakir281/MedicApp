@@ -207,7 +207,7 @@ def compose_final_consent(
 
     storage = get_storage_backend()
     try:
-        full_path = storage.get_local_path(base_pdf.CONSENT_CATEGORY, full_consent_id)
+        full_path = storage.get_local_path(full_consent_category, full_consent_id)
     except StorageError:
         return None
 
@@ -242,6 +242,7 @@ def compose_final_consent(
 def compose_final_document_consent(
     *,
     full_consent_id: str,
+    full_consent_category: str = base_pdf.CONSENT_CATEGORY,
     document_type: str,
     case_id: int,
     signed_ids: list[str] | None = None,

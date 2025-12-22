@@ -136,6 +136,35 @@ def send_consent_download_email(
     send_email(subject, recipient, text_body, html_body=html_body)
 
 
+def send_signature_request_email(
+    recipient: str,
+    *,
+    doc_label: str,
+    signature_link: str,
+    reference: str | None = None,
+) -> None:
+    """Send a neutral signature request email without PHI."""
+    app_name = _app_name()
+    subject = f"[{app_name}] Document medical a signer"
+    reference_line = f"Reference : {reference}\n" if reference else ""
+    text_body = (
+        f"Bonjour,\n\n"
+        f"Vous avez un document medical a signer : {doc_label}.\n"
+        f"{reference_line}"
+        f"Lien de signature securise : {signature_link}\n\n"
+        f"L'equipe {app_name}\n"
+    )
+    reference_html = f"<p><strong>Reference :</strong> {reference}</p>" if reference else ""
+    html_body = f"""
+    <p>Bonjour,</p>
+    <p>Vous avez un document medical a signer : <strong>{doc_label}</strong>.</p>
+    {reference_html}
+    <p><a href="{signature_link}">{signature_link}</a></p>
+    <p>L'equipe {app_name}</p>
+    """
+    send_email(subject, recipient, text_body, html_body=html_body)
+
+
 def send_prescription_email(recipient: str, download_url: str, appointment_type: str) -> None:
     """Send an ordonnance download link to the patient."""
     app_name = _app_name()

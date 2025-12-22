@@ -388,20 +388,22 @@ const Praticien = () => {
   const stats = statsQuery.data;
   const consentActionLoading = initiateConsentMutation.isLoading || remindConsentMutation.isLoading;
   return (
-    <div className="max-w-6xl mx-auto py-10 space-y-10">
+    <div className="min-h-screen bg-slate-50/50">
       <PractitionerHeader userEmail={user?.email} onLogout={logout} />
 
-      <ViewToggle viewMode={viewMode} onChange={setViewMode} />
-      {error && <div className="alert alert-error">{error}</div>}
-      {successMessage && <div className="alert alert-success">{successMessage}</div>}
+      <div className="max-w-6xl mx-auto px-6 pb-10 space-y-8">
+        <ViewToggle viewMode={viewMode} onChange={setViewMode} />
 
-      <section className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <StatCard title="Rendez-vous du jour" value={stats?.total_appointments} tone="primary" />
-        <StatCard title="Creations aujourd&apos;hui" value={stats?.bookings_created} />
-        <StatCard title="Nouveaux patients (7j)" value={stats?.new_patients_week} tone="success" />
-        <StatCard title="Relances necessaires" value={stats?.follow_ups_required} tone="warning" />
-        <StatCard title="Consents manquants" value={stats?.pending_consents} tone="danger" />
-      </section>
+        {error && <div className="alert alert-error shadow-lg">{error}</div>}
+        {successMessage && <div className="alert alert-success shadow-lg">{successMessage}</div>}
+
+        <section className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <StatCard title="Rendez-vous du jour" value={stats?.total_appointments} tone="primary" />
+          <StatCard title="Créations aujourd&apos;hui" value={stats?.bookings_created} tone="neutral" />
+          <StatCard title="Nouveaux patients (7j)" value={stats?.new_patients_week} tone="success" />
+          <StatCard title="Relances nécessaires" value={stats?.follow_ups_required} tone="warning" />
+          <StatCard title="Consents manquants" value={stats?.pending_consents} tone="danger" />
+        </section>
 
       {viewMode === 'agenda' ? (
         <AgendaView
@@ -498,6 +500,7 @@ const Praticien = () => {
           </button>,
         ].filter(Boolean)}
       />
+      </div>
     </div>
   );
 }

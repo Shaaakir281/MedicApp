@@ -24,8 +24,12 @@
  * @property {LegalCaseVM[]} cases
  * @property {{ parent1: DocumentParentStateVM, parent2: DocumentParentStateVM }} byParent
  * @property {string|null} previewPdfUrl
- * @property {string|null} signedPdfUrl
- * @property {string|null} evidencePdfUrl
+ * @property {number|null} documentSignatureId
+ * @property {boolean} finalPdfAvailable
+ * @property {boolean} signedPdfAvailable
+ * @property {boolean} evidencePdfAvailable
+ * @property {boolean} legacySignedAvailable
+ * @property {boolean} legacyEvidenceAvailable
  * @property {boolean} signatureSupported
  *
  * @typedef {Object} PatientDashboardVM
@@ -38,4 +42,3 @@
  */
 
 export {};
-

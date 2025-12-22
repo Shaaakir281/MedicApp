@@ -21,12 +21,38 @@ from sqlalchemy.orm import Session
 import models
 from core.config import get_settings
 from services import consent_pdf
+from services import legal_documents_pdf
 from services import email as email_service
 from services.sms import send_sms
 from services.yousign import YousignClient, YousignConfigurationError, start_neutral_signature_request
+from domain.legal_documents import LEGAL_CATALOG
 from services.yousign.models import YousignSigner
 
 logger = logging.getLogger("uvicorn.error")
+
+
+DOCUMENT_TYPE_ALIASES = {
+    "surgical_authorization_minor": "authorization",
+    "informed_consent": "consent",
+    "fees_consent_quote": "fees",
+}
+VALID_DOCUMENT_TYPES = {"authorization", "consent", "fees"}
+
+
+def normalize_document_type(value: str) -> str:
+    """Normalize API/catalog document types to internal identifiers."""
+    if not value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Type de document manquant."
+        )
+    normalized = DOCUMENT_TYPE_ALIASES.get(value, value)
+    if normalized not in VALID_DOCUMENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Type de document invalide: {value}"
+        )
+    return normalized
 
 
 def get_document_signature(
@@ -63,6 +89,7 @@ def get_or_create_document_signature(
     """
     Récupère ou crée un DocumentSignature pour un document spécifique.
     """
+    document_type = normalize_document_type(document_type)
     existing = db.query(models.DocumentSignature).filter(
         models.DocumentSignature.procedure_case_id == procedure_case_id,
         models.DocumentSignature.document_type == document_type,
@@ -169,6 +196,7 @@ def initiate_document_signature(
             detail="ProcedureCase introuvable."
         )
 
+    document_type = normalize_document_type(document_type)
     _validate_contacts(case)
 
     # 2. Récupérer ou créer DocumentSignature
@@ -197,16 +225,15 @@ def initiate_document_signature(
     try:
         client = YousignClient()
 
-        # Hash du PDF médical complet (si disponible)
+        # Hash du PDF medical complet (si disponible)
+        doc_type_enum = legal_documents_pdf.normalize_document_type(document_type)
+        document_version = LEGAL_CATALOG[doc_type_enum].version
         consent_hash = None
-        if case.consent_pdf_path:
-            from services import pdf as pdf_service
-            pdf_bytes = consent_pdf.load_pdf_bytes(pdf_service.CONSENT_CATEGORY, case.consent_pdf_path)
-            if pdf_bytes:
-                consent_hash = consent_pdf.compute_pdf_sha256(pdf_bytes)
+        base_doc_id = legal_documents_pdf.ensure_legal_document_pdf(case, doc_type_enum)
+        pdf_bytes = consent_pdf.load_pdf_bytes(legal_documents_pdf.LEGAL_DOCUMENT_CATEGORY, base_doc_id)
+        if pdf_bytes:
+            consent_hash = consent_pdf.compute_pdf_sha256(pdf_bytes)
 
-        # TODO: Déterminer document_version depuis catalog
-        document_version = "v1.0"
 
         # Générer PDF neutre SPÉCIFIQUE au document_type
         neutral_pdf_path = consent_pdf.render_neutral_document_pdf(
@@ -339,12 +366,13 @@ def _send_document_notifications(
         "fees": "Honoraires",
     }
     doc_label = doc_labels.get(document_type, document_type)
+    reference = f"{case.id}-{document_type}"
 
     def _build_body(link: str) -> str:
         # RGPD: Message neutre sans PHI
         return (
             f"Vous avez un document médical à signer : {doc_label}.\n"
-            f"Référence : {case.id}-{document_type}\n"
+            f"Référence : {reference}\n"
             f"Lien de signature sécurisé : {link}\n"
             f"{app_name}"
         )
@@ -357,17 +385,20 @@ def _send_document_notifications(
 
     # Email
     if case.parent1_email and doc_sig.parent1_signature_link:
-        email_service.send_consent_download_email(
+        email_service.send_signature_request_email(
             case.parent1_email,
-            f"Document médical - {doc_label}",
-            doc_sig.parent1_signature_link
+            doc_label=doc_label,
+            signature_link=doc_sig.parent1_signature_link,
+            reference=reference,
         )
     if case.parent2_email and doc_sig.parent2_signature_link:
-        email_service.send_consent_download_email(
+        email_service.send_signature_request_email(
             case.parent2_email,
-            f"Document médical - {doc_label}",
-            doc_sig.parent2_signature_link
+            doc_label=doc_label,
+            signature_link=doc_sig.parent2_signature_link,
+            reference=reference,
         )
+
 
 
 def _download_and_store_artifacts(
@@ -449,12 +480,18 @@ def _assemble_final_document(
         models.ProcedureCase.id == doc_sig.procedure_case_id
     ).first()
 
-    if not case or not case.consent_pdf_path:
+    if not case:
         return None
 
-    # TODO: Adapter pour charger PDF spécifique au document_type
-    # Pour l'instant, on utilise le consent_pdf_path global
-    full_consent_id = case.consent_pdf_path
+    try:
+        full_consent_id = legal_documents_pdf.ensure_legal_document_pdf(case, doc_sig.document_type)
+    except Exception:
+        logger.exception(
+            "Echec generation document legal case=%d doc_type=%s",
+            doc_sig.procedure_case_id,
+            doc_sig.document_type,
+        )
+        return None
 
     signed_ids = []
     evidence_ids = []
@@ -477,6 +514,7 @@ def _assemble_final_document(
         )
         return consent_pdf.compose_final_document_consent(
             full_consent_id=full_consent_id,
+            full_consent_category=legal_documents_pdf.LEGAL_DOCUMENT_CATEGORY,
             document_type=doc_sig.document_type,
             case_id=doc_sig.procedure_case_id,
             signed_ids=signed_ids,

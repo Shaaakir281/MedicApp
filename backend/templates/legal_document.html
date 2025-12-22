@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{{ document_title }}</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 40px;
+        color: #111827;
+        line-height: 1.5;
+      }
+      h1 {
+        text-align: center;
+        margin-bottom: 12px;
+      }
+      .meta {
+        text-align: center;
+        font-size: 11pt;
+        color: #4b5563;
+        margin-bottom: 24px;
+      }
+      .box {
+        border: 1px solid #e5e7eb;
+        padding: 16px;
+        margin-bottom: 20px;
+        background-color: #f9fafb;
+      }
+      h2 {
+        font-size: 13pt;
+        margin-top: 18px;
+        margin-bottom: 8px;
+      }
+      ul {
+        padding-left: 18px;
+      }
+      li {
+        margin-bottom: 6px;
+      }
+      .signatures {
+        margin-top: 28px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>{{ document_title }}</h1>
+    <div class="meta">
+      Version {{ document_version }} | Reference {{ reference }} | Genere le {{ generated_at }}
+    </div>
+
+    <div class="box">
+      <p><strong>Enfant :</strong> {{ child_full_name or 'N/A' }}{% if child_birthdate %} (ne le {{ child_birthdate }}){% endif %}</p>
+      <p><strong>Parent 1 :</strong> {{ parent1_name or 'N/A' }}</p>
+      <p><strong>Parent 2 :</strong> {{ parent2_name or 'N/A' }}</p>
+    </div>
+
+    <h2>Declaration</h2>
+    <ul>
+      {% for item in cases %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+
+    <div class="signatures">
+      <p>Signature parent 1 : ____________________  Date : __/__/____</p>
+      <p>Signature parent 2 : ____________________  Date : __/__/____</p>
+    </div>
+  </body>
+</html>

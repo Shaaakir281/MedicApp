@@ -22,8 +22,6 @@ export function LegalDocumentCard({
   onReloadCase,
   onReloadDashboard,
   setPreviewState,
-  preconsultationDate,
-  canSignAfterDelay,
 }) {
   const [roleState, setRoleState] = useState('parent1');
   const [isChecklistExpanded, setIsChecklistExpanded] = useState(true);
@@ -112,8 +110,6 @@ export function LegalDocumentCard({
             setError={setError}
             setSuccessMessage={setSuccessMessage}
             setPreviewState={setPreviewState}
-            preconsultationDate={preconsultationDate}
-            canSignAfterDelay={canSignAfterDelay}
           />
         )}
       </div>

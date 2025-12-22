@@ -1,5 +1,15 @@
 import { DOCUMENT_TYPES, SIGNER_ROLES } from './patientDashboard.api.js';
 
+const SIGNATURE_TYPE_TO_CATALOG = {
+  authorization: DOCUMENT_TYPES.SURGICAL_AUTHORIZATION_MINOR,
+  consent: DOCUMENT_TYPES.INFORMED_CONSENT,
+  fees: DOCUMENT_TYPES.FEES_CONSENT_QUOTE,
+};
+
+function mapSignatureTypeToCatalog(value) {
+  return SIGNATURE_TYPE_TO_CATALOG[value] || value;
+}
+
 function splitChildFullName(fullName) {
   const cleaned = String(fullName || '').trim();
   if (!cleaned) return { firstName: '', lastName: '' };
@@ -59,6 +69,7 @@ function mapAppointments(dashboard, procedureCase) {
   }
 
   const appointments = procedureCase?.appointments || [];
+
   return {
     upcoming: appointments.map((appt) => ({
       id: appt.id,
@@ -87,21 +98,20 @@ function buildDocumentVM({
 
   // Architecture granulaire: chercher DocumentSignature pour CE document
   const docSignature = (documentSignatures || []).find(
-    (sig) => sig?.document_type === docType
+    (sig) => mapSignatureTypeToCatalog(sig?.document_type) === docType
   );
 
   // Fallback vers ancien système si pas de DocumentSignature
-  const signedPdfUrl =
-    docSignature?.final_pdf_identifier ||
-    docSignature?.signed_pdf_identifier ||
-    (isConsent ? dashboard?.signature?.signed_pdf_url : null) ||
-    (isConsent ? procedureCase?.consent_signed_pdf_url : null) ||
-    null;
-  const evidencePdfUrl =
-    docSignature?.evidence_pdf_identifier ||
-    (isConsent ? dashboard?.signature?.evidence_pdf_url : null) ||
-    (isConsent ? procedureCase?.consent_evidence_pdf_url : null) ||
-    null;
+  const documentSignatureId = docSignature?.id || null;
+  const finalPdfAvailable = Boolean(docSignature?.final_pdf_identifier);
+  const signedPdfAvailable = Boolean(docSignature?.signed_pdf_identifier);
+  const evidencePdfAvailable = Boolean(docSignature?.evidence_pdf_identifier);
+  const legacySignedAvailable = Boolean(
+    isConsent && (dashboard?.signature?.signed_pdf_url || procedureCase?.consent_signed_pdf_url),
+  );
+  const legacyEvidenceAvailable = Boolean(
+    isConsent && (dashboard?.signature?.evidence_pdf_url || procedureCase?.consent_evidence_pdf_url),
+  );
   const previewPdfUrl = isConsent ? procedureCase?.consent_download_url || null : null;
 
   const byParent = roles.reduce((acc, role) => {
@@ -167,9 +177,13 @@ function buildDocumentVM({
     })),
     byParent,
     previewPdfUrl,
-    signedPdfUrl,
-    evidencePdfUrl,
-    signatureSupported: isConsent,
+    documentSignatureId,
+    finalPdfAvailable,
+    signedPdfAvailable,
+    evidencePdfAvailable,
+    legacySignedAvailable,
+    legacyEvidenceAvailable,
+    signatureSupported: true,
   };
 }
 
@@ -209,6 +223,23 @@ export function buildPatientDashboardVM({
     }),
   );
 
+  const signatureCompleteFromDocs = (legalDocuments || []).length
+    ? (legalDocuments || []).every((doc) => {
+        const parent1Required = doc?.byParent?.parent1?.total > 0;
+        const parent2Required = doc?.byParent?.parent2?.total > 0;
+        const parent1Signed = String(doc?.byParent?.parent1?.signatureStatus || '').toLowerCase() === 'signed';
+        const parent2Signed = String(doc?.byParent?.parent2?.signatureStatus || '').toLowerCase() === 'signed';
+        return (!parent1Required || parent1Signed) && (!parent2Required || parent2Signed);
+      })
+    : false;
+  const legacySignatureComplete = Boolean(
+    dashboard?.signature?.signed_pdf_url ||
+      (dashboard?.signature?.entries || []).some(
+        (entry) => (entry?.status || '').toLowerCase() === 'signed',
+      ) ||
+      procedureCase?.consent_signed_pdf_url,
+  );
+
   return {
     child: {
       firstName,
@@ -236,13 +267,6 @@ export function buildPatientDashboardVM({
     appointments,
     legalDocuments,
     legalComplete: Boolean(legalStatus?.complete ?? dashboard?.legal_status?.complete),
-    signatureComplete: Boolean(
-      dashboard?.signature?.signed_pdf_url ||
-        (dashboard?.signature?.entries || []).some(
-          (entry) => (entry?.status || '').toLowerCase() === 'signed',
-        ) ||
-        procedureCase?.consent_signed_pdf_url,
-    ),
+    signatureComplete: signatureCompleteFromDocs || legacySignatureComplete,
   };
 }
-

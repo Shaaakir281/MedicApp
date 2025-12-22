@@ -280,12 +280,19 @@ def _serve_prescription_version_file(
 
 def _ensure_prescription(db: Session, appointment: models.Appointment) -> models.Prescription:
     storage = get_storage_backend()
-    if appointment.prescription:
-        pres = appointment.prescription
+
+    # Explicitly check if prescription exists in DB (in case relationship not loaded)
+    existing_pres = db.query(models.Prescription).filter(
+        models.Prescription.appointment_id == appointment.id
+    ).first()
+
+    if existing_pres:
+        pres = existing_pres
         file_missing = not (pres.pdf_path and storage.exists(ORDONNANCE_CATEGORY, pres.pdf_path))
         if not file_missing:
             return pres
 
+        # Regenerate missing PDF
         existing_qr = pres.qr_codes[0] if pres.qr_codes else None
         context, reference, qr_meta = _build_prescription_context(
             db,
@@ -317,6 +324,7 @@ def _ensure_prescription(db: Session, appointment: models.Appointment) -> models
         db.refresh(pres)
         return pres
 
+    # Create new prescription if none exists
     existing_qr = None
     context, reference, qr_meta = _build_prescription_context(
         db,

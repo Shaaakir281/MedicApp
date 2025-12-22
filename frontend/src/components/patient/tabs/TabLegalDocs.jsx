@@ -63,26 +63,18 @@ export function TabLegalDocs({
 
   const overallLegalComplete = Boolean(legalStatus?.complete);
 
-  // Calculer le délai de 15 jours après la pré-consultation
-  const preconsultationDate = useMemo(() => {
-    const preconsult = procedureCase?.appointments?.find((a) => a.appointment_type === 'preconsultation');
-    return preconsult?.date || null;
-  }, [procedureCase]);
 
-  const canSignAfterDelay = useMemo(() => {
-    if (!preconsultationDate) return false;
-    const preconsultDate = new Date(preconsultationDate);
-    const now = new Date();
-    const daysSincePreconsult = Math.floor((now - preconsultDate) / (1000 * 60 * 60 * 24));
-    return daysSincePreconsult >= 15;
-  }, [preconsultationDate]);
+
+  const documentAppointmentOptions = useMemo(() => {
+    return (appointmentOptions || []).filter((appt) => appt?.appointment_type === 'act');
+  }, [appointmentOptions]);
 
   const vmWithDocs = useMemo(() => {
     return buildPatientDashboardVM({
       procedureCase,
       dashboard,
       legalCatalog: catalog,
-      legalStatus: legalStatus || dashboard?.legal_status || null,
+      legalStatus: legalStatus || null,
     });
   }, [catalog, dashboard, legalStatus, procedureCase]);
 
@@ -132,11 +124,10 @@ export function TabLegalDocs({
           <div>
             <h3 className="font-semibold mb-2">Parcours de signature des documents</h3>
             <ol className="list-decimal list-inside space-y-1 text-sm">
-              <li>Prenez un rendez-vous de pré-consultation dans l'onglet "Rendez-vous"</li>
-              <li>Lors de la pré-consultation, le praticien vous informera sur la procédure</li>
-              <li>Après un délai de réflexion de 15 jours, vous pourrez accéder à cet onglet pour signer les documents</li>
-              <li>Les 2 parents doivent signer tous les documents</li>
-              <li>Une fois tous les documents signés, vous pourrez prendre le rendez-vous pour l'acte</li>
+              <li>Prenez un rendez-vous pour l'acte dans l'onglet "Rendez-vous"</li>
+              <li>Le praticien vous informera sur la proc?dure avant l'acte</li>
+              <li>Les 2 parents doivent signer chaque document</li>
+              <li>Une fois tous les documents sign?s, le rendez-vous d'acte peut ?tre confirm?</li>
             </ol>
           </div>
         </div>
@@ -151,14 +142,14 @@ export function TabLegalDocs({
           <p className="font-semibold">Informations importantes :</p>
           <ul className="list-disc list-inside mt-1 space-y-1">
             <li>Les 2 parents doivent signer chaque document</li>
-            <li>Délai de réflexion de 15 jours après la pré-consultation requis</li>
+            <li>Les documents concernent uniquement le rendez-vous d'acte</li>
           </ul>
         </div>
       </div>
 
       <AppointmentContextSelector
-        appointmentOptions={appointmentOptions}
-        activeAppointmentId={activeAppointmentId}
+        appointmentOptions={documentAppointmentOptions}
+        activeAppointmentId={signatureAppointmentId}
         onChangeAppointmentId={setActiveAppointmentId}
       />
 
@@ -183,12 +174,9 @@ export function TabLegalDocs({
             onReloadCase={onReloadCase}
             onReloadDashboard={onReloadDashboard}
             setPreviewState={setPreviewState}
-            preconsultationDate={preconsultationDate}
-            canSignAfterDelay={canSignAfterDelay}
           />
         ))}
       </div>
     </div>
   );
 }
-

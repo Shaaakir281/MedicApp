@@ -74,16 +74,26 @@ export function usePatientSpaceController({ token, procedureSelection }) {
     return undefined;
   }, [successMessage]);
 
+  const signatureAppointmentId = useMemo(() => {
+    if (!procedure.procedureCase?.appointments?.length) return null;
+    const actAppt = procedure.procedureCase.appointments.find((appt) => appt.appointment_type === 'act');
+    if (actAppt) return actAppt.id;
+    return activeAppointmentId || procedure.procedureCase.appointments[0]?.id || null;
+  }, [activeAppointmentId, procedure.procedureCase]);
+
   const dashboardQuery = usePatientDashboard({
     token,
     appointmentId: activeAppointmentId,
   });
 
   useEffect(() => {
+    const dashboardAppointmentId = dashboardQuery.dashboard?.appointment_id;
+    if (!dashboardAppointmentId) return;
+    if (signatureAppointmentId && dashboardAppointmentId !== signatureAppointmentId) return;
     if (dashboardQuery.dashboard?.legal_status) {
       setLegalStatus(dashboardQuery.dashboard.legal_status);
     }
-  }, [dashboardQuery.dashboard]);
+  }, [dashboardQuery.dashboard, signatureAppointmentId]);
 
   const vm = useMemo(
     () =>
@@ -95,14 +105,6 @@ export function usePatientSpaceController({ token, procedureSelection }) {
       }),
     [procedure.procedureCase, dashboardQuery.dashboard, legalStatus],
   );
-
-  const signatureAppointmentId = useMemo(() => {
-    if (activeAppointmentId) return activeAppointmentId;
-    if (!procedure.procedureCase?.appointments?.length) return null;
-    const actAppt = procedure.procedureCase.appointments.find((appt) => appt.appointment_type === 'act');
-    if (actAppt) return actAppt.id;
-    return procedure.procedureCase.appointments[0]?.id || null;
-  }, [activeAppointmentId, procedure.procedureCase]);
 
   const canSchedule = Boolean(procedure.procedureCase && procedure.procedureCase.parental_authority_ack);
   const showScheduling = canSchedule && (!appointments.bothAppointmentsBooked || appointments.editingAppointmentId);

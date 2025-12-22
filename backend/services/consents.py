@@ -169,6 +169,8 @@ def initiate_consent(db: Session, case: models.ProcedureCase, *, in_person: bool
 
     case.yousign_procedure_id = procedure.procedure_id
     now = dt.datetime.utcnow()
+    doc_label = "Consentement eclaire"
+    reference = f"{case.id}-consent"
     # Associer les signers retournés à nos labels (ordre d'insertion)
     for idx, signer in enumerate(procedure.signers):
         label = signers[idx].get("label") if idx < len(signers) else None
@@ -199,11 +201,13 @@ def initiate_consent(db: Session, case: models.ProcedureCase, *, in_person: bool
 def _send_initial_notifications(case: models.ProcedureCase) -> None:
     """Send emails and SMS for initial signature availability."""
     app_name = get_settings().app_name
-    child = case.child_full_name
+    doc_label = "Consentement eclaire"
+    reference = f"{case.id}-consent"
 
     def _build_body(link: str) -> str:
         return (
-            f"Vous pouvez signer le consentement pour {child}.\n"
+            f"Vous avez un document medical a signer : {doc_label}.\n"
+            f"Reference : {reference}\n"
             f"Lien de signature securise : {link}\n"
             f"{app_name}"
         )
@@ -214,21 +218,33 @@ def _send_initial_notifications(case: models.ProcedureCase) -> None:
         send_sms(case.parent2_phone, _build_body(case.parent2_signature_link))
 
     if case.parent1_email and case.parent1_signature_link:
-        email_service.send_consent_download_email(case.parent1_email, child, case.parent1_signature_link)
+        email_service.send_signature_request_email(
+            case.parent1_email,
+            doc_label=doc_label,
+            signature_link=case.parent1_signature_link,
+            reference=reference,
+        )
     if case.parent2_email and case.parent2_signature_link:
-        email_service.send_consent_download_email(case.parent2_email, child, case.parent2_signature_link)
+        email_service.send_signature_request_email(
+            case.parent2_email,
+            doc_label=doc_label,
+            signature_link=case.parent2_signature_link,
+            reference=reference,
+        )
 
 
 def remind_pending(db: Session, case: models.ProcedureCase) -> models.ProcedureCase:
     """Resend notifications for parents who have not signed yet."""
     now = dt.datetime.utcnow()
+    doc_label = "Consentement eclaire"
+    reference = f"{case.id}-consent"
     if case.parent1_consent_status != "signed" and case.parent1_signature_link:
         case.parent1_consent_status = "sent"
         case.parent1_consent_sent_at = now
         if case.parent1_sms_optin and case.parent1_phone:
             send_sms(
                 case.parent1_phone,
-                f"Rappel : merci de signer le consentement pour {case.child_full_name} : {case.parent1_signature_link}",
+                f"Rappel : document medical a signer ({doc_label}, {reference}) : {case.parent1_signature_link}",
             )
     if case.parent2_consent_status != "signed" and case.parent2_signature_link:
         case.parent2_consent_status = "sent"
@@ -236,7 +252,7 @@ def remind_pending(db: Session, case: models.ProcedureCase) -> models.ProcedureC
         if case.parent2_sms_optin and case.parent2_phone:
             send_sms(
                 case.parent2_phone,
-                f"Rappel : merci de signer le consentement pour {case.child_full_name} : {case.parent2_signature_link}",
+                f"Rappel : document medical a signer ({doc_label}, {reference}) : {case.parent2_signature_link}",
             )
 
     db.add(case)

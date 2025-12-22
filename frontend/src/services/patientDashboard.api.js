@@ -1,4 +1,5 @@
 import {
+  API_BASE_URL,
   acknowledgeLegalBulk,
   acknowledgeLegalCase,
   downloadSignedConsent,
@@ -105,6 +106,25 @@ export async function sendConsentSignatureLinkByEmail({ token, email }) {
 
 export async function downloadSignedConsentBlob({ token }) {
   return downloadSignedConsent(token);
+}
+
+export async function downloadConsentAuditTrailBlob({ token }) {
+  if (!token) {
+    throw new Error('Authentification requise.');
+  }
+  const resolvedToken = token;
+  const headers = resolvedToken ? { Authorization: `Bearer ${resolvedToken}` } : {};
+  const resp = await fetch(`${API_BASE_URL}/procedures/current/audit-trail`, {
+    method: 'GET',
+    headers,
+  });
+  if (!resp.ok) {
+    const message = `Echec de telechargement (${resp.status})`;
+    const error = new Error(message);
+    error.status = resp.status;
+    throw error;
+  }
+  return await resp.blob();
 }
 
 export async function requestGuardianPhoneOtp({ token, parentRole }) {

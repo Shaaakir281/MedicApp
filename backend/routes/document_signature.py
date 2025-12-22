@@ -9,15 +9,17 @@ Architecture:
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 import models
 import schemas
 from database import get_db
 from dependencies.auth import get_current_user, get_optional_user
-from services import document_signature_service
+from services import consent_pdf, document_signature_service, legal_documents_pdf
 from services import legal as legal_service
+from services.storage import StorageError, get_storage_backend
 
 router = APIRouter(prefix="/signature", tags=["document_signature"])
 
@@ -183,6 +185,105 @@ def get_case_document_signatures(
             schemas.DocumentSignatureDetail.model_validate(sig) for sig in signatures
         ],
     )
+
+
+@router.get("/case/{procedure_case_id}/document/{document_type}/preview")
+def preview_legal_document(
+    procedure_case_id: int,
+    document_type: str,
+    inline: bool = Query(default=True),
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Preview the base legal document PDF (authorization/consent/fees).
+
+    Access is restricted to the owning patient (or practitioners).
+    """
+    case = db.query(models.ProcedureCase).filter(
+        models.ProcedureCase.id == procedure_case_id
+    ).first()
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case introuvable.")
+
+    if current_user.role == models.UserRole.patient and case.patient_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acces refuse.")
+
+    doc_type = legal_documents_pdf.normalize_document_type(document_type)
+    identifier = legal_documents_pdf.ensure_legal_document_pdf(case, doc_type)
+
+    storage = get_storage_backend()
+    download_name = f"case-{case.id}-{doc_type.value}.pdf"
+
+    if storage.supports_presigned_urls:
+        try:
+            url = storage.generate_presigned_url(
+                legal_documents_pdf.LEGAL_DOCUMENT_CATEGORY,
+                identifier,
+                download_name=download_name,
+                expires_in_seconds=600,
+                inline=inline,
+            )
+            return RedirectResponse(url, status_code=307)
+        except StorageError:
+            pass
+
+    try:
+        return storage.build_file_response(
+            legal_documents_pdf.LEGAL_DOCUMENT_CATEGORY,
+            identifier,
+            download_name,
+            inline=inline,
+        )
+    except StorageError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fichier introuvable.") from exc
+
+
+@router.get("/document/{document_signature_id}/file/{file_kind}")
+def download_document_signature_file(
+    document_signature_id: int,
+    file_kind: str,
+    inline: bool = Query(default=False),
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Download a document signature artifact (final, signed, evidence).
+
+    Access is restricted to the owning patient (or practitioners).
+    """
+    if file_kind not in {"final", "signed", "evidence"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Type de fichier invalide.")
+
+    doc_sig = document_signature_service.get_document_signature(db, document_signature_id)
+    case = db.query(models.ProcedureCase).filter(
+        models.ProcedureCase.id == doc_sig.procedure_case_id
+    ).first()
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case introuvable.")
+
+    if current_user.role == models.UserRole.patient and case.patient_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acces refuse.")
+
+    if file_kind == "final":
+        identifier = doc_sig.final_pdf_identifier
+        category = consent_pdf.FINAL_CONSENT_CATEGORY
+    elif file_kind == "signed":
+        identifier = doc_sig.signed_pdf_identifier
+        category = consent_pdf.SIGNED_CONSENT_CATEGORY
+    else:
+        identifier = doc_sig.evidence_pdf_identifier
+        category = consent_pdf.EVIDENCE_CATEGORY
+
+    if not identifier:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fichier indisponible.")
+
+    storage = get_storage_backend()
+    download_name = f"case-{case.id}-{doc_sig.document_type}-{file_kind}.pdf"
+    try:
+        return storage.build_file_response(category, identifier, download_name, inline=inline)
+    except StorageError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fichier introuvable.") from exc
 
 
 @router.post("/webhook/yousign-document")
