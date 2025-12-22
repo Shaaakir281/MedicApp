@@ -2,7 +2,7 @@ import React from 'react';
 
 import { InputField } from '../../ui';
 
-export function ChildIdentityForm({ formState, onChange }) {
+export function ChildIdentityForm({ formState, onChange, disabled = false }) {
   return (
     <div className="space-y-3">
       <div className="grid gap-4 md:grid-cols-2">
@@ -12,6 +12,7 @@ export function ChildIdentityForm({ formState, onChange }) {
           value={formState.childFirstName || ''}
           onChange={(e) => onChange('childFirstName', e.target.value)}
           required
+          disabled={disabled}
         />
         <InputField
           label="Nom"
@@ -19,6 +20,7 @@ export function ChildIdentityForm({ formState, onChange }) {
           value={formState.childLastName || ''}
           onChange={(e) => onChange('childLastName', e.target.value)}
           required
+          disabled={disabled}
         />
       </div>
       <InputField
@@ -27,6 +29,7 @@ export function ChildIdentityForm({ formState, onChange }) {
         value={formState.birthDate || ''}
         onChange={(e) => onChange('birthDate', e.target.value)}
         required
+        disabled={disabled}
       />
       <InputField
         label="Poids (kg)"
@@ -36,6 +39,7 @@ export function ChildIdentityForm({ formState, onChange }) {
         value={formState.weightKg ?? ''}
         onChange={(e) => onChange('weightKg', e.target.value)}
         placeholder="Ex. 8.2"
+        disabled={disabled}
       />
       <label className="form-control w-full">
         <span className="label-text font-medium text-slate-600">Notes médicales</span>
@@ -45,6 +49,7 @@ export function ChildIdentityForm({ formState, onChange }) {
           placeholder="Allergies, traitements en cours..."
           value={formState.medicalNotes || ''}
           onChange={(e) => onChange('medicalNotes', e.target.value)}
+          disabled={disabled}
         />
       </label>
     </div>

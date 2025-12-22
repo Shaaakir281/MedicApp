@@ -26,6 +26,7 @@ export function LegalDocumentCard({
   canSignAfterDelay,
 }) {
   const [roleState, setRoleState] = useState('parent1');
+  const [isChecklistExpanded, setIsChecklistExpanded] = useState(true);
   const role = fixedRole || roleState;
 
   const parentState = doc?.byParent?.[role] || { checkedKeys: [], completedCount: 0, total: 0 };
@@ -58,17 +59,41 @@ export function LegalDocumentCard({
       </div>
 
       <div className="px-5 pb-5 space-y-5">
+        {/* Accordion header for checklist */}
         <div className="space-y-2">
-          <p className="font-semibold text-slate-700">Checklist</p>
-          <Checklist
-            cases={doc?.cases || []}
-            role={role}
-            checkedKeys={checkedKeys}
-            onCheck={(caseKey) => onAcknowledgeCase?.({ docType: doc.docType, role, caseKey })}
-            submitting={submitting}
-          />
+          <button
+            type="button"
+            onClick={() => setIsChecklistExpanded(!isChecklistExpanded)}
+            className="flex items-center justify-between w-full font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+          >
+            <span>Checklist</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className={`h-5 w-5 transition-transform ${isChecklistExpanded ? 'rotate-180' : ''}`}
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+
+          {/* Collapsible checklist content */}
+          {isChecklistExpanded && (
+            <Checklist
+              cases={doc?.cases || []}
+              role={role}
+              checkedKeys={checkedKeys}
+              onCheck={(caseKey) => onAcknowledgeCase?.({ docType: doc.docType, role, caseKey })}
+              submitting={submitting}
+            />
+          )}
         </div>
 
+        {/* Signature actions - always visible */}
         {showSignatureActions && (
           <SignatureActions
             doc={doc}

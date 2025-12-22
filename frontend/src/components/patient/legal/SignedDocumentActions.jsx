@@ -10,10 +10,19 @@ export function SignedDocumentActions({
   filename = 'document-signe.pdf',
   setError,
   setPreviewState,
+  signatureLink = null,
+  hasFinalPdf = false,
 }) {
   const [downloading, setDownloading] = useState(false);
 
   const handlePreview = async () => {
+    // Si pas de PDF final mais un lien Yousign, ouvrir le lien dans un nouvel onglet
+    if (!hasFinalPdf && signatureLink) {
+      window.open(signatureLink, '_blank', 'noopener');
+      return;
+    }
+
+    // Sinon télécharger le PDF final signé
     if (!token) return;
     setError?.(null);
     setDownloading(true);
@@ -61,9 +70,10 @@ export function SignedDocumentActions({
       </button>
       <button
         type="button"
-        className={`btn btn-xs ${enabled ? 'btn-outline' : 'btn-disabled'}`}
+        className={`btn btn-xs ${hasFinalPdf ? 'btn-outline' : 'btn-disabled'}`}
         onClick={handleDownload}
-        disabled={!enabled || downloading}
+        disabled={!hasFinalPdf || downloading}
+        title={!hasFinalPdf ? 'Téléchargement disponible après signature complète' : ''}
       >
         {downloading ? LABELS_FR.common.loading : LABELS_FR.patientSpace.documents.signature.downloadSigned}
       </button>

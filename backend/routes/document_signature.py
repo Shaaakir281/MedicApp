@@ -39,6 +39,10 @@ def start_document_signature(
     - Notifications neutres sans nom d'enfant
     - Purge automatique après récupération
     """
+    import logging
+    logger = logging.getLogger("uvicorn.error")
+    logger.info(f"start_document_signature called with payload: {payload.model_dump()}")
+
     # Gestion session cabinet (bypass auth)
     session = None
     procedure_case_id = payload.procedure_case_id

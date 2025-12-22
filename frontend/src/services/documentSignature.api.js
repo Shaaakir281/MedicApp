@@ -12,6 +12,20 @@
 import { apiRequest } from '../lib/api.js';
 
 /**
+ * Maps catalog document types to signature API document types.
+ * Catalog: surgical_authorization_minor, informed_consent, fees_consent_quote
+ * API: authorization, consent, fees
+ */
+function mapDocumentType(catalogType) {
+  const mapping = {
+    'surgical_authorization_minor': 'authorization',
+    'informed_consent': 'consent',
+    'fees_consent_quote': 'fees',
+  };
+  return mapping[catalogType] || catalogType;
+}
+
+/**
  * Démarre la signature pour UN document spécifique.
  *
  * @param {Object} params
@@ -44,7 +58,7 @@ export async function startDocumentSignature({
     token,
     body: {
       procedure_case_id: procedureCaseId,
-      document_type: documentType,
+      document_type: mapDocumentType(documentType), // Map catalog type to API type
       signer_role: signerRole,
       mode,
       session_code: sessionCode,

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 import models
 from core.config import get_settings
 from dossier import schemas
-from dossier.models import Child, Guardian, GuardianPhoneVerification, GuardianRole, VerificationStatus
+from dossier.models import Child, Guardian, GuardianPhoneVerification, GuardianEmailVerification, GuardianRole, VerificationStatus
 from services import sms
 from services import consents as consents_service
 
@@ -222,6 +222,17 @@ def get_dossier(db: Session, child_id: str, current_user) -> schemas.DossierResp
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dossier introuvable.")
     _guard_patient_access(child, current_user)
     guardians = list(db.scalars(select(Guardian).where(Guardian.child_id == child.id)))
+
+    # Populate email_sent_at from latest email verification
+    for guardian in guardians:
+        latest_verification = db.scalars(
+            select(GuardianEmailVerification)
+            .where(GuardianEmailVerification.guardian_id == guardian.id)
+            .order_by(GuardianEmailVerification.sent_at.desc())
+            .limit(1)
+        ).first()
+        guardian.email_sent_at = latest_verification.sent_at if latest_verification else None
+
     warnings: List[str] = []
     if not any(g.role == GuardianRole.parent2.value for g in guardians):
         warnings.append("Parent 2 incomplet")

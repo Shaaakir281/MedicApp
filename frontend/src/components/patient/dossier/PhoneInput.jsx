@@ -18,7 +18,7 @@ function findOptionByValue(value) {
   return match || COUNTRY_OPTIONS[0];
 }
 
-export function PhoneInput({ label, value, onChange, required = false }) {
+export function PhoneInput({ label, value, onChange, required = false, disabled = false }) {
   const selected = useMemo(() => findOptionByValue(value || ''), [value]);
   const nationalDigits = useMemo(() => {
     const current = String(value || '');
@@ -56,6 +56,7 @@ export function PhoneInput({ label, value, onChange, required = false }) {
           className="select select-bordered select-sm"
           value={selected.dialCode}
           onChange={handleCountryChange}
+          disabled={disabled}
         >
           {COUNTRY_OPTIONS.map((opt) => (
             <option key={opt.code} value={opt.dialCode}>
@@ -71,6 +72,7 @@ export function PhoneInput({ label, value, onChange, required = false }) {
           onChange={handleNumberChange}
           required={required}
           className="flex-1"
+          disabled={disabled}
         />
       </div>
     </div>

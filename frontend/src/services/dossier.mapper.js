@@ -10,6 +10,8 @@ function buildGuardianDefaults() {
       email: '',
       phoneE164: '',
       phoneVerifiedAt: null,
+      emailVerifiedAt: null,
+      emailSentAt: null,
     };
     return acc;
   }, {});
@@ -36,6 +38,8 @@ export function toDossierVM(apiResponse) {
       email: g.email || '',
       phoneE164: g.phone_e164 || '',
       phoneVerifiedAt: g.phone_verified_at || null,
+      emailVerifiedAt: g.email_verified_at || null,
+      emailSentAt: g.email_sent_at || null,
     };
     if (g.phone_verified_at) {
       verification[role] = { step: 'verified', verifiedAt: g.phone_verified_at };

@@ -24,6 +24,7 @@ class Guardian(GuardianBase):
     id: str
     phone_verified_at: Optional[datetime] = None
     email_verified_at: Optional[datetime] = None
+    email_sent_at: Optional[datetime] = None  # From latest email verification
     created_at: datetime
     updated_at: datetime
 

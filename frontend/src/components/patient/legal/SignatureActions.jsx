@@ -37,12 +37,14 @@ export function SignatureActions({
   const checklistComplete = parentState.total > 0 && parentState.completedCount === parentState.total;
   const signatureSupported = Boolean(doc?.signatureSupported);
 
+  // DEMO MODE: Allow signing even if delay not met (keep warning message)
+  // INDEPENDENT DOCUMENTS: Each document can be signed independently
   const canSignCabinet = Boolean(
     signatureSupported &&
       appointmentId &&
-      checklistComplete &&
-      overallLegalComplete &&
-      canSignAfterDelay
+      checklistComplete
+      // overallLegalComplete removed - documents are independent
+      // canSignAfterDelay removed for demo
   );
   const canSignRemote = Boolean(canSignCabinet && parentVerified);
 
@@ -59,9 +61,9 @@ export function SignatureActions({
       return `Délai de réflexion de 15 jours requis. Vous pourrez signer à partir du ${delayEndDate.toLocaleDateString('fr-FR')}.`;
     }
     if (!checklistComplete) return LABELS_FR.patientSpace.documents.reasons.checklistIncomplete;
-    if (!overallLegalComplete) return 'Les 3 documents doivent être validés avant la signature.';
+    // Removed: if (!overallLegalComplete) return 'Les 3 documents doivent être validés avant la signature.';
     return null;
-  }, [appointmentId, checklistComplete, overallLegalComplete, signatureSupported, preconsultationDate, canSignAfterDelay]);
+  }, [appointmentId, checklistComplete, signatureSupported, preconsultationDate, canSignAfterDelay]);
 
   const handleStartSignature = async (mode) => {
     if (!token) return;
@@ -145,10 +147,12 @@ export function SignatureActions({
       {signatureSupported && (
         <SignedDocumentActions
           token={token}
-          enabled={Boolean(doc?.signedPdfUrl)}
+          enabled={Boolean(doc?.signedPdfUrl || parentState.signatureLink)}
           title={doc?.title}
           setError={setError}
           setPreviewState={setPreviewState}
+          signatureLink={parentState.signatureLink}
+          hasFinalPdf={Boolean(doc?.signedPdfUrl)}
         />
       )}
 

@@ -21,6 +21,7 @@ export function GuardianForm({
   sendingEmail = false,
   isUserAccount = false, // true si c'est le compte user (Parent 1)
   userEmailVerified = false, // true si email user déjà vérifié
+  disabled = false,
 }) {
   const [code, setCode] = useState('');
   const [countdown, setCountdown] = useState(0);
@@ -29,6 +30,15 @@ export function GuardianForm({
   const isEmailVerified = guardianData?.emailVerifiedAt || (isUserAccount && userEmailVerified);
   const canSendCode = formState[`${prefix}Phone`] && !sending;
   const showCodeInput = verificationState?.step === 'sent' && !isPhoneVerified;
+
+  // Check if email changed compared to verified/sent email
+  const currentEmail = formState[`${prefix}Email`] || '';
+  const verifiedEmail = guardianData?.email || '';
+  const emailChanged = currentEmail !== verifiedEmail;
+
+  // Email verification states
+  const emailSentPending = guardianData?.emailSentAt && !guardianData?.emailVerifiedAt;
+  const showEmailVerificationButton = !isUserAccount && onSendEmailVerification && formState[`${prefix}Email`] && (!emailSentPending || emailChanged);
 
   // Gérer le compte à rebours
   useEffect(() => {
@@ -90,6 +100,7 @@ export function GuardianForm({
           value={formState[`${prefix}FirstName`] || ''}
           onChange={(e) => onChange(`${prefix}FirstName`, e.target.value)}
           required={required}
+          disabled={disabled}
         />
         <InputField
           label="Nom"
@@ -97,20 +108,46 @@ export function GuardianForm({
           value={formState[`${prefix}LastName`] || ''}
           onChange={(e) => onChange(`${prefix}LastName`, e.target.value)}
           required={required}
+          disabled={disabled}
         />
       </div>
 
-      <InputField
-        label="Email"
-        type="email"
-        placeholder="parent@email.com"
-        value={formState[`${prefix}Email`] || ''}
-        onChange={(e) => onChange(`${prefix}Email`, e.target.value)}
-        required={required}
-      />
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <label className="label">
+            <span className="label-text">Email {required && <span className="text-error">*</span>}</span>
+          </label>
+          {isEmailVerified && (
+            <span className="badge badge-success badge-sm gap-1">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-3 w-3"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Vérifié
+            </span>
+          )}
+        </div>
+        <input
+          type="email"
+          placeholder="parent@email.com"
+          className="input input-bordered w-full"
+          value={formState[`${prefix}Email`] || ''}
+          onChange={(e) => onChange(`${prefix}Email`, e.target.value)}
+          required={required}
+          disabled={disabled}
+        />
+      </div>
 
       {/* Vérification Email intégrée */}
-      {isUserAccount && isEmailVerified && (
+      {!disabled && isUserAccount && isEmailVerified && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-2">
           <p className="text-xs text-green-800 flex items-center gap-1">
             <svg
@@ -130,7 +167,31 @@ export function GuardianForm({
         </div>
       )}
 
-      {!isUserAccount && onSendEmailVerification && !isEmailVerified && formState[`${prefix}Email`] && (
+      {/* Email sent, pending verification */}
+      {!disabled && !isUserAccount && emailSentPending && !emailChanged && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <div className="flex items-start gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+              <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-xs font-medium text-yellow-800">Email envoyé - En attente de vérification</p>
+              <p className="text-xs text-yellow-700 mt-1">
+                Un email de vérification a été envoyé à <strong>{guardianData?.email}</strong>. Veuillez cliquer sur le lien dans l'email pour vérifier votre adresse.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Show button to send/resend email */}
+      {!disabled && showEmailVerificationButton && (
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
           <div className="flex items-start gap-2">
             <svg
@@ -146,13 +207,20 @@ export function GuardianForm({
               La vérification email permet la signature électronique à distance.
             </p>
           </div>
+          {emailChanged && guardianData?.emailVerifiedAt && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-2 mb-2">
+              <p className="text-xs text-orange-800">
+                ⚠️ L'email a été modifié. Une nouvelle vérification est requise.
+              </p>
+            </div>
+          )}
           <button
             type="button"
             className="btn btn-sm btn-secondary w-full"
             onClick={onSendEmailVerification}
             disabled={sendingEmail}
           >
-            {sendingEmail ? 'Envoi en cours...' : "Envoyer l'email de vérification"}
+            {sendingEmail ? 'Envoi en cours...' : (emailChanged && emailSentPending) ? "Renvoyer l'email de vérification" : "Envoyer l'email de vérification"}
           </button>
           <p className="text-xs text-purple-700">
             📧 Un lien de vérification sera envoyé à {formState[`${prefix}Email`]}
@@ -160,7 +228,8 @@ export function GuardianForm({
         </div>
       )}
 
-      {!isUserAccount && isEmailVerified && (
+      {/* Email verified */}
+      {!disabled && !isUserAccount && isEmailVerified && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-2">
           <p className="text-xs text-green-800 flex items-center gap-1">
             <svg
@@ -185,10 +254,11 @@ export function GuardianForm({
         value={formState[`${prefix}Phone`] || ''}
         onChange={(val) => onChange(`${prefix}Phone`, val)}
         required={required}
+        disabled={disabled}
       />
 
       {/* Vérification SMS intégrée directement après le téléphone */}
-      {onSendCode && !isPhoneVerified && (
+      {!disabled && onSendCode && !isPhoneVerified && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
           <div className="flex items-start gap-2">
             <svg
@@ -263,7 +333,7 @@ export function GuardianForm({
       )}
 
       {/* Message si téléphone déjà vérifié */}
-      {isPhoneVerified && guardianData?.phoneE164 && (
+      {!disabled && isPhoneVerified && guardianData?.phoneE164 && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-2">
           <p className="text-xs text-green-800 flex items-center gap-1">
             <svg

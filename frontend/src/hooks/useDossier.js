@@ -16,6 +16,7 @@ export function useDossier({ token }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [isEditing, setIsEditing] = useState(true);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -25,7 +26,13 @@ export function useDossier({ token }) {
       const data = await fetchDossier({ token });
       const nextVm = toDossierVM(data);
       setVm(nextVm);
-      setFormState(vmToForm(nextVm));
+      const form = vmToForm(nextVm);
+      // Restore checkbox state from localStorage
+      const savedAck = localStorage.getItem('procedure_info_acknowledged');
+      if (savedAck === 'true') {
+        form.procedure_info_acknowledged = true;
+      }
+      setFormState(form);
     } catch (err) {
       setError(err?.message || 'Impossible de charger le dossier.');
     } finally {
@@ -39,6 +46,10 @@ export function useDossier({ token }) {
 
   const updateForm = (field, value) => {
     setFormState((prev) => ({ ...(prev || {}), [field]: value }));
+    // Save checkbox state to localStorage
+    if (field === 'procedure_info_acknowledged') {
+      localStorage.setItem('procedure_info_acknowledged', value ? 'true' : 'false');
+    }
   };
 
   const save = async () => {
@@ -65,8 +76,12 @@ export function useDossier({ token }) {
       const data = await saveDossier({ token, payload });
       const nextVm = toDossierVM(data);
       setVm(nextVm);
-      setFormState(vmToForm(nextVm));
+      const updatedForm = vmToForm(nextVm);
+      // Preserve checkbox state after save
+      updatedForm.procedure_info_acknowledged = formState.procedure_info_acknowledged;
+      setFormState(updatedForm);
       setSuccess('Dossier enregistré.');
+      setIsEditing(false); // Switch to read-only mode after save
     } catch (err) {
       setError(err?.message || 'Enregistrement impossible.');
     } finally {
@@ -144,10 +159,27 @@ export function useDossier({ token }) {
         guardianId,
         email: vm.guardians[role].email || undefined,
       });
+      // Update vm to mark email as sent (pending verification)
+      setVm((prev) => ({
+        ...(prev || {}),
+        guardians: {
+          ...(prev?.guardians || {}),
+          [role]: {
+            ...(prev?.guardians?.[role] || {}),
+            emailSentAt: new Date().toISOString(), // Track when email was sent
+          },
+        },
+      }));
       setSuccess(`Email de vérification envoyé à ${resp.email}`);
     } catch (err) {
       setError(err?.message || "Envoi de l'email impossible.");
     }
+  };
+
+  const enableEdit = () => {
+    setIsEditing(true);
+    setError(null);
+    setSuccess(null);
   };
 
   return {
@@ -166,5 +198,7 @@ export function useDossier({ token }) {
     sendEmailVerification,
     setError,
     setSuccess,
+    isEditing,
+    enableEdit,
   };
 }

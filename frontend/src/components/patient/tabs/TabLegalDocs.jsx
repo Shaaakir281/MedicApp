@@ -152,7 +152,6 @@ export function TabLegalDocs({
           <ul className="list-disc list-inside mt-1 space-y-1">
             <li>Les 2 parents doivent signer chaque document</li>
             <li>Délai de réflexion de 15 jours après la pré-consultation requis</li>
-            <li>Tous les documents doivent être signés avant de prendre le RDV d'acte</li>
           </ul>
         </div>
       </div>
