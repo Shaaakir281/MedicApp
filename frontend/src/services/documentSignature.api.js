@@ -1,211 +1,148 @@
-/**
- * Document Signature API Client
- *
- * Architecture granulaire: 1 Signature Request Yousign = 1 document médical
- *
- * Endpoints:
- * - POST /signature/start-document : Démarrer signature pour UN document
- * - GET /signature/document/{id} : Statut d'une signature
- * - GET /signature/case/{caseId}/documents : Liste des signatures d'un case
- */
-
-import { apiRequest, API_BASE_URL } from '../lib/api.js';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 /**
- * Maps catalog document types to signature API document types.
- * Catalog: surgical_authorization_minor, informed_consent, fees_consent_quote
- * API: authorization, consent, fees
+ * Démarre la signature pour un document spécifique (patient)
+ * @param {Object} payload - Données de la requête
+ * @param {number} payload.procedure_case_id - ID du dossier
+ * @param {string} payload.document_type - Type de document
+ * @param {string} payload.signer_role - Rôle du signataire (parent1/parent2)
+ * @param {string} payload.mode - Mode de signature (remote/cabinet)
+ * @param {string} payload.session_code - Code de session (optionnel)
+ * @param {string} token - Token d'authentification (optionnel)
+ * @returns {Promise<Object>} Réponse avec le lien de signature
  */
-function mapDocumentType(catalogType) {
-  const mapping = {
-    'surgical_authorization_minor': 'authorization',
-    'informed_consent': 'consent',
-    'fees_consent_quote': 'fees',
+export async function startDocumentSignature(payload, token = null) {
+  const headers = {
+    'Content-Type': 'application/json',
   };
-  return mapping[catalogType] || catalogType;
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/signature/start-document`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || 'Impossible de démarrer la signature');
+  }
+
+  return response.json();
 }
 
 /**
- * Démarre la signature pour UN document spécifique.
- *
- * @param {Object} params
- * @param {string} params.token - JWT token
- * @param {number} params.procedureCaseId - ID du ProcedureCase
- * @param {string} params.documentType - "authorization", "consent", "fees"
- * @param {string} params.signerRole - "parent1" ou "parent2"
- * @param {string} params.mode - "remote" (OTP SMS) ou "cabinet" (no OTP)
- * @param {string} [params.sessionCode] - Code session cabinet (optionnel)
- *
- * @returns {Promise<{
- *   document_signature_id: number,
- *   document_type: string,
- *   signer_role: string,
- *   signature_link: string,
- *   yousign_procedure_id: string,
- *   status: string
- * }>}
+ * Permet au praticien d'envoyer ou renvoyer une demande de signature pour un document
+ * @param {string} token - Token d'authentification
+ * @param {number} caseId - ID du dossier patient
+ * @param {string} documentType - Type de document ("authorization" | "consent" | "fees")
+ * @returns {Promise<Object>} Détails de la signature du document
  */
-export async function startDocumentSignature({
-  token,
-  procedureCaseId,
-  documentType,
-  signerRole,
-  mode = 'remote',
-  sessionCode = null,
-}) {
-  return apiRequest('/signature/start-document', {
+export async function practitionerSendSignature(token, caseId, documentType) {
+  const response = await fetch(`${API_BASE_URL}/signature/practitioner/send-document`, {
     method: 'POST',
-    token,
-    body: {
-      procedure_case_id: procedureCaseId,
-      document_type: mapDocumentType(documentType), // Map catalog type to API type
-      signer_role: signerRole,
-      mode,
-      session_code: sessionCode,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      case_id: caseId,
+      document_type: documentType,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || 'Impossible d\'envoyer la demande de signature');
+  }
+
+  return response.json();
+}
+
+/**
+ * Récupère tous les documents de signature pour un dossier
+ * @param {string} token - Token d'authentification
+ * @param {number} caseId - ID du dossier patient
+ * @returns {Promise<Object>} Liste des documents de signature
+ */
+export async function getCaseDocumentSignatures(token, caseId) {
+  const response = await fetch(`${API_BASE_URL}/signature/case/${caseId}/documents`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
     },
   });
-}
 
-/**
- * Récupère le statut d'une signature de document.
- *
- * @param {Object} params
- * @param {string} params.token - JWT token
- * @param {number} params.documentSignatureId - ID du DocumentSignature
- *
- * @returns {Promise<{
- *   id: number,
- *   procedure_case_id: number,
- *   document_type: string,
- *   document_version: string,
- *   overall_status: string,
- *   parent1_status: string,
- *   parent1_signature_link: string,
- *   parent1_signed_at: string,
- *   parent2_status: string,
- *   parent2_signature_link: string,
- *   parent2_signed_at: string,
- *   signed_pdf_identifier: string,
- *   evidence_pdf_identifier: string,
- *   final_pdf_identifier: string,
- *   created_at: string,
- *   updated_at: string,
- *   completed_at: string,
- *   yousign_purged_at: string
- * }>}
- */
-export async function getDocumentSignatureStatus({ token, documentSignatureId }) {
-  return apiRequest(`/signature/document/${documentSignatureId}`, { token });
-}
-
-/**
- * Liste toutes les signatures de documents pour un ProcedureCase.
- *
- * @param {Object} params
- * @param {string} params.token - JWT token
- * @param {number} params.procedureCaseId - ID du ProcedureCase
- *
- * @returns {Promise<{
- *   procedure_case_id: number,
- *   document_signatures: Array<DocumentSignatureDetail>
- * }>}
- */
-export async function getCaseDocumentSignatures({ token, procedureCaseId }) {
-  return apiRequest(`/signature/case/${procedureCaseId}/documents`, { token });
-}
-
-/**
- * Download a document signature artifact (final, signed, evidence).
- *
- * @param {Object} params
- * @param {string} params.token - JWT token
- * @param {number} params.documentSignatureId - ID du DocumentSignature
- * @param {string} params.fileKind - "final" | "signed" | "evidence"
- * @param {boolean} [params.inline] - Inline response flag
- */
-export async function downloadDocumentSignatureFile({
-  token,
-  documentSignatureId,
-  fileKind,
-  inline = false,
-}) {
-  if (!token) {
-    throw new Error('Authentification requise.');
-  }
-  const allowed = new Set(['final', 'signed', 'evidence']);
-  if (!allowed.has(fileKind)) {
-    throw new Error('Type de fichier invalide.');
-  }
-  const query = inline ? '?inline=true' : '';
-  const response = await fetch(
-    `${API_BASE_URL}/signature/document/${documentSignatureId}/file/${fileKind}${query}`,
-    {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  );
   if (!response.ok) {
-    let message = `Echec de telechargement (${response.status})`;
-    try {
-      const payload = await response.json();
-      if (payload?.detail) {
-        message = typeof payload.detail === 'string' ? payload.detail : JSON.stringify(payload.detail);
-      }
-    } catch (_) {
-      // ignore parsing errors for non-json responses
-    }
-    const error = new Error(message);
-    error.status = response.status;
-    throw error;
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || 'Impossible de récupérer les documents');
   }
-  return await response.blob();
+
+  return response.json();
 }
 
 /**
- * Download the base legal document PDF for preview.
- *
- * @param {Object} params
- * @param {string} params.token - JWT token
- * @param {number} params.procedureCaseId - ID du ProcedureCase
- * @param {string} params.documentType - catalog document type
- * @param {boolean} [params.inline] - Inline response flag
+ * Télécharge un fichier de signature de document (final, signed, evidence)
+ * @param {Object} params - Paramètres
+ * @param {string} params.token - Token d'authentification
+ * @param {number} params.documentSignatureId - ID de la signature de document
+ * @param {string} params.fileKind - Type de fichier ('final', 'signed', 'evidence')
+ * @param {boolean} params.inline - Si true, affiche dans le navigateur, sinon télécharge
+ * @returns {Promise<Blob>} Le fichier PDF
  */
-export async function downloadLegalDocumentPreview({
-  token,
-  procedureCaseId,
-  documentType,
-  inline = true,
-}) {
-  if (!token) {
-    throw new Error('Authentification requise.');
+export async function downloadDocumentSignatureFile({ token, documentSignatureId, fileKind, inline = false }) {
+  const params = new URLSearchParams();
+  if (inline) {
+    params.append('inline', 'true');
   }
-  if (!procedureCaseId) {
-    throw new Error('Dossier manquant.');
-  }
-  if (!documentType) {
-    throw new Error('Type de document manquant.');
-  }
-  const query = inline ? '?inline=true' : '';
-  const response = await fetch(
-    `${API_BASE_URL}/signature/case/${procedureCaseId}/document/${encodeURIComponent(documentType)}/preview${query}`,
-    {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${token}` },
+
+  const queryString = params.toString();
+  const url = `${API_BASE_URL}/signature/document/${documentSignatureId}/file/${fileKind}${queryString ? `?${queryString}` : ''}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
     },
-  );
+  });
+
   if (!response.ok) {
-    let message = `Echec de telechargement (${response.status})`;
-    try {
-      const payload = await response.json();
-      if (payload?.detail) {
-        message = typeof payload.detail === 'string' ? payload.detail : JSON.stringify(payload.detail);
-      }
-    } catch (_) {
-      // ignore parsing errors for non-json responses
-    }
-    const error = new Error(message);
-    error.status = response.status;
-    throw error;
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || 'Impossible de télécharger le fichier');
   }
-  return await response.blob();
+
+  return response.blob();
+}
+
+/**
+ * Télécharge la prévisualisation d'un document légal (base non signée)
+ * @param {Object} params - Paramètres
+ * @param {string} params.token - Token d'authentification
+ * @param {number} params.procedureCaseId - ID du dossier
+ * @param {string} params.documentType - Type de document
+ * @param {boolean} params.inline - Si true, affiche dans le navigateur, sinon télécharge
+ * @returns {Promise<Blob>} Le fichier PDF
+ */
+export async function downloadLegalDocumentPreview({ token, procedureCaseId, documentType, inline = true }) {
+  const params = new URLSearchParams();
+  if (inline) {
+    params.append('inline', 'true');
+  }
+
+  const queryString = params.toString();
+  const url = `${API_BASE_URL}/signature/case/${procedureCaseId}/document/${documentType}/preview${queryString ? `?${queryString}` : ''}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || 'Impossible de télécharger la prévisualisation');
+  }
+
+  return response.blob();
 }

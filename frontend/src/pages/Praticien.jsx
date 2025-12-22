@@ -424,6 +424,7 @@ const Praticien = () => {
           previewingId={previewingId}
           signingId={signingId}
           sendingId={activeSendId}
+          token={token}
         />
       ) : (
         <NewPatientsList

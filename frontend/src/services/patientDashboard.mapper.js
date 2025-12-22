@@ -1,4 +1,5 @@
 import { DOCUMENT_TYPES, SIGNER_ROLES } from './patientDashboard.api.js';
+import { DocumentSignatureVM } from '../types/patientDashboard.vm.js';
 
 const SIGNATURE_TYPE_TO_CATALOG = {
   authorization: DOCUMENT_TYPES.SURGICAL_AUTHORIZATION_MINOR,
@@ -268,5 +269,20 @@ export function buildPatientDashboardVM({
     legalDocuments,
     legalComplete: Boolean(legalStatus?.complete ?? dashboard?.legal_status?.complete),
     signatureComplete: signatureCompleteFromDocs || legacySignatureComplete,
+  };
+}
+
+/**
+ * Mapper pour les données praticien
+ * Transforme document_signatures (snake_case) en documentSignatures (camelCase avec VM)
+ */
+export function mapPractitionerProcedureCase(procedureData) {
+  if (!procedureData) return procedureData;
+
+  return {
+    ...procedureData,
+    documentSignatures: (procedureData.document_signatures || []).map(
+      (doc) => new DocumentSignatureVM(doc)
+    ),
   };
 }

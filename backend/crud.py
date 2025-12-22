@@ -361,8 +361,12 @@ def create_procedure_case(
         child_birthdate=case_data.child_birthdate,
         child_weight_kg=case_data.child_weight_kg,
         parent1_name=case_data.parent1_name,
+        parent1_first_name=getattr(case_data, 'parent1_first_name', None),
+        parent1_last_name=getattr(case_data, 'parent1_last_name', None),
         parent1_email=case_data.parent1_email,
         parent2_name=case_data.parent2_name,
+        parent2_first_name=getattr(case_data, 'parent2_first_name', None),
+        parent2_last_name=getattr(case_data, 'parent2_last_name', None),
         parent2_email=case_data.parent2_email,
         parent1_phone=case_data.parent1_phone,
         parent2_phone=case_data.parent2_phone,
@@ -399,8 +403,12 @@ def update_procedure_case(
     procedure.child_birthdate = case_data.child_birthdate
     procedure.child_weight_kg = case_data.child_weight_kg
     procedure.parent1_name = case_data.parent1_name
+    procedure.parent1_first_name = getattr(case_data, 'parent1_first_name', None)
+    procedure.parent1_last_name = getattr(case_data, 'parent1_last_name', None)
     procedure.parent1_email = case_data.parent1_email
     procedure.parent2_name = case_data.parent2_name
+    procedure.parent2_first_name = getattr(case_data, 'parent2_first_name', None)
+    procedure.parent2_last_name = getattr(case_data, 'parent2_last_name', None)
     procedure.parent2_email = case_data.parent2_email
     procedure.parent1_phone = case_data.parent1_phone
     procedure.parent2_phone = case_data.parent2_phone

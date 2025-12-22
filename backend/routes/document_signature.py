@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 import models
 import schemas
 from database import get_db
-from dependencies.auth import get_current_user, get_optional_user
+from dependencies.auth import get_current_user, get_optional_user, require_practitioner
 from services import consent_pdf, document_signature_service, legal_documents_pdf
 from services import legal as legal_service
 from services.storage import StorageError, get_storage_backend
@@ -369,3 +369,60 @@ def handle_yousign_document_webhook(
 
     logger.info("Unhandled event type: %s", event_type)
     return {"status": "ignored", "reason": "unhandled_event_type"}
+
+
+@router.post("/practitioner/send-document", response_model=schemas.DocumentSignatureDetail)
+def practitioner_send_document_signature(
+    case_id: int,
+    document_type: str,
+    _: models.User = Depends(require_practitioner),
+    db: Session = Depends(get_db),
+) -> schemas.DocumentSignatureDetail:
+    """
+    Permet au praticien d'envoyer ou renvoyer une demande de signature pour un document.
+
+    Le praticien peut utiliser cet endpoint pour:
+    - Initier une nouvelle signature si aucune n'existe
+    - Renvoyer la demande si elle existe déjà mais n'est pas complétée
+    """
+    import logging
+    logger = logging.getLogger("uvicorn.error")
+
+    # Vérifier que le case existe
+    case = db.query(models.ProcedureCase).filter(
+        models.ProcedureCase.id == case_id
+    ).first()
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="ProcedureCase introuvable."
+        )
+
+    # Vérifier si une signature existe déjà pour ce document
+    existing_sig = db.query(models.DocumentSignature).filter(
+        models.DocumentSignature.procedure_case_id == case_id,
+        models.DocumentSignature.document_type == document_type
+    ).first()
+
+    if existing_sig:
+        # Si déjà complété, on renvoie juste le status
+        if existing_sig.overall_status == "completed":
+            logger.info(f"Document {document_type} pour case {case_id} déjà complété")
+            return schemas.DocumentSignatureDetail.model_validate(existing_sig)
+
+        # Sinon, on peut régénérer/renvoyer (selon business logic)
+        # Pour l'instant, on retourne l'existant
+        logger.info(f"Document {document_type} pour case {case_id} existe avec status {existing_sig.overall_status}")
+        return schemas.DocumentSignatureDetail.model_validate(existing_sig)
+
+    # Créer une nouvelle signature
+    doc_sig = document_signature_service.initiate_document_signature(
+        db,
+        procedure_case_id=case_id,
+        document_type=document_type,
+        in_person=False,  # Remote par défaut pour praticien
+    )
+
+    logger.info(f"Praticien a créé une nouvelle signature pour case {case_id}, document {document_type}")
+
+    return schemas.DocumentSignatureDetail.model_validate(doc_sig)

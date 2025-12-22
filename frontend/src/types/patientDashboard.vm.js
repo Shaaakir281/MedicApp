@@ -41,4 +41,52 @@
  * @property {boolean} signatureComplete
  */
 
+/**
+ * View Model pour une signature de document (praticien)
+ */
+export class DocumentSignatureVM {
+  constructor(data) {
+    this.id = data.id;
+    this.documentType = data.document_type; // "authorization" | "consent" | "fees"
+    this.parent1SignedAt = data.parent1_signed_at;
+    this.parent1SignatureUrl = data.parent1_signature_url;
+    this.parent2SignedAt = data.parent2_signed_at;
+    this.parent2SignatureUrl = data.parent2_signature_url;
+    this.downloadUrl = data.download_url;
+    this.overallStatus = data.overall_status || 'draft';
+    this.parent1Status = data.parent1_status || 'draft';
+    this.parent2Status = data.parent2_status || 'draft';
+    this.status = this._calculateStatus();
+  }
+
+  _calculateStatus() {
+    if (this.overallStatus === 'completed') return 'completed';
+
+    const p1Signed = Boolean(this.parent1SignedAt);
+    const p2Signed = Boolean(this.parent2SignedAt);
+
+    if (p1Signed && p2Signed) return 'completed';
+    if (p1Signed || p2Signed) return 'partial';
+    return 'pending';
+  }
+
+  get displayLabel() {
+    const labels = {
+      authorization: 'Autorisation parentale',
+      consent: 'Consentement éclairé',
+      fees: 'Frais et honoraires',
+      surgical_authorization_minor: 'Autorisation parentale',
+      informed_consent: 'Consentement éclairé',
+      fees_consent_quote: 'Frais et honoraires',
+    };
+    return labels[this.documentType] || this.documentType;
+  }
+
+  get signaturesText() {
+    const p1 = this.parent1SignedAt ? 'Parent 1 ✓' : 'Parent 1 ✗';
+    const p2 = this.parent2SignedAt ? 'Parent 2 ✓' : 'Parent 2 ✗';
+    return `${p1}, ${p2}`;
+  }
+}
+
 export {};

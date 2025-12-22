@@ -92,8 +92,12 @@ class ProcedureCaseBase(BaseModel):
     child_birthdate: date
     child_weight_kg: Optional[float] = None
     parent1_name: str
+    parent1_first_name: Optional[str] = None
+    parent1_last_name: Optional[str] = None
     parent1_email: Optional[EmailStr] = None
     parent2_name: Optional[str] = None
+    parent2_first_name: Optional[str] = None
+    parent2_last_name: Optional[str] = None
     parent2_email: Optional[EmailStr] = None
     parent1_phone: Optional[str] = None
     parent2_phone: Optional[str] = None
@@ -162,8 +166,12 @@ class PractitionerCaseStatus(BaseModel):
     child_full_name: Optional[str] = None
     child_weight_kg: Optional[float] = None
     parent1_name: Optional[str] = None
+    parent1_first_name: Optional[str] = None
+    parent1_last_name: Optional[str] = None
     parent1_email: Optional[EmailStr] = None
     parent2_name: Optional[str] = None
+    parent2_first_name: Optional[str] = None
+    parent2_last_name: Optional[str] = None
     parent2_email: Optional[EmailStr] = None
     parent1_phone: Optional[str] = None
     parent2_phone: Optional[str] = None
@@ -203,6 +211,7 @@ class PractitionerCaseStatus(BaseModel):
     signature_open_at: Optional[date] = None
     parent1_phone_verified_at: Optional[datetime] = None
     parent2_phone_verified_at: Optional[datetime] = None
+    document_signatures: List["DocumentSignatureDetail"] = Field(default_factory=list)
 
 
 class PractitionerAppointmentSummary(BaseModel):
@@ -370,8 +379,12 @@ class PractitionerCaseUpdate(BaseModel):
     child_birthdate: Optional[date] = None
     child_weight_kg: Optional[float] = Field(default=None, ge=0)
     parent1_name: Optional[str] = None
+    parent1_first_name: Optional[str] = None
+    parent1_last_name: Optional[str] = None
     parent1_email: Optional[EmailStr] = None
     parent2_name: Optional[str] = None
+    parent2_first_name: Optional[str] = None
+    parent2_last_name: Optional[str] = None
     parent2_email: Optional[EmailStr] = None
     parent1_phone: Optional[str] = None
     parent2_phone: Optional[str] = None

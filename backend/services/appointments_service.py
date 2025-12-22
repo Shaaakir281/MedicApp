@@ -239,6 +239,7 @@ def get_agenda(
             joinedload(models.Appointment.procedure_case)
             .joinedload(models.ProcedureCase.appointments)
             .joinedload(models.Appointment.prescription),
+            joinedload(models.Appointment.procedure_case).joinedload(models.ProcedureCase.document_signatures),
         )
         .filter(
             models.Appointment.date >= start_date,

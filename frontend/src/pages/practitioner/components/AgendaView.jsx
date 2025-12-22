@@ -20,6 +20,7 @@ export const AgendaView = ({
   previewingId,
   signingId,
   sendingId,
+  token,
 }) => {
   return (
     <>
@@ -54,6 +55,8 @@ export const AgendaView = ({
               previewingId={previewingId}
               signingId={signingId}
               sendingId={sendingId}
+              token={token}
+              onRefreshAppointments={onRefresh}
             />
           ))}
       </section>

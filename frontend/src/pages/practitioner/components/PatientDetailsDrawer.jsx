@@ -7,6 +7,9 @@ import { CaseForm } from './CaseForm.jsx';
 import { ScheduleForm } from './ScheduleForm.jsx';
 import { CaseStatus } from './CaseStatus.jsx';
 import { PrescriptionsSection } from './PrescriptionsSection.jsx';
+import { DocumentSignatureSection } from './DocumentSignatureSection.jsx';
+import { practitionerSendSignature } from '../../../services/documentSignature.api.js';
+import { mapPractitionerProcedureCase } from '../../../services/patientDashboard.mapper.js';
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString('fr-FR') : '--');
 const toInputDate = (value) => (value ? new Date(value).toISOString().split('T')[0] : '');
@@ -17,8 +20,12 @@ const buildCaseForm = (procedure, patient) => ({
   child_birthdate: toInputDate(procedure?.child_birthdate),
   child_weight_kg: procedure?.child_weight_kg?.toString() ?? '',
   parent1_name: procedure?.parent1_name || '',
+  parent1_first_name: procedure?.parent1_first_name || '',
+  parent1_last_name: procedure?.parent1_last_name || '',
   parent1_email: procedure?.parent1_email || '',
   parent2_name: procedure?.parent2_name || '',
+  parent2_first_name: procedure?.parent2_first_name || '',
+  parent2_last_name: procedure?.parent2_last_name || '',
   parent2_email: procedure?.parent2_email || '',
   parent1_phone: procedure?.parent1_phone || '',
   parent2_phone: procedure?.parent2_phone || '',
@@ -57,8 +64,12 @@ const sanitizeCaseValues = (form) => {
     child_birthdate: form.child_birthdate || null,
     child_weight_kg: parsedWeight,
     parent1_name: nullable(form.parent1_name),
+    parent1_first_name: nullable(form.parent1_first_name),
+    parent1_last_name: nullable(form.parent1_last_name),
     parent1_email: nullable(form.parent1_email),
     parent2_name: nullable(form.parent2_name),
+    parent2_first_name: nullable(form.parent2_first_name),
+    parent2_last_name: nullable(form.parent2_last_name),
     parent2_email: nullable(form.parent2_email),
     parent1_phone: nullable(form.parent1_phone),
     parent2_phone: nullable(form.parent2_phone),
@@ -344,6 +355,14 @@ export function PatientDetailsDrawer({
     }
   };
 
+  const handleSendSignature = async (caseId, documentType) => {
+    if (!token) {
+      console.error('Token manquant pour envoyer signature');
+      return;
+    }
+    await practitionerSendSignature(token, caseId, documentType);
+  };
+
   const handleCreateCabinetSession = async (role) => {
     if (!token || !appointment?.appointment_id) return;
     setCabinetError(null);
@@ -425,6 +444,19 @@ export function PatientDetailsDrawer({
           onRemindConsent={onRemindConsent}
           consentActionLoading={consentActionLoading}
         />
+
+        {procedure && (
+          <div className="bg-white border rounded-2xl p-4">
+            <DocumentSignatureSection
+              documentSignatures={mapPractitionerProcedureCase(procedure).documentSignatures || []}
+              caseId={procedure.case_id}
+              onSend={handleSendSignature}
+              onRefresh={() => {
+                // Refresh sera géré par le parent via onUpdateCase ou un refetch
+              }}
+            />
+          </div>
+        )}
 
         <div className="bg-slate-50 border rounded-2xl p-4 text-sm text-slate-700 space-y-2">
           <div className="flex items-center justify-between">
