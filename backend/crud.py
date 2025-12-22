@@ -221,7 +221,8 @@ def get_active_procedure_case(db: Session, patient_id: int) -> Optional[models.P
     return (
         db.query(models.ProcedureCase)
         .options(
-            joinedload(models.ProcedureCase.appointments).joinedload(models.Appointment.prescription)
+            joinedload(models.ProcedureCase.appointments).joinedload(models.Appointment.prescription),
+            joinedload(models.ProcedureCase.document_signatures),
         )
         .filter(models.ProcedureCase.patient_id == patient_id)
         .order_by(models.ProcedureCase.created_at.desc())

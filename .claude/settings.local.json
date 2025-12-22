@@ -1,7 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(alembic current:*)",
+      "Bash(python -c:*)",
+      "Bash(alembic history:*)",
+      "Bash(alembic upgrade:*)",
+      "Bash(alembic stamp:*)",
+      "Bash(alembic heads)",
+      "Bash(docker compose restart:*)",
+      "Bash(docker-compose restart:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(docker compose:*)",
+      "Bash(timeout:*)",
+      "Bash(git add:*)"
     ]
   }
 }

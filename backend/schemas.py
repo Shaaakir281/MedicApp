@@ -145,6 +145,7 @@ class ProcedureCase(ProcedureCaseBase):
     signature_open_at: Optional[date] = None
     parent1_phone_verified_at: Optional[datetime] = None
     parent2_phone_verified_at: Optional[datetime] = None
+    document_signatures: List["DocumentSignatureDetail"] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -464,3 +465,88 @@ class PharmacyContact(PharmacyContactBase):
 class PharmacySearchResponse(BaseModel):
     total: int
     items: List[PharmacyContact] = Field(default_factory=list)
+
+
+# =============================================================================
+# Document Signature Schemas (Granular Yousign Signatures)
+# =============================================================================
+
+
+class DocumentSignatureStartRequest(BaseModel):
+    """Démarrer la signature pour UN document spécifique."""
+    procedure_case_id: int
+    document_type: str = Field(
+        pattern="^(authorization|consent|fees)$",
+        description="Type de document à signer"
+    )
+    signer_role: SignerRole
+    mode: str = Field(
+        default="remote",
+        pattern="^(remote|cabinet)$",
+        description="Mode de signature (remote=OTP SMS, cabinet=no OTP)"
+    )
+    session_code: Optional[str] = None
+
+
+class DocumentSignatureStartResponse(BaseModel):
+    """Réponse après démarrage de signature pour un document."""
+    document_signature_id: int
+    document_type: str
+    signer_role: SignerRole
+    signature_link: Optional[str] = None
+    yousign_procedure_id: Optional[str] = None
+    status: str  # "sent", "draft"
+
+    model_config = ConfigDict(use_enum_values=True)
+
+
+class DocumentSignatureDetail(BaseModel):
+    """Détail complet d'une signature de document."""
+    id: int
+    procedure_case_id: int
+    document_type: str
+    document_version: Optional[str] = None
+    overall_status: str  # draft|sent|partially_signed|completed|expired|cancelled
+
+    # Parent 1
+    parent1_status: str
+    parent1_signature_link: Optional[str] = None
+    parent1_sent_at: Optional[datetime] = None
+    parent1_signed_at: Optional[datetime] = None
+    parent1_method: Optional[str] = None
+
+    # Parent 2
+    parent2_status: str
+    parent2_signature_link: Optional[str] = None
+    parent2_sent_at: Optional[datetime] = None
+    parent2_signed_at: Optional[datetime] = None
+    parent2_method: Optional[str] = None
+
+    # Artefacts
+    signed_pdf_identifier: Optional[str] = None
+    evidence_pdf_identifier: Optional[str] = None
+    final_pdf_identifier: Optional[str] = None
+
+    # Métadonnées
+    created_at: datetime
+    updated_at: datetime
+    completed_at: Optional[datetime] = None
+    yousign_purged_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentSignatureStatusUpdate(BaseModel):
+    """Mise à jour du statut de signature (webhook Yousign)."""
+    parent_label: str = Field(pattern="^(parent1|parent2)$")
+    status_value: str
+    signed_at: Optional[datetime] = None
+    method: Optional[str] = None
+    signed_file_url: Optional[str] = None
+    evidence_url: Optional[str] = None
+
+
+class CaseDocumentSignaturesSummary(BaseModel):
+    """Résumé des signatures pour un ProcedureCase."""
+    procedure_case_id: int
+    document_signatures: List[DocumentSignatureDetail] = Field(default_factory=list)

@@ -77,6 +77,7 @@ function buildDocumentVM({
   statusDoc,
   dashboard,
   procedureCase,
+  documentSignatures = [],
 }) {
   const roles = [SIGNER_ROLES.PARENT_1, SIGNER_ROLES.PARENT_2];
   const ack = statusDoc?.acknowledged || {};
@@ -84,11 +85,20 @@ function buildDocumentVM({
   const docType = catalogDoc.document_type;
   const isConsent = docType === DOCUMENT_TYPES.INFORMED_CONSENT;
 
+  // Architecture granulaire: chercher DocumentSignature pour CE document
+  const docSignature = (documentSignatures || []).find(
+    (sig) => sig?.document_type === docType
+  );
+
+  // Fallback vers ancien système si pas de DocumentSignature
   const signedPdfUrl =
+    docSignature?.final_pdf_identifier ||
+    docSignature?.signed_pdf_identifier ||
     (isConsent ? dashboard?.signature?.signed_pdf_url : null) ||
     (isConsent ? procedureCase?.consent_signed_pdf_url : null) ||
     null;
   const evidencePdfUrl =
+    docSignature?.evidence_pdf_identifier ||
     (isConsent ? dashboard?.signature?.evidence_pdf_url : null) ||
     (isConsent ? procedureCase?.consent_evidence_pdf_url : null) ||
     null;
@@ -102,20 +112,45 @@ function buildDocumentVM({
     const checkedKeys = ack[role] || [];
     const completedCount = requiredCases.filter((item) => checkedKeys.includes(item.key)).length;
 
-    const signatureEntry = isConsent ? signatureEntryByRole(dashboard, role) : null;
-    const signatureLink =
-      (signatureEntry?.signature_link || null) ||
-      (role === SIGNER_ROLES.PARENT_1 ? procedureCase?.parent1_signature_link : procedureCase?.parent2_signature_link) ||
-      null;
+    // Architecture granulaire: données de signature depuis DocumentSignature
+    let signatureStatus = null;
+    let signatureLink = null;
+    let sentAt = null;
+    let signedAt = null;
+
+    if (docSignature) {
+      // Données granulaires par document
+      if (role === SIGNER_ROLES.PARENT_1) {
+        signatureStatus = docSignature.parent1_status || 'pending';
+        signatureLink = docSignature.parent1_signature_link || null;
+        sentAt = docSignature.parent1_sent_at || null;
+        signedAt = docSignature.parent1_signed_at || null;
+      } else if (role === SIGNER_ROLES.PARENT_2) {
+        signatureStatus = docSignature.parent2_status || 'pending';
+        signatureLink = docSignature.parent2_signature_link || null;
+        sentAt = docSignature.parent2_sent_at || null;
+        signedAt = docSignature.parent2_signed_at || null;
+      }
+    } else {
+      // Fallback vers ancien système (monolithique)
+      const signatureEntry = isConsent ? signatureEntryByRole(dashboard, role) : null;
+      signatureStatus = signatureEntry?.status || null;
+      signatureLink =
+        (signatureEntry?.signature_link || null) ||
+        (role === SIGNER_ROLES.PARENT_1 ? procedureCase?.parent1_signature_link : procedureCase?.parent2_signature_link) ||
+        null;
+      sentAt = signatureEntry?.sent_at || null;
+      signedAt = signatureEntry?.signed_at || null;
+    }
 
     acc[role] = {
       checkedKeys,
       completedCount,
       total,
-      signatureStatus: signatureEntry?.status || null,
+      signatureStatus,
       signatureLink,
-      sentAt: signatureEntry?.sent_at || null,
-      signedAt: signatureEntry?.signed_at || null,
+      sentAt,
+      signedAt,
     };
     return acc;
   }, {});
@@ -161,12 +196,16 @@ export function buildPatientDashboardVM({
   const statusByType = new Map(statusDocs.map((doc) => [String(doc.document_type), doc]));
   const catalogDocs = legalCatalog?.documents || [];
 
+  // Architecture granulaire: extraire document_signatures depuis procedureCase
+  const documentSignatures = procedureCase?.document_signatures || [];
+
   const legalDocuments = catalogDocs.map((doc) =>
     buildDocumentVM({
       catalogDoc: doc,
       statusDoc: statusByType.get(String(doc.document_type)) || null,
       dashboard,
       procedureCase,
+      documentSignatures,
     }),
   );
 

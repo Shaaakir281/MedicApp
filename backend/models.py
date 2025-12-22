@@ -386,6 +386,103 @@ class ProcedureCase(Base):
         back_populates="procedure_case",
         cascade="all,delete-orphan",
     )
+    document_signatures = relationship(
+        "DocumentSignature",
+        back_populates="procedure_case",
+        cascade="all,delete-orphan",
+    )
+
+
+class DocumentSignatureStatus(str, enum.Enum):
+    """État du processus de signature pour un document spécifique."""
+    draft = "draft"
+    sent = "sent"
+    partially_signed = "partially_signed"
+    completed = "completed"
+    expired = "expired"
+    cancelled = "cancelled"
+
+
+class DocumentSignature(Base):
+    """
+    Signature Request Yousign pour UN document médical spécifique.
+
+    Architecture granulaire: 1 DocumentSignature = 1 type de document
+    (authorization, consent, fees, etc.)
+
+    RGPD/HDS:
+    - Chaque document a sa propre signature Yousign
+    - Purge Yousign après récupération locale
+    - Traçabilité par document + version
+    """
+    __tablename__ = "document_signatures"
+    __table_args__ = (
+        UniqueConstraint(
+            "procedure_case_id",
+            "document_type",
+            name="uq_document_signature_per_case",
+        ),
+        UniqueConstraint("yousign_procedure_id", name="uq_yousign_procedure_id"),
+    )
+
+    # Identité
+    id: int = Column(Integer, primary_key=True, index=True)
+    procedure_case_id: int = Column(
+        Integer,
+        ForeignKey("procedure_cases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    document_type: str = Column(String(64), nullable=False, index=True)
+    # Types supportés: "authorization", "consent", "fees"
+    document_version: str | None = Column(String(32), nullable=True)
+
+    # Yousign Signature Request
+    yousign_procedure_id: str | None = Column(String(128), nullable=True, unique=True, index=True)
+
+    # Parent 1 (signataire principal)
+    parent1_yousign_signer_id: str | None = Column(String(128), nullable=True)
+    parent1_signature_link: str | None = Column(String, nullable=True)
+    parent1_status: str = Column(String(32), nullable=False, default="pending")
+    parent1_sent_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    parent1_signed_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    parent1_method: str | None = Column(String(32), nullable=True)
+
+    # Parent 2 (signataire secondaire)
+    parent2_yousign_signer_id: str | None = Column(String(128), nullable=True)
+    parent2_signature_link: str | None = Column(String, nullable=True)
+    parent2_status: str = Column(String(32), nullable=False, default="pending")
+    parent2_sent_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    parent2_signed_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    parent2_method: str | None = Column(String(32), nullable=True)
+
+    # État global
+    overall_status: DocumentSignatureStatus = Column(
+        Enum(DocumentSignatureStatus),
+        nullable=False,
+        default=DocumentSignatureStatus.draft,
+    )
+
+    # Artefacts (identifiants stockage HDS)
+    signed_pdf_identifier: str | None = Column(String, nullable=True)
+    evidence_pdf_identifier: str | None = Column(String, nullable=True)
+    final_pdf_identifier: str | None = Column(String, nullable=True)
+
+    # Métadonnées
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+    updated_at: datetime.datetime = Column(
+        DateTime,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+        nullable=False,
+    )
+    completed_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    yousign_purged_at: datetime.datetime | None = Column(DateTime, nullable=True)
+
+    # Relations
+    procedure_case = relationship("ProcedureCase", back_populates="document_signatures")
 
 
 class SignatureCabinetSessionStatus(str, enum.Enum):

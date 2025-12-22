@@ -246,3 +246,46 @@ def send_password_reset_email(recipient: str, reset_link: str) -> None:
     <p>Si vous n'&ecirc;tes pas &agrave; l'origine de cette demande, ignorez ce message.</p>
     """
     send_email(subject, recipient, text_body, html_body=html_body)
+
+
+def send_guardian_verification_email(
+    to_email: str,
+    guardian_name: str,
+    child_name: str,
+    verification_link: str,
+) -> None:
+    """Send email verification link to guardian for dossier completion."""
+    app_name = _app_name()
+    subject = f"[{app_name}] Vérifiez votre adresse e-mail"
+    text_body = (
+        f"Bonjour {guardian_name},\n\n"
+        f"Dans le cadre du dossier médical de {child_name}, nous avons besoin de vérifier votre adresse e-mail.\n\n"
+        f"Veuillez confirmer votre adresse e-mail en cliquant sur le lien suivant :\n"
+        f"{verification_link}\n\n"
+        f"Ce lien est valide pendant 24 heures.\n\n"
+        f"La vérification de votre email permet d'activer la signature électronique à distance.\n\n"
+        f"Si vous n'êtes pas à l'origine de cette demande, ignorez simplement ce message.\n\n"
+        f"L'équipe {app_name}"
+    )
+    html_body = f"""
+    <p>Bonjour <strong>{guardian_name}</strong>,</p>
+    <p>Dans le cadre du dossier médical de <strong>{child_name}</strong>, nous avons besoin de vérifier votre adresse e-mail.</p>
+    <p>Veuillez confirmer votre adresse e-mail en cliquant sur le bouton ci-dessous :</p>
+    <p style="text-align: center; margin: 30px 0;">
+        <a href="{verification_link}"
+           style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+            Vérifier mon adresse e-mail
+        </a>
+    </p>
+    <p style="font-size: 12px; color: #666;">
+        Ou copiez ce lien dans votre navigateur :<br>
+        <a href="{verification_link}">{verification_link}</a>
+    </p>
+    <p><small>Ce lien est valide pendant 24 heures.</small></p>
+    <p><small>✅ La vérification de votre email permet d'activer la signature électronique à distance.</small></p>
+    <p style="margin-top: 30px; color: #666; font-size: 12px;">
+        Si vous n'êtes pas à l'origine de cette demande, ignorez simplement ce message.
+    </p>
+    <p>L'équipe {app_name}</p>
+    """
+    send_email(subject, to_email, text_body, html_body=html_body)

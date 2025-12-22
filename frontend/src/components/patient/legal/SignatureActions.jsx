@@ -10,6 +10,7 @@ export function SignatureActions({
   role,
   token,
   appointmentId,
+  procedureCaseId,
   parentVerified,
   parentEmail,
   otherParentEmail,
@@ -19,6 +20,8 @@ export function SignatureActions({
   setError,
   setSuccessMessage,
   setPreviewState,
+  preconsultationDate,
+  canSignAfterDelay,
 }) {
   const [signing, setSigning] = useState(false);
 
@@ -34,16 +37,31 @@ export function SignatureActions({
   const checklistComplete = parentState.total > 0 && parentState.completedCount === parentState.total;
   const signatureSupported = Boolean(doc?.signatureSupported);
 
-  const canSignCabinet = Boolean(signatureSupported && appointmentId && checklistComplete && overallLegalComplete);
+  const canSignCabinet = Boolean(
+    signatureSupported &&
+      appointmentId &&
+      checklistComplete &&
+      overallLegalComplete &&
+      canSignAfterDelay
+  );
   const canSignRemote = Boolean(canSignCabinet && parentVerified);
 
   const disabledReason = useMemo(() => {
     if (!signatureSupported) return LABELS_FR.patientSpace.documents.reasons.featureUnavailable;
     if (!appointmentId) return LABELS_FR.patientSpace.documents.reasons.missingAppointment;
+    if (!preconsultationDate) {
+      return "Un rendez-vous de pré-consultation est requis avant de pouvoir signer les documents.";
+    }
+    if (!canSignAfterDelay) {
+      const preconsultDate = new Date(preconsultationDate);
+      const delayEndDate = new Date(preconsultDate);
+      delayEndDate.setDate(delayEndDate.getDate() + 15);
+      return `Délai de réflexion de 15 jours requis. Vous pourrez signer à partir du ${delayEndDate.toLocaleDateString('fr-FR')}.`;
+    }
     if (!checklistComplete) return LABELS_FR.patientSpace.documents.reasons.checklistIncomplete;
     if (!overallLegalComplete) return 'Les 3 documents doivent être validés avant la signature.';
     return null;
-  }, [appointmentId, checklistComplete, overallLegalComplete, signatureSupported]);
+  }, [appointmentId, checklistComplete, overallLegalComplete, signatureSupported, preconsultationDate, canSignAfterDelay]);
 
   const handleStartSignature = async (mode) => {
     if (!token) return;
@@ -57,6 +75,7 @@ export function SignatureActions({
     try {
       const response = await startDocumentSignature({
         appointmentId,
+        procedureCaseId,
         parentRole: role,
         mode,
         token,

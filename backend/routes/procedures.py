@@ -153,6 +153,12 @@ def _serialize_case(case) -> schemas.ProcedureCase:
             f"{base_url}/prescriptions/access/{token}?actor=patient&channel=patient_case"
         )
 
+    # Serialize document_signatures (architecture granulaire)
+    document_signatures_payload = [
+        schemas.DocumentSignatureDetail.model_validate(doc_sig)
+        for doc_sig in (case.document_signatures or [])
+    ]
+
     return schemas.ProcedureCase(
         id=case.id,
         procedure_type=case.procedure_type.value,
@@ -204,6 +210,7 @@ def _serialize_case(case) -> schemas.ProcedureCase:
         steps_acknowledged=case.steps_acknowledged,
         dossier_completed=case.dossier_completed,
         missing_fields=case.missing_fields or [],
+        document_signatures=document_signatures_payload,
     )
 
 

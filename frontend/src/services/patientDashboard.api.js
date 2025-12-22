@@ -10,6 +10,7 @@ import {
   startSignature,
   verifyPhoneOtp,
 } from '../lib/api.js';
+import { startDocumentSignature as startDocumentSignatureGranular } from './documentSignature.api.js';
 
 export const DOCUMENT_TYPES = {
   SURGICAL_AUTHORIZATION_MINOR: 'surgical_authorization_minor',
@@ -70,12 +71,26 @@ export async function acknowledgeLegalCheckboxesBulk({
 
 export async function startDocumentSignature({
   appointmentId,
+  procedureCaseId,
   parentRole,
   mode = 'remote',
   sessionCode,
   token,
   docType,
 }) {
+  // Architecture granulaire: utiliser l'endpoint granulaire si procedureCaseId fourni
+  if (procedureCaseId && docType) {
+    return startDocumentSignatureGranular({
+      token,
+      procedureCaseId,
+      documentType: docType,
+      signerRole: parentRole,
+      mode,
+      sessionCode,
+    });
+  }
+
+  // Fallback vers ancien endpoint monolithique (deprecated)
   if (docType && docType !== DOCUMENT_TYPES.INFORMED_CONSENT) {
     const error = new Error('Signature de ce document non disponible pour le moment.');
     error.code = 'NOT_IMPLEMENTED';

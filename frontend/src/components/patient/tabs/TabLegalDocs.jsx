@@ -63,6 +63,20 @@ export function TabLegalDocs({
 
   const overallLegalComplete = Boolean(legalStatus?.complete);
 
+  // Calculer le délai de 15 jours après la pré-consultation
+  const preconsultationDate = useMemo(() => {
+    const preconsult = procedureCase?.appointments?.find((a) => a.appointment_type === 'preconsultation');
+    return preconsult?.date || null;
+  }, [procedureCase]);
+
+  const canSignAfterDelay = useMemo(() => {
+    if (!preconsultationDate) return false;
+    const preconsultDate = new Date(preconsultationDate);
+    const now = new Date();
+    const daysSincePreconsult = Math.floor((now - preconsultDate) / (1000 * 60 * 60 * 24));
+    return daysSincePreconsult >= 15;
+  }, [preconsultationDate]);
+
   const vmWithDocs = useMemo(() => {
     return buildPatientDashboardVM({
       procedureCase,
@@ -112,11 +126,37 @@ export function TabLegalDocs({
   };
 
   if (!signatureAppointmentId) {
-    return <div className="alert alert-info">{LABELS_FR.patientSpace.documents.reasons.missingAppointment}</div>;
+    return (
+      <div className="space-y-4">
+        <div className="alert alert-info">
+          <div>
+            <h3 className="font-semibold mb-2">Parcours de signature des documents</h3>
+            <ol className="list-decimal list-inside space-y-1 text-sm">
+              <li>Prenez un rendez-vous de pré-consultation dans l'onglet "Rendez-vous"</li>
+              <li>Lors de la pré-consultation, le praticien vous informera sur la procédure</li>
+              <li>Après un délai de réflexion de 15 jours, vous pourrez accéder à cet onglet pour signer les documents</li>
+              <li>Les 2 parents doivent signer tous les documents</li>
+              <li>Une fois tous les documents signés, vous pourrez prendre le rendez-vous pour l'acte</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
+      <div className="alert alert-info">
+        <div className="text-sm">
+          <p className="font-semibold">Informations importantes :</p>
+          <ul className="list-disc list-inside mt-1 space-y-1">
+            <li>Les 2 parents doivent signer chaque document</li>
+            <li>Délai de réflexion de 15 jours après la pré-consultation requis</li>
+            <li>Tous les documents doivent être signés avant de prendre le RDV d'acte</li>
+          </ul>
+        </div>
+      </div>
+
       <AppointmentContextSelector
         appointmentOptions={appointmentOptions}
         activeAppointmentId={activeAppointmentId}
@@ -133,6 +173,7 @@ export function TabLegalDocs({
             doc={doc}
             token={token}
             appointmentId={signatureAppointmentId}
+            procedureCaseId={procedureCase?.id}
             overallLegalComplete={overallLegalComplete}
             parentVerifiedByRole={parentVerifiedByRole}
             parentEmailByRole={parentEmailByRole}
@@ -143,6 +184,8 @@ export function TabLegalDocs({
             onReloadCase={onReloadCase}
             onReloadDashboard={onReloadDashboard}
             setPreviewState={setPreviewState}
+            preconsultationDate={preconsultationDate}
+            canSignAfterDelay={canSignAfterDelay}
           />
         ))}
       </div>

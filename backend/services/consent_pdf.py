@@ -53,7 +53,11 @@ def load_pdf_bytes(category: str, identifier: str) -> Optional[bytes]:
 
 
 def render_neutral_consent_pdf(consent_id: str, consent_hash: Optional[str] = None) -> Path:
-    """Render a neutral consent PDF to a temporary file and return its path."""
+    """
+    Render a neutral consent PDF to a temporary file and return its path.
+
+    DEPRECATED: Utiliser render_neutral_document_pdf() pour l'architecture granulaire.
+    """
     if base_pdf.HTML is None:
         raise RuntimeError("WeasyPrint is not installed in this environment")
 
@@ -64,6 +68,62 @@ def render_neutral_consent_pdf(consent_id: str, consent_hash: Optional[str] = No
 
     temp_dir = Path(tempfile.mkdtemp(prefix="consent-neutral-"))
     filename = f"yousign-neutral-consent-{uuid.uuid4().hex}.pdf"
+    path = temp_dir / filename
+    path.write_bytes(pdf_bytes)
+    return path
+
+
+def render_neutral_document_pdf(
+    document_type: str,
+    consent_id: str,
+    document_version: Optional[str] = None,
+    consent_hash: Optional[str] = None,
+) -> Path:
+    """
+    Génère un PDF neutre SPÉCIFIQUE à un type de document.
+
+    Architecture granulaire: 1 PDF neutre = 1 document médical.
+
+    Args:
+        document_type: "authorization", "consent", "fees"
+        consent_id: Identifiant du case (UUID ou ID)
+        document_version: Version du document (ex: "v1.0", "v2.1")
+        consent_hash: Hash SHA-256 du PDF médical complet (optionnel)
+
+    RGPD: Aucune donnée médicale, aucun nom de patient.
+
+    Exemples de contenu:
+    - "Je confirme mon consentement pour le document AUTORISATION D'INTERVENTION"
+    - "Je confirme mon consentement pour le document CONSENTEMENT ÉCLAIRÉ"
+    - "Je confirme mon consentement pour le document HONORAIRES"
+    """
+    if base_pdf.HTML is None:
+        raise RuntimeError("WeasyPrint is not installed in this environment")
+
+    # Labels des documents
+    doc_labels = {
+        "authorization": "AUTORISATION D'INTERVENTION",
+        "consent": "CONSENTEMENT ÉCLAIRÉ",
+        "fees": "HONORAIRES ET MODALITÉS FINANCIÈRES",
+    }
+    document_label = doc_labels.get(document_type, document_type.upper())
+
+    # Référence complète
+    full_reference = f"{consent_id}-{document_type}"
+    if document_version:
+        full_reference += f"-{document_version}"
+
+    env = _env()
+    template = env.get_template("consent_neutral_document.html")
+    html = template.render(
+        document_label=document_label,
+        full_reference=full_reference,
+        consent_hash=consent_hash,
+    )
+    pdf_bytes = base_pdf.HTML(string=html).write_pdf()
+
+    temp_dir = Path(tempfile.mkdtemp(prefix="consent-neutral-doc-"))
+    filename = f"yousign-neutral-{document_type}-{uuid.uuid4().hex}.pdf"
     path = temp_dir / filename
     path.write_bytes(pdf_bytes)
     return path
@@ -135,7 +195,11 @@ def compose_final_consent(
     signed_ids: list[str] | None = None,
     evidence_ids: list[str] | None = None,
 ) -> Optional[str]:
-    """Merge consent + audits + signed neutral PDFs into a single PDF (local storage only)."""
+    """
+    Merge consent + audits + signed neutral PDFs into a single PDF (local storage only).
+
+    DEPRECATED: Utiliser compose_final_document_consent() pour l'architecture granulaire.
+    """
     try:
         from PyPDF2 import PdfMerger
     except Exception as exc:  # pragma: no cover - optional dependency
@@ -172,4 +236,78 @@ def compose_final_consent(
     merger.close()
     stored_id = store_pdf_bytes(FINAL_CONSENT_CATEGORY, f"{case_id}-final-consent", output_path.read_bytes())
     prune_case_files(FINAL_CONSENT_CATEGORY, case_id, keep_latest=1)
+    return stored_id
+
+
+def compose_final_document_consent(
+    *,
+    full_consent_id: str,
+    document_type: str,
+    case_id: int,
+    signed_ids: list[str] | None = None,
+    evidence_ids: list[str] | None = None,
+) -> Optional[str]:
+    """
+    Assemble le package final pour UN document spécifique.
+
+    Architecture granulaire: 1 package = 1 document médical.
+
+    Contenu:
+    1. PDF médical complet du document_type
+    2. Audit trail(s) Yousign
+    3. PDF(s) neutre(s) signé(s)
+
+    Stockage en HDS uniquement.
+    """
+    try:
+        from PyPDF2 import PdfMerger
+    except Exception as exc:  # pragma: no cover - optional dependency
+        raise RuntimeError("PyPDF2 est requis pour assembler le PDF final") from exc
+
+    storage = get_storage_backend()
+
+    # TODO: Adapter pour charger le PDF spécifique au document_type
+    # Pour l'instant, on utilise le full_consent_id global
+    try:
+        full_path = storage.get_local_path(base_pdf.CONSENT_CATEGORY, full_consent_id)
+    except StorageError:
+        return None
+
+    merger = PdfMerger()
+    merger.append(str(full_path))
+
+    # Ajouter les audit trails
+    for evid in evidence_ids or []:
+        try:
+            evidence_path = storage.get_local_path(EVIDENCE_CATEGORY, evid)
+            merger.append(str(evidence_path))
+        except StorageError:
+            continue
+
+    # Ajouter les PDFs neutres signés
+    for signed in signed_ids or []:
+        try:
+            signed_path = storage.get_local_path(SIGNED_CONSENT_CATEGORY, signed)
+            merger.append(str(signed_path))
+        except StorageError:
+            continue
+
+    temp_dir = Path(tempfile.mkdtemp(prefix="consent-final-doc-"))
+    filename = f"consent-final-{document_type}-{uuid.uuid4().hex}.pdf"
+    output_path = temp_dir / filename
+
+    with output_path.open("wb") as f:
+        merger.write(f)
+    merger.close()
+
+    # Stocker avec nom explicite
+    stored_id = store_pdf_bytes(
+        FINAL_CONSENT_CATEGORY,
+        f"{case_id}-{document_type}-final",
+        output_path.read_bytes()
+    )
+
+    # Pruning : garder 1 version max par document
+    prune_case_files(FINAL_CONSENT_CATEGORY, case_id, keep_latest=3)
+
     return stored_id

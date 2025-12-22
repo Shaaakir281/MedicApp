@@ -9,6 +9,7 @@ export function LegalDocumentCard({
   doc,
   token,
   appointmentId,
+  procedureCaseId,
   overallLegalComplete,
   parentVerifiedByRole,
   parentEmailByRole,
@@ -21,6 +22,8 @@ export function LegalDocumentCard({
   onReloadCase,
   onReloadDashboard,
   setPreviewState,
+  preconsultationDate,
+  canSignAfterDelay,
 }) {
   const [roleState, setRoleState] = useState('parent1');
   const role = fixedRole || roleState;
@@ -72,6 +75,7 @@ export function LegalDocumentCard({
             role={role}
             token={token}
             appointmentId={appointmentId}
+            procedureCaseId={procedureCaseId}
             parentVerified={Boolean(parentVerifiedByRole?.[role])}
             parentEmail={parentEmailByRole?.[role] || ''}
             otherParentEmail={
@@ -83,6 +87,8 @@ export function LegalDocumentCard({
             setError={setError}
             setSuccessMessage={setSuccessMessage}
             setPreviewState={setPreviewState}
+            preconsultationDate={preconsultationDate}
+            canSignAfterDelay={canSignAfterDelay}
           />
         )}
       </div>

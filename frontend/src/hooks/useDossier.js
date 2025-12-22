@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { fetchDossier, saveDossier, sendGuardianVerification, verifyGuardianCode } from '../services/dossier.api.js';
+import {
+  fetchDossier,
+  saveDossier,
+  sendGuardianVerification,
+  verifyGuardianCode,
+  sendGuardianEmailVerification,
+} from '../services/dossier.api.js';
 import { formToPayload, toDossierVM, vmToForm } from '../services/dossier.mapper.js';
 
 export function useDossier({ token }) {
@@ -124,6 +130,26 @@ export function useDossier({ token }) {
     }
   };
 
+  const sendEmailVerification = async (role) => {
+    const guardianId = vm?.guardians?.[role]?.id;
+    if (!guardianId) {
+      setError('Identifiant parent manquant.');
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    try {
+      const resp = await sendGuardianEmailVerification({
+        token,
+        guardianId,
+        email: vm.guardians[role].email || undefined,
+      });
+      setSuccess(`Email de vérification envoyé à ${resp.email}`);
+    } catch (err) {
+      setError(err?.message || "Envoi de l'email impossible.");
+    }
+  };
+
   return {
     vm,
     formState,
@@ -137,6 +163,7 @@ export function useDossier({ token }) {
     save,
     sendOtp,
     verifyOtp,
+    sendEmailVerification,
     setError,
     setSuccess,
   };

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Consentement électronique - Document médical</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 12pt;
+        line-height: 1.8;
+        color: #111;
+        max-width: 600px;
+        margin: 40px auto;
+        padding: 20px;
+      }
+      h1 {
+        font-size: 18pt;
+        color: #2563eb;
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .document-type {
+        background-color: #eff6ff;
+        border: 2px solid #2563eb;
+        padding: 15px;
+        margin: 20px 0;
+        text-align: center;
+        font-weight: bold;
+        font-size: 14pt;
+        color: #1e40af;
+      }
+      .reference {
+        background-color: #f9fafb;
+        border: 1px solid #d1d5db;
+        padding: 12px;
+        margin: 20px 0;
+        font-family: monospace;
+        font-size: 10pt;
+      }
+      .signature-statement {
+        margin: 30px 0;
+        padding: 20px;
+        background-color: #fef3c7;
+        border-left: 4px solid #f59e0b;
+      }
+      code {
+        font-family: monospace;
+        font-size: 9pt;
+        background-color: #f3f4f6;
+        padding: 2px 4px;
+        border-radius: 3px;
+      }
+      .box {
+        border: 1px solid #d1d5db;
+        padding: 12px;
+        margin-top: 12px;
+        background-color: #fafafa;
+      }
+      .footer {
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+        font-size: 10pt;
+        color: #6b7280;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Consentement électronique</h1>
+
+    <div class="document-type">
+      {{ document_label }}
+    </div>
+
+    <div class="signature-statement">
+      <p><strong>Je confirme mon consentement électronique</strong> pour le document médical ci-dessus.</p>
+      <p>J'atteste que le contenu complet m'a été présenté dans mon espace sécurisé avant cette signature.</p>
+    </div>
+
+    <div class="reference">
+      <strong>Référence du document :</strong><br>
+      <code>{{ full_reference }}</code>
+    </div>
+
+    {% if consent_hash %}
+    <div class="box">
+      <strong>Empreinte cryptographique (SHA-256) du document complet présenté au signataire :</strong>
+      <div style="margin-top: 8px; word-break: break-all;">
+        <code>{{ consent_hash }}</code>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="signature-statement" style="background-color: #dcfce7; border-left-color: #16a34a;">
+      <p><strong>Je signe électroniquement ce document.</strong></p>
+    </div>
+
+    <div class="footer">
+      <p>Document généré par la plateforme MedScript</p>
+      <p>Ce document neutre est utilisé uniquement pour la signature électronique.</p>
+      <p>Le contenu médical complet est stocké séparément dans un environnement certifié HDS.</p>
+    </div>
+  </body>
+</html>

@@ -54,6 +54,7 @@ class Guardian(Base):
     email: str | None = sa.Column(sa.String, nullable=True)
     phone_e164: str | None = sa.Column(sa.String(32), nullable=True)
     phone_verified_at = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    email_verified_at = sa.Column(sa.DateTime(timezone=True), nullable=True)
     created_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False)
     updated_at = sa.Column(
         sa.DateTime(timezone=True),
@@ -65,6 +66,9 @@ class Guardian(Base):
     child = relationship("Child", back_populates="guardians")
     verifications = relationship(
         "GuardianPhoneVerification", back_populates="guardian", cascade="all, delete-orphan"
+    )
+    email_verifications = relationship(
+        "GuardianEmailVerification", back_populates="guardian", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
@@ -82,6 +86,12 @@ class VerificationStatus(str, enum.Enum):
     verified = "VERIFIED"
     expired = "EXPIRED"
     locked = "LOCKED"
+
+
+class EmailVerificationStatus(str, enum.Enum):
+    sent = "SENT"
+    verified = "VERIFIED"
+    expired = "EXPIRED"
 
 
 class GuardianPhoneVerification(Base):
@@ -112,5 +122,34 @@ class GuardianPhoneVerification(Base):
         sa.CheckConstraint(
             "status in ('SENT','VERIFIED','EXPIRED','LOCKED')",
             name="ck_guardian_verification_status",
+        ),
+    )
+
+
+class GuardianEmailVerification(Base):
+    __tablename__ = "guardian_email_verifications"
+
+    id: str = sa.Column(sa.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    guardian_id: str = sa.Column(
+        sa.String(36),
+        sa.ForeignKey("guardians.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    email: str = sa.Column(sa.String(255), nullable=False)
+    token_hash: str = sa.Column(sa.String(128), nullable=False, unique=True, index=True)
+    expires_at = sa.Column(sa.DateTime(timezone=True), nullable=False)
+    status: str = sa.Column(sa.String(16), nullable=False)
+    sent_at = sa.Column(sa.DateTime(timezone=True), nullable=False)
+    consumed_at = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ip_address: str | None = sa.Column(sa.String(64), nullable=True)
+    user_agent: str | None = sa.Column(sa.String(255), nullable=True)
+
+    guardian = relationship("Guardian", back_populates="email_verifications")
+
+    __table_args__ = (
+        sa.CheckConstraint(
+            "status in ('SENT','VERIFIED','EXPIRED')",
+            name="ck_guardian_email_verification_status",
         ),
     )

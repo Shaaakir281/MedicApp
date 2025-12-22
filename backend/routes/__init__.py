@@ -11,6 +11,7 @@ from .consents import router as consents_router  # noqa: F401
 from .legal import router as legal_router  # noqa: F401
 from .cabinet_sessions import router as cabinet_sessions_router  # noqa: F401
 from .signature import router as signature_router  # noqa: F401
+from .document_signature import router as document_signature_router  # noqa: F401
 from .patient_dashboard import router as patient_dashboard_router  # noqa: F401
 from .dossier import router as dossier_router  # noqa: F401
 
@@ -28,6 +29,7 @@ all_routers = [
     legal_router,
     cabinet_sessions_router,
     signature_router,
+    document_signature_router,
     patient_dashboard_router,
     dossier_router,
 ]

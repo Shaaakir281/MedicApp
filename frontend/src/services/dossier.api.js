@@ -31,3 +31,14 @@ export async function verifyGuardianCode({ token, guardianId, code } = {}) {
     body: { code },
   });
 }
+
+export async function sendGuardianEmailVerification({ token, guardianId, email } = {}) {
+  if (!guardianId) {
+    throw new Error('guardianId requis pour envoyer l\'email de vérification.');
+  }
+  return apiRequest(`/dossier/guardians/${guardianId}/email-verification/send`, {
+    method: 'POST',
+    token,
+    body: { email },
+  });
+}

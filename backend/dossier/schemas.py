@@ -23,6 +23,7 @@ class GuardianCreate(GuardianBase):
 class Guardian(GuardianBase):
     id: str
     phone_verified_at: Optional[datetime] = None
+    email_verified_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -73,5 +74,19 @@ class SmsVerifyRequest(BaseModel):
 
 
 class SmsVerifyResponse(BaseModel):
+    verified: bool
+    verified_at: Optional[datetime] = None
+
+
+class EmailSendRequest(BaseModel):
+    email: Optional[EmailStr] = None
+
+
+class EmailSendResponse(BaseModel):
+    status: str
+    email: str
+
+
+class EmailVerifyResponse(BaseModel):
     verified: bool
     verified_at: Optional[datetime] = None

@@ -26,9 +26,9 @@ except Exception:  # pragma: no cover - optional dependency
 
 logger = logging.getLogger("uvicorn.error")
 
-CODE_LENGTH = 5
-TTL_SECONDS = 300
-COOLDOWN_SECONDS = 30
+CODE_LENGTH = 6  # Code à 6 chiffres (aligné avec ancien système)
+TTL_SECONDS = 600  # 10 minutes (aligné avec ancien système, marge pour délai SMS)
+COOLDOWN_SECONDS = 15  # 15 secondes (plus fluide, garde protection anti-spam)
 
 
 class InvalidPhoneNumber(ValueError):
@@ -128,16 +128,77 @@ def _guard_patient_access(child: Child | None, current_user) -> None:
 
 
 def _sync_to_procedure_case(db: Session, patient_id: int, guardians: List[Guardian]) -> None:
-    """Propagate guardians data to the legacy procedure_case for compatibility."""
+    """Propagate guardians data to the legacy procedure_case for compatibility.
+
+    Creates ProcedureCase automatically if it doesn't exist.
+    """
+    import crud
+
     case = (
         db.query(models.ProcedureCase)
         .filter(models.ProcedureCase.patient_id == patient_id)
         .order_by(models.ProcedureCase.created_at.desc())
         .first()
     )
-    if not case:
-        return
 
+    # Auto-create ProcedureCase if it doesn't exist
+    if not case:
+        child = (
+            db.query(Child)
+            .filter(Child.patient_id == patient_id)
+            .order_by(Child.created_at.desc())
+            .first()
+        )
+        if not child:
+            return  # No child data, cannot create case
+
+        # Build parent names from guardians
+        parent1_name = ""
+        parent1_email = None
+        parent1_phone = None
+        parent2_name = ""
+        parent2_email = None
+        parent2_phone = None
+
+        for guardian in guardians:
+            role = GuardianRole(guardian.role)
+            full_name = f"{guardian.first_name} {guardian.last_name}".strip()
+            if role == GuardianRole.parent1:
+                parent1_name = full_name
+                parent1_email = guardian.email
+                parent1_phone = guardian.phone_e164
+            elif role == GuardianRole.parent2:
+                parent2_name = full_name
+                parent2_email = guardian.email
+                parent2_phone = guardian.phone_e164
+
+        # Create minimal case data
+        case_data = type(
+            "CaseData",
+            (object,),
+            {
+                "procedure_type": "circumcision",
+                "child_full_name": f"{child.first_name} {child.last_name}".strip(),
+                "child_birthdate": child.birth_date,
+                "child_weight_kg": child.weight_kg,
+                "parent1_name": parent1_name or "Parent 1",
+                "parent1_email": parent1_email,
+                "parent2_name": parent2_name,
+                "parent2_email": parent2_email,
+                "parent1_phone": parent1_phone,
+                "parent2_phone": parent2_phone,
+                "parent1_sms_optin": False,
+                "parent2_sms_optin": False,
+                "parental_authority_ack": True,  # Auto-accepted when Dossier is saved
+                "notes": "[Auto-créé depuis Dossier]",
+                "preconsultation_date": None,
+            },
+        )()
+
+        case = crud.create_procedure_case(db, patient_id, case_data)
+        return  # Already committed in create_procedure_case
+
+    # Update existing case
     for guardian in guardians:
         role = GuardianRole(guardian.role)
         if role == GuardianRole.parent1:
@@ -182,8 +243,8 @@ def get_or_create_child_for_patient(db: Session, patient_id: int) -> Child:
     child_data, guardians_data = _prefill_from_procedure_case(db, patient_id)
     child = Child(
         patient_id=patient_id,
-        first_name=child_data.get("first_name") or "",
-        last_name=child_data.get("last_name") or "",
+        first_name=child_data.get("first_name") or "Prénom",
+        last_name=child_data.get("last_name") or "Nom",
         birth_date=child_data.get("birth_date") or dt.date.today(),
         weight_kg=child_data.get("weight_kg"),
         medical_notes=child_data.get("medical_notes"),
@@ -256,7 +317,8 @@ def save_dossier(db: Session, child_id: str, payload: schemas.DossierPayload, cu
 
     # Compatibilité : synchroniser vers procedure_cases pour que les autres onglets voient les données
     if current_user.role == models.UserRole.patient:
-        _sync_to_procedure_case(db, current_user.id, updated)
+        all_guardians = list(db.scalars(select(Guardian).where(Guardian.child_id == child.id)))
+        _sync_to_procedure_case(db, current_user.id, all_guardians)
 
     return get_dossier(db, child_id, current_user)
 
@@ -305,7 +367,7 @@ def send_verification_code(
         expires_at=now + dt.timedelta(seconds=TTL_SECONDS),
         cooldown_until=now + dt.timedelta(seconds=COOLDOWN_SECONDS),
         attempt_count=0,
-        max_attempts=5,
+        max_attempts=10,  # 10 tentatives (moins restrictif, erreurs de frappe possibles)
         status=VerificationStatus.sent.value,
         sent_at=now,
         verified_at=None,
