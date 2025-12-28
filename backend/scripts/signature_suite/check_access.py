@@ -19,6 +19,7 @@ def run(document_signature_id=None):
 
     if document_signature_id is None:
         document_signature_id = _get_env('DOCUMENT_SIGNATURE_ID', required=True)
+    file_kind = _get_env('FILE_KIND', 'final')
 
     headers = {
         'Authorization': f'Bearer {other_token}',
@@ -30,11 +31,24 @@ def run(document_signature_id=None):
         headers=headers,
         timeout=30,
     )
-    if resp.status_code == 403:
-        print(f"access denied as expected for document_signature_id={document_signature_id}")
-        return True
-    print(f"unexpected access result: {resp.status_code} {resp.text}")
-    return False
+    ok_meta = resp.status_code == 403
+    if ok_meta:
+        print(f"meta access denied as expected for document_signature_id={document_signature_id}")
+    else:
+        print(f"unexpected meta access result: {resp.status_code} {resp.text}")
+
+    resp = requests.get(
+        f"{base_url}/signature/document/{document_signature_id}/file/{file_kind}?inline=true",
+        headers=headers,
+        timeout=30,
+    )
+    ok_file = resp.status_code == 403
+    if ok_file:
+        print(f"file access denied as expected for document_signature_id={document_signature_id}")
+    else:
+        print(f"unexpected file access result: {resp.status_code} {resp.text}")
+
+    return ok_meta and ok_file
 
 
 if __name__ == '__main__':

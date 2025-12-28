@@ -84,6 +84,7 @@ export async function startDocumentSignature({
     return startDocumentSignatureGranular({
       token,
       procedureCaseId,
+      appointmentId,
       documentType: docType,
       signerRole: parentRole,
       mode,

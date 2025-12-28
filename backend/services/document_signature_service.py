@@ -230,7 +230,8 @@ def initiate_document_signature(
         document_version = LEGAL_CATALOG[doc_type_enum].version
         consent_hash = None
         base_doc_id = legal_documents_pdf.ensure_legal_document_pdf(case, doc_type_enum)
-        pdf_bytes = consent_pdf.load_pdf_bytes(legal_documents_pdf.LEGAL_DOCUMENT_CATEGORY, base_doc_id)
+        base_category = legal_documents_pdf.base_category_for(doc_type_enum)
+        pdf_bytes = consent_pdf.load_pdf_bytes(base_category, base_doc_id)
         if pdf_bytes:
             consent_hash = consent_pdf.compute_pdf_sha256(pdf_bytes)
 
@@ -420,6 +421,10 @@ def _download_and_store_artifacts(
     signed_identifier = None
     evidence_identifier = None
 
+    doc_type = legal_documents_pdf.normalize_document_type(doc_sig.document_type)
+    signed_category = legal_documents_pdf.signed_category_for(doc_type)
+    evidence_category = legal_documents_pdf.evidence_category_for(doc_type)
+
     # Télécharger PDF signé (neutre)
     try:
         if signed_url:
@@ -428,10 +433,10 @@ def _download_and_store_artifacts(
             signed_bytes = client.download_signed_documents(doc_sig.yousign_procedure_id)
         if signed_bytes:
             prefix = f"{doc_sig.procedure_case_id}-{doc_sig.document_type}"
-            signed_identifier = consent_pdf.store_signed_pdf(signed_bytes, prefix=prefix)
+            signed_identifier = consent_pdf.store_pdf_bytes(signed_category, prefix, signed_bytes)
             # Pruning : garder 2 versions max
             consent_pdf.prune_case_files(
-                consent_pdf.SIGNED_CONSENT_CATEGORY,
+                signed_category,
                 doc_sig.procedure_case_id,
                 keep_latest=2
             )
@@ -441,28 +446,70 @@ def _download_and_store_artifacts(
             doc_sig.id
         )
 
-    # Télécharger audit trail
-    try:
-        if evidence_url:
+    # Télécharger audit trail (priorité: URL > tous les signataires > par signataire)
+    evidence_ids: list[str] = []
+
+    def _store_evidence(data: bytes, label: str | None = None) -> None:
+        if not data:
+            return
+        suffix = f"-{label}" if label else ""
+        prefix = f"{doc_sig.procedure_case_id}-{doc_sig.document_type}-audit{suffix}"
+        identifier = consent_pdf.store_pdf_bytes(evidence_category, prefix, data)
+        evidence_ids.append(identifier)
+
+    if evidence_url:
+        try:
             evidence_bytes = client.download_with_auth(evidence_url)
+            if evidence_bytes:
+                _store_evidence(evidence_bytes, "url")
+        except Exception:
+            logger.exception(
+                "Failed to download evidence URL for DocumentSignature %d",
+                doc_sig.id
+            )
+
+    if not evidence_ids:
+        try:
+            evidence_bytes = client.download_audit_trails_all(doc_sig.yousign_procedure_id)
+            if evidence_bytes:
+                _store_evidence(evidence_bytes, "all")
+        except Exception:
+            logger.exception(
+                "Failed to download audit trails (all) for DocumentSignature %d",
+                doc_sig.id
+            )
+
+    if not evidence_ids:
+        signer_ids: list[str] = []
+        if signer_id:
+            signer_ids.append(signer_id)
         else:
-            evidence_bytes = client.download_evidence(
-                doc_sig.yousign_procedure_id,
-                signer_id=signer_id
-            )
-        if evidence_bytes:
-            prefix = f"{doc_sig.procedure_case_id}-{doc_sig.document_type}"
-            evidence_identifier = consent_pdf.store_evidence_pdf(evidence_bytes, prefix=prefix)
-            consent_pdf.prune_case_files(
-                consent_pdf.EVIDENCE_CATEGORY,
-                doc_sig.procedure_case_id,
-                keep_latest=2
-            )
-    except Exception:
-        logger.exception(
-            "Failed to download evidence PDF for DocumentSignature %d",
-            doc_sig.id
+            if doc_sig.parent1_yousign_signer_id:
+                signer_ids.append(doc_sig.parent1_yousign_signer_id)
+            if doc_sig.parent2_yousign_signer_id:
+                signer_ids.append(doc_sig.parent2_yousign_signer_id)
+        for candidate in signer_ids:
+            try:
+                evidence_bytes = client.download_audit_trail_for_signer(
+                    doc_sig.yousign_procedure_id,
+                    candidate
+                )
+                if evidence_bytes:
+                    _store_evidence(evidence_bytes, f"signer-{candidate}")
+            except Exception:
+                logger.exception(
+                    "Failed to download audit trail for signer %s (DocumentSignature %d)",
+                    candidate,
+                    doc_sig.id,
+                )
+
+    if evidence_ids:
+        consent_pdf.prune_case_files(
+            evidence_category,
+            doc_sig.procedure_case_id,
+            keep_latest=max(4, len(evidence_ids))
         )
+        evidence_identifier = evidence_ids[0]
 
     return signed_identifier, evidence_identifier
 
@@ -493,12 +540,15 @@ def _assemble_final_document(
         )
         return None
 
-    signed_ids = []
-    evidence_ids = []
+    signed_category = legal_documents_pdf.signed_category_for(doc_sig.document_type)
+    evidence_category = legal_documents_pdf.evidence_category_for(doc_sig.document_type)
 
-    if doc_sig.signed_pdf_identifier:
+    signed_ids = consent_pdf.list_local_files_for_case(signed_category, doc_sig.procedure_case_id)
+    evidence_ids = consent_pdf.list_local_files_for_case(evidence_category, doc_sig.procedure_case_id)
+
+    if doc_sig.signed_pdf_identifier and doc_sig.signed_pdf_identifier not in signed_ids:
         signed_ids.append(doc_sig.signed_pdf_identifier)
-    if doc_sig.evidence_pdf_identifier:
+    if doc_sig.evidence_pdf_identifier and doc_sig.evidence_pdf_identifier not in evidence_ids:
         evidence_ids.append(doc_sig.evidence_pdf_identifier)
 
     if not signed_ids and not evidence_ids:
@@ -514,7 +564,10 @@ def _assemble_final_document(
         )
         return consent_pdf.compose_final_document_consent(
             full_consent_id=full_consent_id,
-            full_consent_category=legal_documents_pdf.LEGAL_DOCUMENT_CATEGORY,
+            full_consent_category=legal_documents_pdf.base_category_for(doc_sig.document_type),
+            signed_category=legal_documents_pdf.signed_category_for(doc_sig.document_type),
+            evidence_category=legal_documents_pdf.evidence_category_for(doc_sig.document_type),
+            final_category=legal_documents_pdf.final_category_for(doc_sig.document_type),
             document_type=doc_sig.document_type,
             case_id=doc_sig.procedure_case_id,
             signed_ids=signed_ids,
@@ -636,6 +689,113 @@ def update_document_signature_status(
     return doc_sig
 
 
+def poll_and_fetch_document_signature(
+    db: Session,
+    doc_sig: models.DocumentSignature,
+) -> models.DocumentSignature:
+    """
+    Fallback polling: fetch Yousign SR, download artifacts, assemble final package.
+
+    This mirrors the legacy consent flow to avoid regressions when webhook data
+    is missing or delayed.
+    """
+    client = YousignClient()
+    if client.mock_mode or not doc_sig.yousign_procedure_id or doc_sig.yousign_purged_at:
+        return doc_sig
+
+    try:
+        sr = client.fetch_signature_request(doc_sig.yousign_procedure_id)
+    except Exception:
+        logger.exception("Poll Yousign SR failed for DocumentSignature %d", doc_sig.id)
+        return doc_sig
+
+    now = dt.datetime.utcnow()
+    signed_parents: list[str] = []
+    signers_payload = sr.get("signers") or []
+    if not signers_payload:
+        try:
+            signers_payload = client.fetch_signers(doc_sig.yousign_procedure_id)
+        except Exception:
+            signers_payload = []
+    for signer in signers_payload:
+        if (signer.get("status") or "").lower() != "signed":
+            continue
+        signer_id = str(signer.get("id"))
+        if signer_id == doc_sig.parent1_yousign_signer_id:
+            doc_sig.parent1_status = "signed"
+            doc_sig.parent1_signed_at = now
+            doc_sig.parent1_method = "yousign"
+            signed_parents.append("parent1")
+        elif signer_id == doc_sig.parent2_yousign_signer_id:
+            doc_sig.parent2_status = "signed"
+            doc_sig.parent2_signed_at = now
+            doc_sig.parent2_method = "yousign"
+            signed_parents.append("parent2")
+
+    signed_url = sr.get("signed_file_url")
+    evidence_url = sr.get("evidence_url")
+
+    both_signed = doc_sig.parent1_status == "signed" and doc_sig.parent2_status == "signed"
+
+    if both_signed:
+        stored_signed, stored_evidence = _download_and_store_artifacts(
+            doc_sig,
+            signed_url=signed_url,
+            evidence_url=evidence_url,
+            signer_id=None,
+        )
+        if stored_signed:
+            doc_sig.signed_pdf_identifier = stored_signed
+        if stored_evidence:
+            doc_sig.evidence_pdf_identifier = stored_evidence
+
+        final_path = _assemble_final_document(db, doc_sig)
+        if final_path:
+            doc_sig.final_pdf_identifier = final_path
+
+        doc_sig.overall_status = models.DocumentSignatureStatus.completed
+        doc_sig.completed_at = now
+
+        try:
+            purge_document_signature(doc_sig)
+            doc_sig.yousign_purged_at = dt.datetime.utcnow()
+        except Exception:
+            logger.exception(
+                "Echec purge Yousign pour DocumentSignature %d",
+                doc_sig.id,
+            )
+    elif signed_parents:
+        for parent_label in signed_parents:
+            signer_id = (
+                doc_sig.parent1_yousign_signer_id
+                if parent_label == "parent1"
+                else doc_sig.parent2_yousign_signer_id
+            )
+            stored_signed, stored_evidence = _download_and_store_artifacts(
+                doc_sig,
+                signed_url=None,
+                evidence_url=None,
+                signer_id=signer_id,
+            )
+            if stored_signed:
+                doc_sig.signed_pdf_identifier = stored_signed
+            if stored_evidence:
+                doc_sig.evidence_pdf_identifier = stored_evidence
+
+        assembled = _assemble_final_document(db, doc_sig)
+        if assembled:
+            doc_sig.final_pdf_identifier = assembled
+
+        doc_sig.overall_status = models.DocumentSignatureStatus.partially_signed
+    else:
+        doc_sig.overall_status = models.DocumentSignatureStatus.sent
+
+    db.add(doc_sig)
+    db.commit()
+    db.refresh(doc_sig)
+    return doc_sig
+
+
 def purge_document_signature(doc_sig: models.DocumentSignature) -> None:
     """
     Purge la Signature Request Yousign pour CE document.
@@ -647,6 +807,23 @@ def purge_document_signature(doc_sig: models.DocumentSignature) -> None:
         return
 
     try:
+        try:
+            documents = client.fetch_documents(doc_sig.yousign_procedure_id)
+        except Exception:
+            documents = []
+
+        for doc in documents:
+            doc_id = doc.get("id") if isinstance(doc, dict) else None
+            if not doc_id:
+                continue
+            try:
+                client.delete_document(doc_sig.yousign_procedure_id, str(doc_id))
+            except Exception:
+                logger.exception(
+                    "Failed to delete Yousign document %s (DocumentSignature %d)",
+                    doc_id,
+                    doc_sig.id,
+                )
         client.delete_signature_request(doc_sig.yousign_procedure_id, permanent_delete=True)
         logger.info(
             "Yousign SR %s purged (DocumentSignature %d, doc_type=%s)",

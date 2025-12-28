@@ -4,6 +4,7 @@ import sys
 from start_signatures import run as start_signatures
 from fetch_signatures import run as fetch_signatures
 from check_access import run as check_access
+from download_artifacts import run as download_artifacts
 
 
 def main():
@@ -15,6 +16,8 @@ def main():
         if not doc_id:
             continue
         ok = check_access(document_signature_id=doc_id) and ok
+        if os.getenv('DOWNLOAD_ARTIFACTS'):
+            ok = download_artifacts(document_signature_id=doc_id, allow_404=True) and ok
     if not ok:
         sys.exit(3)
 

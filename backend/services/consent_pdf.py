@@ -216,14 +216,14 @@ def compose_final_consent(
 
     for evid in evidence_ids or []:
         try:
-            evidence_path = storage.get_local_path(EVIDENCE_CATEGORY, evid)
+            evidence_path = storage.get_local_path(evidence_category, evid)
             merger.append(str(evidence_path))
         except StorageError:
             continue
 
     for signed in signed_ids or []:
         try:
-            signed_path = storage.get_local_path(SIGNED_CONSENT_CATEGORY, signed)
+            signed_path = storage.get_local_path(signed_category, signed)
             merger.append(str(signed_path))
         except StorageError:
             continue
@@ -243,6 +243,9 @@ def compose_final_document_consent(
     *,
     full_consent_id: str,
     full_consent_category: str = base_pdf.CONSENT_CATEGORY,
+    signed_category: str = SIGNED_CONSENT_CATEGORY,
+    evidence_category: str = EVIDENCE_CATEGORY,
+    final_category: str = FINAL_CONSENT_CATEGORY,
     document_type: str,
     case_id: int,
     signed_ids: list[str] | None = None,
@@ -270,7 +273,7 @@ def compose_final_document_consent(
     # TODO: Adapter pour charger le PDF spécifique au document_type
     # Pour l'instant, on utilise le full_consent_id global
     try:
-        full_path = storage.get_local_path(base_pdf.CONSENT_CATEGORY, full_consent_id)
+        full_path = storage.get_local_path(full_consent_category, full_consent_id)
     except StorageError:
         return None
 
@@ -280,7 +283,7 @@ def compose_final_document_consent(
     # Ajouter les audit trails
     for evid in evidence_ids or []:
         try:
-            evidence_path = storage.get_local_path(EVIDENCE_CATEGORY, evid)
+            evidence_path = storage.get_local_path(evidence_category, evid)
             merger.append(str(evidence_path))
         except StorageError:
             continue
@@ -288,7 +291,7 @@ def compose_final_document_consent(
     # Ajouter les PDFs neutres signés
     for signed in signed_ids or []:
         try:
-            signed_path = storage.get_local_path(SIGNED_CONSENT_CATEGORY, signed)
+            signed_path = storage.get_local_path(signed_category, signed)
             merger.append(str(signed_path))
         except StorageError:
             continue
@@ -303,12 +306,12 @@ def compose_final_document_consent(
 
     # Stocker avec nom explicite
     stored_id = store_pdf_bytes(
-        FINAL_CONSENT_CATEGORY,
+        final_category,
         f"{case_id}-{document_type}-final",
         output_path.read_bytes()
     )
 
     # Pruning : garder 1 version max par document
-    prune_case_files(FINAL_CONSENT_CATEGORY, case_id, keep_latest=3)
+    prune_case_files(final_category, case_id, keep_latest=3)
 
     return stored_id

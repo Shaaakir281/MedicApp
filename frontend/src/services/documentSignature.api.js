@@ -1,6 +1,19 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 /**
+ * Maps catalog document types to signature API document types.
+ */
+function mapDocumentType(value) {
+  const mapping = {
+    surgical_authorization_minor: 'authorization',
+    informed_consent: 'consent',
+    fees_consent_quote: 'fees',
+  };
+  return mapping[value] || value;
+}
+
+
+/**
  * Démarre la signature pour un document spécifique (patient)
  * @param {Object} payload - Données de la requête
  * @param {number} payload.procedure_case_id - ID du dossier
@@ -11,19 +24,36 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
  * @param {string} token - Token d'authentification (optionnel)
  * @returns {Promise<Object>} Réponse avec le lien de signature
  */
-export async function startDocumentSignature(payload, token = null) {
+export async function startDocumentSignature(payload = {}, token = null) {
+  const resolvedToken = token || payload?.token || null;
+  const procedureCaseId = payload?.procedureCaseId ?? payload?.procedure_case_id ?? null;
+  const appointmentId = payload?.appointmentId ?? payload?.appointment_id ?? null;
+  const documentType = payload?.documentType ?? payload?.document_type ?? null;
+  const signerRole = payload?.signerRole ?? payload?.signer_role ?? null;
+  const mode = payload?.mode || 'remote';
+  const sessionCode = payload?.sessionCode ?? payload?.session_code ?? null;
+
+  const body = {
+    procedure_case_id: procedureCaseId || undefined,
+    appointment_id: appointmentId || undefined,
+    document_type: mapDocumentType(documentType) || undefined,
+    signer_role: signerRole || undefined,
+    mode,
+    session_code: sessionCode || undefined,
+  };
+
   const headers = {
     'Content-Type': 'application/json',
   };
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (resolvedToken) {
+    headers.Authorization = `Bearer ${resolvedToken}`;
   }
 
   const response = await fetch(`${API_BASE_URL}/signature/start-document`, {
     method: 'POST',
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {

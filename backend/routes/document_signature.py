@@ -48,9 +48,16 @@ def start_document_signature(
     # Gestion session cabinet (bypass auth)
     session = None
     procedure_case_id = payload.procedure_case_id
-    document_type = payload.document_type
+    appointment_id = payload.appointment_id
+    document_type = (payload.document_type or "").strip()
     signer_role = payload.signer_role
     mode = payload.mode
+
+    if not document_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Type de document manquant."
+        )
 
     if payload.session_code:
         session = legal_service.get_active_session(db, payload.session_code)
@@ -77,6 +84,28 @@ def start_document_signature(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentification requise."
+        )
+
+    if session is None and procedure_case_id is None and appointment_id is not None:
+        appointment = db.query(models.Appointment).filter(
+            models.Appointment.id == appointment_id
+        ).first()
+        if not appointment or not appointment.procedure_case_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Appointment ou case introuvable."
+            )
+        if current_user and current_user.role == models.UserRole.patient and appointment.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Accès refusé."
+            )
+        procedure_case_id = appointment.procedure_case_id
+
+    if procedure_case_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="procedure_case_id ou appointment_id requis."
         )
 
     # Vérifier ownership
@@ -211,6 +240,7 @@ def preview_legal_document(
 
     doc_type = legal_documents_pdf.normalize_document_type(document_type)
     identifier = legal_documents_pdf.ensure_legal_document_pdf(case, doc_type)
+    base_category = legal_documents_pdf.base_category_for(doc_type)
 
     storage = get_storage_backend()
     download_name = f"case-{case.id}-{doc_type.value}.pdf"
@@ -218,7 +248,7 @@ def preview_legal_document(
     if storage.supports_presigned_urls:
         try:
             url = storage.generate_presigned_url(
-                legal_documents_pdf.LEGAL_DOCUMENT_CATEGORY,
+                base_category,
                 identifier,
                 download_name=download_name,
                 expires_in_seconds=600,
@@ -230,7 +260,7 @@ def preview_legal_document(
 
     try:
         return storage.build_file_response(
-            legal_documents_pdf.LEGAL_DOCUMENT_CATEGORY,
+            base_category,
             identifier,
             download_name,
             inline=inline,
@@ -265,25 +295,46 @@ def download_document_signature_file(
     if current_user.role == models.UserRole.patient and case.patient_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acces refuse.")
 
+    doc_type = legal_documents_pdf.normalize_document_type(doc_sig.document_type)
     if file_kind == "final":
         identifier = doc_sig.final_pdf_identifier
-        category = consent_pdf.FINAL_CONSENT_CATEGORY
+        primary_category = legal_documents_pdf.final_category_for(doc_type)
+        fallback_categories = [consent_pdf.FINAL_CONSENT_CATEGORY]
     elif file_kind == "signed":
         identifier = doc_sig.signed_pdf_identifier
-        category = consent_pdf.SIGNED_CONSENT_CATEGORY
+        primary_category = legal_documents_pdf.signed_category_for(doc_type)
+        fallback_categories = [consent_pdf.SIGNED_CONSENT_CATEGORY]
     else:
         identifier = doc_sig.evidence_pdf_identifier
-        category = consent_pdf.EVIDENCE_CATEGORY
-
-    if not identifier:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fichier indisponible.")
+        primary_category = legal_documents_pdf.evidence_category_for(doc_type)
+        fallback_categories = [consent_pdf.EVIDENCE_CATEGORY]
 
     storage = get_storage_backend()
     download_name = f"case-{case.id}-{doc_sig.document_type}-{file_kind}.pdf"
-    try:
-        return storage.build_file_response(category, identifier, download_name, inline=inline)
-    except StorageError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fichier introuvable.") from exc
+
+    def _build_response(doc_identifier: str | None):
+        if not doc_identifier:
+            return None
+        for category in [primary_category, *fallback_categories]:
+            if storage.exists(category, doc_identifier):
+                return storage.build_file_response(category, doc_identifier, download_name, inline=inline)
+        return None
+
+    response = _build_response(identifier)
+    if response:
+        return response
+
+    doc_sig = document_signature_service.poll_and_fetch_document_signature(db, doc_sig)
+    if file_kind == "final":
+        identifier = doc_sig.final_pdf_identifier
+    elif file_kind == "signed":
+        identifier = doc_sig.signed_pdf_identifier
+    else:
+        identifier = doc_sig.evidence_pdf_identifier
+    response = _build_response(identifier)
+    if response:
+        return response
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fichier introuvable.")
 
 
 @router.post("/webhook/yousign-document")
@@ -306,8 +357,16 @@ def handle_yousign_document_webhook(
 
     logger.info("Yousign document webhook received: %s", payload)
 
+    data = payload.get("data", {}) if isinstance(payload, dict) else {}
+    signature_request = data.get("signature_request") or payload.get("signature_request") or {}
+    signer_payload = data.get("signer") or payload.get("signer") or {}
+
     # Extraire procedure_id
-    procedure_id = payload.get("signature_request", {}).get("id")
+    procedure_id = (
+        signature_request.get("id")
+        or payload.get("procedure_id")
+        or payload.get("procedureId")
+    )
     if not procedure_id:
         logger.warning("Missing signature_request.id in webhook payload")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing signature_request.id")
@@ -322,10 +381,19 @@ def handle_yousign_document_webhook(
         return {"status": "ignored", "reason": "unknown_procedure_id"}
 
     # Identifier l'événement
-    event_type = payload.get("event_name") or payload.get("event")
+    event_type = (
+        payload.get("event_name")
+        or payload.get("event")
+        or data.get("event_name")
+        or ""
+    )
+    event_type = str(event_type).lower()
 
-    if event_type == "signer.signed":
-        signer_payload = payload.get("signer", {})
+    if "signature_request" in event_type and any(token in event_type for token in ("done", "completed")):
+        document_signature_service.poll_and_fetch_document_signature(db, doc_sig)
+        return {"status": "processed", "document_signature_id": doc_sig.id}
+
+    if "signer" in event_type and any(token in event_type for token in ("signed", "done", "completed")):
         signer_id = signer_payload.get("id")
 
         if not signer_id:
@@ -343,8 +411,8 @@ def handle_yousign_document_webhook(
             return {"status": "ignored", "reason": "unknown_signer"}
 
         # Extraire URLs artefacts (si disponibles)
-        signed_file_url = payload.get("signature_request", {}).get("signed_file_url")
-        evidence_url = payload.get("signature_request", {}).get("evidence_url")
+        signed_file_url = signature_request.get("signed_file_url")
+        evidence_url = signature_request.get("evidence_url")
 
         # Mise à jour
         document_signature_service.update_document_signature_status(

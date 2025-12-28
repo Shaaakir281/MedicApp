@@ -125,15 +125,50 @@ async def yousign_webhook(
     logger.info("Webhook Yousign payload: %s", payload)
 
     data = payload.get("data", {}) if isinstance(payload, dict) else {}
-    sr = data.get("signature_request") or {}
-    signer = data.get("signer") or {}
-    procedure_id = sr.get("id") or payload.get("procedure_id") or payload.get("procedureId")
+    signature_request = data.get("signature_request") or payload.get("signature_request") or {}
+    signer = data.get("signer") or payload.get("signer") or {}
+    procedure_id = signature_request.get("id") or payload.get("procedure_id") or payload.get("procedureId")
     signer_id = signer.get("id") or payload.get("signer_id") or payload.get("signerId")
     event_name = (payload.get("event_name") or payload.get("eventName") or "").lower()
-    signed_file_url = payload.get("signed_file_url") or sr.get("signed_file_url")
-    evidence_url = payload.get("evidence_url") or sr.get("evidence_url")
+    signed_file_url = payload.get("signed_file_url") or signature_request.get("signed_file_url")
+    evidence_url = payload.get("evidence_url") or signature_request.get("evidence_url")
 
-    from models import ProcedureCase  # imported lazily to avoid circular import in autoloaders
+    from models import ProcedureCase, DocumentSignature  # imported lazily to avoid circular import in autoloaders
+    from services import document_signature_service
+
+    doc_sig = None
+    if procedure_id:
+        doc_sig = db.query(DocumentSignature).filter(
+            DocumentSignature.yousign_procedure_id == procedure_id
+        ).first()
+
+    if doc_sig:
+        if "signature_request" in event_name and any(token in event_name for token in ("done", "completed")):
+            document_signature_service.poll_and_fetch_document_signature(db, doc_sig)
+            return {"detail": "ok"}
+
+        if "signer" in event_name and any(token in event_name for token in ("signed", "done", "completed")):
+            parent_label = None
+            if signer_id == doc_sig.parent1_yousign_signer_id:
+                parent_label = "parent1"
+            elif signer_id == doc_sig.parent2_yousign_signer_id:
+                parent_label = "parent2"
+
+            if not parent_label:
+                document_signature_service.poll_and_fetch_document_signature(db, doc_sig)
+                return {"detail": "ok"}
+
+            document_signature_service.update_document_signature_status(
+                db,
+                doc_sig.id,
+                parent_label=parent_label,
+                status_value="signed",
+                signed_at=dt.datetime.utcnow(),
+                method="yousign",
+                signed_file_url=signed_file_url,
+                evidence_url=evidence_url,
+            )
+        return {"detail": "ok"}
 
     if procedure_id:
         case = db.query(ProcedureCase).filter(ProcedureCase.yousign_procedure_id == procedure_id).first()

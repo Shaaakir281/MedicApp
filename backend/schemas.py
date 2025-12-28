@@ -487,11 +487,9 @@ class PharmacySearchResponse(BaseModel):
 
 class DocumentSignatureStartRequest(BaseModel):
     """Démarrer la signature pour UN document spécifique."""
-    procedure_case_id: int
-    document_type: str = Field(
-        pattern="^(authorization|consent|fees|surgical_authorization_minor|informed_consent|fees_consent_quote)$",
-        description="Type de document à signer"
-    )
+    procedure_case_id: int | None = None
+    appointment_id: int | None = None
+    document_type: str | None = None
     signer_role: SignerRole
     mode: str = Field(
         default="remote",
