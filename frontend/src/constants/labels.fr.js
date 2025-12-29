@@ -12,6 +12,7 @@ export const LABELS_FR = {
     tabs: {
       file: 'Dossier',
       appointments: 'Rendez-vous',
+      prescriptions: 'Ordonnances',
       documents: 'Documents à signer',
     },
     header: {
@@ -79,4 +80,3 @@ export const LABELS_FR = {
     },
   },
 };
-

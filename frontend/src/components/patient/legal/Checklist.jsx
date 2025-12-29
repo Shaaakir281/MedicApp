@@ -5,12 +5,14 @@ export function Checklist({
   role,
   checkedKeys,
   onCheck,
+  signatureStatus = null,
   disabled = false,
   submitting = false,
 }) {
   const relevantCases = useMemo(() => {
     return (cases || []).filter((item) => (item.requiredRoles || []).includes(role));
   }, [cases, role]);
+  const signatureLocked = ['sent', 'signed'].includes(String(signatureStatus || '').toLowerCase());
 
   if (!relevantCases.length) {
     return <p className="text-sm text-slate-600">Aucune case à cocher pour ce parent.</p>;
@@ -20,21 +22,29 @@ export function Checklist({
     <ul className="space-y-2">
       {relevantCases.map((item) => {
         const checked = (checkedKeys || []).includes(item.key);
-        const inputDisabled = disabled || submitting || checked;
+        const inputDisabled = disabled || submitting || (checked && signatureLocked);
+        const lockTitle =
+          checked && signatureLocked ? 'Impossible de decocher: signature deja envoyee' : '';
         return (
-          <li key={item.key} className="flex items-start gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-sm mt-1"
-              checked={checked}
-              disabled={inputDisabled}
-              onChange={() => onCheck?.(item.key)}
-            />
-            <span>{item.label}</span>
+          <li key={item.key} className="text-sm text-slate-700">
+            <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3" title={lockTitle}>
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm mt-1"
+                checked={checked}
+                disabled={inputDisabled}
+                onChange={() => onCheck?.(item.key)}
+              />
+              <div className="flex-1">
+                <span className="text-sm">{item.label}</span>
+                {checked && signatureLocked && (
+                  <span className="ml-2 badge badge-xs badge-info">Verrouille</span>
+                )}
+              </div>
+            </label>
           </li>
         );
       })}
     </ul>
   );
 }
-

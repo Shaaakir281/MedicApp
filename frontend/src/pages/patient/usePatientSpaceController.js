@@ -35,6 +35,11 @@ export function usePatientSpaceController({ token, procedureSelection }) {
     setSuccessMessage,
   });
 
+  const dashboardQuery = usePatientDashboard({
+    token,
+    appointmentId: activeAppointmentId,
+  });
+
   const appointments = usePatientAppointments({
     token,
     isAuthenticated: true,
@@ -43,6 +48,7 @@ export function usePatientSpaceController({ token, procedureSelection }) {
     loadProcedureCase: procedure.loadProcedureCase,
     setError,
     setSuccessMessage,
+    onReloadDashboard: dashboardQuery.reload,
   });
 
   const appointmentOptions = useMemo(
@@ -81,11 +87,6 @@ export function usePatientSpaceController({ token, procedureSelection }) {
     return activeAppointmentId || procedure.procedureCase.appointments[0]?.id || null;
   }, [activeAppointmentId, procedure.procedureCase]);
 
-  const dashboardQuery = usePatientDashboard({
-    token,
-    appointmentId: activeAppointmentId,
-  });
-
   useEffect(() => {
     const dashboardAppointmentId = dashboardQuery.dashboard?.appointment_id;
     if (!dashboardAppointmentId) return;
@@ -106,7 +107,13 @@ export function usePatientSpaceController({ token, procedureSelection }) {
     [procedure.procedureCase, dashboardQuery.dashboard, legalStatus],
   );
 
-  const canSchedule = Boolean(procedure.procedureCase && procedure.procedureCase.parental_authority_ack);
+  const procedureCase = procedure.procedureCase;
+  const hasValue = (value) => Boolean(String(value || '').trim());
+  const hasChildName = hasValue(procedureCase?.child_full_name) ||
+    (hasValue(procedureCase?.child_first_name) && hasValue(procedureCase?.child_last_name));
+  const hasParent1Name = hasValue(procedureCase?.parent1_name) ||
+    (hasValue(procedureCase?.parent1_first_name) && hasValue(procedureCase?.parent1_last_name));
+  const canSchedule = Boolean(procedureCase && hasChildName && hasParent1Name);
   const showScheduling = canSchedule && (!appointments.bothAppointmentsBooked || appointments.editingAppointmentId);
 
   const childBirthdateString = watch('child_birthdate') || procedure.procedureCase?.child_birthdate || null;

@@ -6,14 +6,17 @@ import Toast from '../../components/Toast.jsx';
 import { HeaderSummary } from '../../components/patient/HeaderSummary.jsx';
 import { TabAppointments } from '../../components/patient/tabs/TabAppointments.jsx';
 import { TabDossier } from '../../components/patient/tabs/TabDossier.jsx';
+import { TabPrescriptions } from '../../components/patient/tabs/TabPrescriptions.jsx';
 import { TabLegalDocs } from '../../components/patient/tabs/TabLegalDocs.jsx';
 import { LABELS_FR } from '../../constants/labels.fr.js';
-import { PatientTabDossier as PatientTabDossierNew } from './PatientTabDossier.jsx';
+import { useDossier } from '../../hooks/useDossier.js';
+import { PatientTabDossierView } from './PatientTabDossier.jsx';
 import { usePatientSpaceController } from './usePatientSpaceController.js';
 
 const TABS = {
   file: 'file',
   appointments: 'appointments',
+  prescriptions: 'prescriptions',
   documents: 'documents',
 };
 
@@ -25,8 +28,35 @@ export function PatientSpacePage({
   onChangeProcedure,
 }) {
   const enableNewDossier = String(import.meta.env.VITE_FEATURE_NEW_DOSSIER || '').toLowerCase() === 'true';
+  const dossier = useDossier({ token: enableNewDossier ? token : null });
   const controller = usePatientSpaceController({ token, procedureSelection });
   const [activeTab, setActiveTab] = useState(TABS.file);
+  const [pendingPrescriptionId, setPendingPrescriptionId] = useState(null);
+
+  const handleTabChange = (nextTab) => {
+    setActiveTab(nextTab);
+    if (nextTab !== TABS.prescriptions) {
+      setPendingPrescriptionId(null);
+    }
+  };
+
+  const handleViewPrescription = (appt) => {
+    const apptId = appt?.appointment_id || appt?.id;
+    if (apptId) {
+      controller.setActiveAppointmentId?.(apptId);
+      setPendingPrescriptionId(apptId);
+    }
+    setActiveTab(TABS.prescriptions);
+  };
+
+  const handleDownloadPrescription = (appt) => {
+    const { downloadUrl } = controller.appointments.getPrescriptionUrls(appt);
+    if (!downloadUrl) {
+      controller.setError?.("L'ordonnance n'est pas disponible pour ce rendez-vous.");
+      return;
+    }
+    window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+  };
 
   const previewActions = useMemo(() => {
     if (!controller.previewDownloadUrl) return null;
@@ -47,6 +77,8 @@ export function PatientSpacePage({
     <div className="max-w-6xl mx-auto space-y-6 pb-16">
       <HeaderSummary
         vm={controller.vm}
+        dossierForm={enableNewDossier ? dossier.formState : null}
+        dossierVm={enableNewDossier ? dossier.vm : null}
         userEmail={user?.email}
         onLogout={onLogout}
         dossierComplete={controller.dossierComplete}
@@ -58,21 +90,28 @@ export function PatientSpacePage({
           <button
             type="button"
             className={`tab ${activeTab === TABS.file ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab(TABS.file)}
+            onClick={() => handleTabChange(TABS.file)}
           >
             {LABELS_FR.patientSpace.tabs.file}
           </button>
           <button
             type="button"
             className={`tab ${activeTab === TABS.appointments ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab(TABS.appointments)}
+            onClick={() => handleTabChange(TABS.appointments)}
           >
             {LABELS_FR.patientSpace.tabs.appointments}
           </button>
           <button
             type="button"
+            className={`tab ${activeTab === TABS.prescriptions ? 'tab-active' : ''}`}
+            onClick={() => handleTabChange(TABS.prescriptions)}
+          >
+            {LABELS_FR.patientSpace.tabs.prescriptions}
+          </button>
+          <button
+            type="button"
             className={`tab ${activeTab === TABS.documents ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab(TABS.documents)}
+            onClick={() => handleTabChange(TABS.documents)}
           >
             {LABELS_FR.patientSpace.tabs.documents}
           </button>
@@ -89,7 +128,7 @@ export function PatientSpacePage({
       {activeTab === TABS.file && (
         <>
           {enableNewDossier ? (
-            <PatientTabDossierNew token={token} />
+            <PatientTabDossierView dossier={dossier} currentUser={user} />
           ) : (
             <FormProvider {...controller.formMethods}>
               <TabDossier
@@ -118,6 +157,15 @@ export function PatientSpacePage({
           showScheduling={controller.showScheduling}
           setError={controller.setError}
           setPreviewState={controller.setPreviewState}
+          onViewPrescription={handleViewPrescription}
+        />
+      )}
+
+      {activeTab === TABS.prescriptions && (
+        <TabPrescriptions
+          appointments={controller.procedure.procedureCase?.appointments || []}
+          onDownload={handleDownloadPrescription}
+          highlightAppointmentId={pendingPrescriptionId}
         />
       )}
 

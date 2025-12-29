@@ -1,29 +1,37 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { InfoBanner } from '../../components/patient/dossier/InfoBanner.jsx';
 import { ChildIdentityForm } from '../../components/patient/dossier/ChildIdentityForm.jsx';
 import { GuardianForm } from '../../components/patient/dossier/GuardianForm.jsx';
 import { Button, Card, SectionHeading } from '../../components/ui';
 import { useDossier } from '../../hooks/useDossier.js';
-import { vmToForm } from '../../services/dossier.mapper.js';
 
-export function PatientTabDossier({ token, currentUser }) {
-  const dossier = useDossier({ token });
+export function PatientTabDossierView({ dossier, currentUser }) {
   const [sendingRole, setSendingRole] = useState(null);
   const [verifyingRole, setVerifyingRole] = useState(null);
   const [sendingEmailRole, setSendingEmailRole] = useState(null);
+  const autoFilledEmailRef = useRef(false);
+  const userEmailVerified = Boolean(currentUser?.email_verified ?? currentUser?.email);
+  const parent1EmailVerified = Boolean(
+    dossier.vm?.guardians?.PARENT_1?.emailVerifiedAt || userEmailVerified,
+  );
+  const parent1PhoneVerified = Boolean(dossier.vm?.guardians?.PARENT_1?.phoneVerifiedAt);
+  const formComplete = Boolean(
+    dossier.formState?.childFirstName &&
+      dossier.formState?.childLastName &&
+      dossier.formState?.birthDate &&
+      dossier.formState?.parent1FirstName &&
+      dossier.formState?.parent1LastName &&
+      dossier.formState?.parent1Email
+  );
 
   useEffect(() => {
-    if (dossier.vm && !dossier.formState) {
-      const form = vmToForm(dossier.vm);
-      // Restore checkbox state from localStorage on first load
-      const savedAck = localStorage.getItem('procedure_info_acknowledged');
-      if (savedAck === 'true') {
-        form.procedure_info_acknowledged = true;
-      }
-      dossier.setFormState(form);
-    }
-  }, [dossier.vm, dossier.formState]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (autoFilledEmailRef.current) return;
+    if (!currentUser?.email) return;
+    if (!dossier.formState || dossier.formState.parent1Email) return;
+    dossier.updateForm('parent1Email', currentUser.email);
+    autoFilledEmailRef.current = true;
+  }, [currentUser?.email, dossier.formState, dossier]);
 
   const handleSendOtp = async (role) => {
     setSendingRole(role);
@@ -76,7 +84,7 @@ export function PatientTabDossier({ token, currentUser }) {
                 sending={sendingRole === 'PARENT_1'}
                 verifying={verifyingRole === 'PARENT_1'}
                 isUserAccount={true}
-                userEmailVerified={currentUser?.email_verified || false}
+                userEmailVerified={userEmailVerified}
                 disabled={false}
               />
             <GuardianForm
@@ -84,7 +92,7 @@ export function PatientTabDossier({ token, currentUser }) {
                 prefix="parent2"
                 formState={dossier.formState || {}}
                 onChange={dossier.updateForm}
-                required
+                required={false}
                 guardianData={dossier.vm?.guardians?.PARENT_2}
                 verificationState={dossier.vm?.verification?.PARENT_2}
                 onSendCode={() => handleSendOtp('PARENT_2')}
@@ -112,8 +120,15 @@ export function PatientTabDossier({ token, currentUser }) {
             <div className="space-y-2">
               <h4 className="font-semibold text-sm text-slate-700 border-b pb-1 flex items-center justify-between">
                 <span>Parent / Tuteur 1</span>
-                {dossier.vm?.guardians?.PARENT_1?.phoneVerifiedAt && (
-                  <span className="badge badge-success badge-xs">Tél. vérifié</span>
+                {(parent1PhoneVerified || parent1EmailVerified) && (
+                  <div className="flex items-center gap-2">
+                    {parent1PhoneVerified && (
+                      <span className="badge badge-success badge-xs">Tel. verifie</span>
+                    )}
+                    {parent1EmailVerified && (
+                      <span className="badge badge-success badge-xs">Email verifie</span>
+                    )}
+                  </div>
                 )}
               </h4>
               <div className="space-y-1 text-sm">
@@ -167,6 +182,7 @@ export function PatientTabDossier({ token, currentUser }) {
                   id="procedure-info-ack"
                   checked={dossier.formState?.procedure_info_acknowledged || false}
                   onChange={(e) => dossier.updateForm('procedure_info_acknowledged', e.target.checked)}
+                  disabled={!formComplete && !dossier.formState?.procedure_info_acknowledged}
                   className="checkbox checkbox-primary mt-0.5"
                 />
                 <label htmlFor="procedure-info-ack" className="text-sm text-blue-900 cursor-pointer">
@@ -201,4 +217,9 @@ export function PatientTabDossier({ token, currentUser }) {
       </Card>
     </div>
   );
+}
+
+export function PatientTabDossier({ token, currentUser }) {
+  const dossier = useDossier({ token });
+  return <PatientTabDossierView dossier={dossier} currentUser={currentUser} />;
 }

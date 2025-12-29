@@ -85,6 +85,7 @@ export function LegalDocumentCard({
               cases={doc?.cases || []}
               role={role}
               checkedKeys={checkedKeys}
+              signatureStatus={parentState.signatureStatus}
               onCheck={(caseKey) => onAcknowledgeCase?.({ docType: doc.docType, role, caseKey })}
               submitting={submitting}
             />

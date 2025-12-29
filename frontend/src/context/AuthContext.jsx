@@ -103,7 +103,7 @@ export function AuthProvider({ children }) {
     }
     const payload = parseJwtPayload(accessToken) || {};
     const expiresOn = typeof payload.exp === 'number' ? payload.exp * 1000 : null;
-    const normalizedUser =
+    const baseUser =
       fallbackUser ||
       (payload.sub
         ? {
@@ -111,6 +111,16 @@ export function AuthProvider({ children }) {
             email: payload.email || null,
           }
         : null);
+    const emailVerified =
+      typeof payload.email_verified === 'boolean'
+        ? payload.email_verified
+        : baseUser?.email_verified;
+    const normalizedUser = baseUser
+      ? {
+          ...baseUser,
+          email_verified: typeof emailVerified === 'boolean' ? emailVerified : true,
+        }
+      : null;
     return {
       accessToken,
       refreshToken: nextRefreshToken,
@@ -196,6 +206,7 @@ export function AuthProvider({ children }) {
         const currentUser = {
           id: payload.sub ? Number(payload.sub) : null,
           email: payload.email || credentials.email,
+          email_verified: true,
         };
         updateSession(buildSession(data.access_token, data.refresh_token, currentUser));
         return currentUser;

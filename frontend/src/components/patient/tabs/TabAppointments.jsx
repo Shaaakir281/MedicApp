@@ -15,6 +15,7 @@ export function TabAppointments({
   showScheduling,
   setError,
   setPreviewState,
+  onViewPrescription,
 }) {
   const handleSendByEmail = (url) => {
     if (!url) {
@@ -56,6 +57,7 @@ export function TabAppointments({
         cancelingId={appointments.cancelingId}
         onSelectAppointmentId={(apptId) => setActiveAppointmentId?.(apptId)}
         activeAppointmentId={activeAppointmentId}
+        onViewPrescription={onViewPrescription}
       />
 
       <AppointmentHistory
@@ -68,6 +70,7 @@ export function TabAppointments({
         cancelingId={appointments.cancelingId}
         onSelectAppointmentId={(apptId) => setActiveAppointmentId?.(apptId)}
         activeAppointmentId={activeAppointmentId}
+        onViewPrescription={onViewPrescription}
       />
 
       <ScheduleAppointment appointments={appointments} show={showScheduling} />

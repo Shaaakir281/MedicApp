@@ -24,6 +24,19 @@ function buildVerificationDefaults() {
   }, {});
 }
 
+function sanitizeName(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  const normalized = trimmed.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (normalized === 'prenom' || normalized === 'nom') return '';
+  return trimmed;
+}
+
+function optionalString(value) {
+  const trimmed = String(value || '').trim();
+  return trimmed ? trimmed : null;
+}
+
 export function toDossierVM(apiResponse) {
   const guardiansMap = buildGuardianDefaults();
   const verification = buildVerificationDefaults();
@@ -63,17 +76,17 @@ export function toDossierVM(apiResponse) {
 
 export function vmToForm(vm) {
   return {
-    childFirstName: vm?.child?.firstName || '',
-    childLastName: vm?.child?.lastName || '',
+    childFirstName: sanitizeName(vm?.child?.firstName),
+    childLastName: sanitizeName(vm?.child?.lastName),
     birthDate: vm?.child?.birthDate || '',
     weightKg: vm?.child?.weightKg ?? '',
     medicalNotes: vm?.child?.medicalNotes || '',
-    parent1FirstName: vm?.guardians?.PARENT_1?.firstName || '',
-    parent1LastName: vm?.guardians?.PARENT_1?.lastName || '',
+    parent1FirstName: sanitizeName(vm?.guardians?.PARENT_1?.firstName),
+    parent1LastName: sanitizeName(vm?.guardians?.PARENT_1?.lastName),
     parent1Email: vm?.guardians?.PARENT_1?.email || '',
     parent1Phone: vm?.guardians?.PARENT_1?.phoneE164 || '',
-    parent2FirstName: vm?.guardians?.PARENT_2?.firstName || '',
-    parent2LastName: vm?.guardians?.PARENT_2?.lastName || '',
+    parent2FirstName: sanitizeName(vm?.guardians?.PARENT_2?.firstName),
+    parent2LastName: sanitizeName(vm?.guardians?.PARENT_2?.lastName),
     parent2Email: vm?.guardians?.PARENT_2?.email || '',
     parent2Phone: vm?.guardians?.PARENT_2?.phoneE164 || '',
   };
@@ -101,14 +114,19 @@ export function formToPayload(formState) {
       email: formState.parent1Email || null,
       phone_e164: formState.parent1Phone || null,
     },
-    {
-      role: 'PARENT_2',
-      first_name: (formState.parent2FirstName || '').trim(),
-      last_name: (formState.parent2LastName || '').trim(),
-      email: formState.parent2Email || null,
-      phone_e164: formState.parent2Phone || null,
-    },
   ];
+
+  const parent2FirstName = (formState.parent2FirstName || '').trim();
+  const parent2LastName = (formState.parent2LastName || '').trim();
+  if (parent2FirstName && parent2LastName) {
+    guardians.push({
+      role: 'PARENT_2',
+      first_name: parent2FirstName,
+      last_name: parent2LastName,
+      email: optionalString(formState.parent2Email),
+      phone_e164: optionalString(formState.parent2Phone),
+    });
+  }
 
   return { child, guardians };
 }

@@ -14,6 +14,7 @@ export function UpcomingAppointments({
   cancelingId,
   onSelectAppointmentId,
   activeAppointmentId,
+  onViewPrescription,
 }) {
   return (
     <section className="p-6 border rounded-xl bg-white shadow-sm space-y-4">
@@ -35,8 +36,8 @@ export function UpcomingAppointments({
         cancelingId={cancelingId}
         onSelect={onSelectAppointmentId}
         activeAppointmentId={activeAppointmentId}
+        onViewPrescription={onViewPrescription}
       />
     </section>
   );
 }
-

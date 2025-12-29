@@ -7,8 +7,8 @@ import {
   getLegalStatus,
 } from '../../../services/patientDashboard.api.js';
 import { buildPatientDashboardVM } from '../../../services/patientDashboard.mapper.js';
-import { LegalDocumentCard } from '../legal/LegalDocumentCard.jsx';
 import { AppointmentContextSelector } from '../sections/AppointmentContextSelector.jsx';
+import { TabLegalDocsByParent } from './TabLegalDocsByParent.jsx';
 
 export function TabLegalDocs({
   token,
@@ -30,6 +30,7 @@ export function TabLegalDocs({
   const [loading, setLoading] = useState(false);
   const [catalogError, setCatalogError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [activeParentRole, setActiveParentRole] = useState('parent1');
 
   useEffect(() => {
     if (!signatureAppointmentId || !token) {
@@ -156,27 +157,40 @@ export function TabLegalDocs({
       {catalogError && <div className="alert alert-warning">{catalogError}</div>}
       {loading && <div className="loading loading-spinner loading-sm" />}
 
-      <div className="grid gap-4">
-        {(vmWithDocs.legalDocuments || []).map((doc) => (
-          <LegalDocumentCard
-            key={doc.docType}
-            doc={doc}
-            token={token}
-            appointmentId={signatureAppointmentId}
-            procedureCaseId={procedureCase?.id}
-            overallLegalComplete={overallLegalComplete}
-            parentVerifiedByRole={parentVerifiedByRole}
-            parentEmailByRole={parentEmailByRole}
-            onAcknowledgeCase={handleAcknowledgeCase}
-            submitting={submitting}
-            setError={setError}
-            setSuccessMessage={setSuccessMessage}
-            onReloadCase={onReloadCase}
-            onReloadDashboard={onReloadDashboard}
-            setPreviewState={setPreviewState}
-          />
-        ))}
+      <div className="tabs tabs-boxed">
+        <button
+          type="button"
+          className={`tab ${activeParentRole === 'parent1' ? 'tab-active' : ''}`}
+          onClick={() => setActiveParentRole('parent1')}
+        >
+          Parent 1
+        </button>
+        <button
+          type="button"
+          className={`tab ${activeParentRole === 'parent2' ? 'tab-active' : ''}`}
+          onClick={() => setActiveParentRole('parent2')}
+        >
+          Parent 2
+        </button>
       </div>
+
+      <TabLegalDocsByParent
+        parentRole={activeParentRole}
+        legalDocuments={vmWithDocs.legalDocuments || []}
+        token={token}
+        appointmentId={signatureAppointmentId}
+        procedureCaseId={procedureCase?.id}
+        overallLegalComplete={overallLegalComplete}
+        parentVerifiedByRole={parentVerifiedByRole}
+        parentEmailByRole={parentEmailByRole}
+        onAcknowledgeCase={handleAcknowledgeCase}
+        submitting={submitting}
+        setError={setError}
+        setSuccessMessage={setSuccessMessage}
+        onReloadCase={onReloadCase}
+        onReloadDashboard={onReloadDashboard}
+        setPreviewState={setPreviewState}
+      />
     </div>
   );
 }

@@ -14,6 +14,7 @@ export function usePatientAppointments({
   loadProcedureCase,
   setError,
   setSuccessMessage,
+  onReloadDashboard,
 }) {
   const today = useMemo(() => new Date(), []);
   const [currentMonth, setCurrentMonth] = useState(
@@ -162,6 +163,7 @@ export function usePatientAppointments({
       setEditingAppointmentId(null);
       setEditModalOpen(false);
       await loadProcedureCase?.();
+      await onReloadDashboard?.();
       return true;
     } catch (err) {
       setError?.(err.message);
@@ -177,6 +179,7 @@ export function usePatientAppointments({
     appointmentMode,
     editingAppointmentId,
     loadProcedureCase,
+    onReloadDashboard,
     setError,
     setSuccessMessage,
   ]);
@@ -209,6 +212,7 @@ export function usePatientAppointments({
         await deleteAppointment(token, apptId, { cascadeAct: false });
         setSuccessMessage?.('Rendez-vous annulé. Vous pouvez en planifier un nouveau.');
         await loadProcedureCase?.();
+        await onReloadDashboard?.();
       } catch (err) {
         setError?.(err.message);
       } finally {
@@ -219,7 +223,7 @@ export function usePatientAppointments({
         }
       }
     },
-    [cancelingId, editingAppointmentId, loadProcedureCase, setError, setSuccessMessage, token],
+    [cancelingId, editingAppointmentId, loadProcedureCase, onReloadDashboard, setError, setSuccessMessage, token],
   );
 
   const handleCloseEditModal = () => {

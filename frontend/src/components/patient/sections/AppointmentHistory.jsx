@@ -13,6 +13,7 @@ export function AppointmentHistory({
   cancelingId,
   onSelectAppointmentId,
   activeAppointmentId,
+  onViewPrescription,
 }) {
   return (
     <section className="p-6 border rounded-xl bg-white shadow-sm space-y-4">
@@ -33,8 +34,8 @@ export function AppointmentHistory({
         cancelingId={cancelingId}
         onSelect={onSelectAppointmentId}
         activeAppointmentId={activeAppointmentId}
+        onViewPrescription={onViewPrescription}
       />
     </section>
   );
 }
-
