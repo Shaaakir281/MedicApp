@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+import datetime as dt
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session, joinedload
+
+import models
 import schemas
 from core.config import get_settings
 from database import get_db
@@ -26,7 +29,8 @@ def create_cabinet_session(
         signer_role=payload.signer_role,
         practitioner_id=current_user.id,
     )
-    base_url = get_settings().app_base_url.rstrip("/")
+    settings = get_settings()
+    base_url = (settings.frontend_base_url or settings.app_base_url).rstrip("/")
     tablet_url = f"{base_url}/tablet/{code}"
     return schemas.CabinetSessionResponse(
         appointment_id=session.appointment_id,
@@ -55,3 +59,56 @@ def get_cabinet_session(session_code: str, db: Session = Depends(get_db)) -> dic
         "child_full_name": case.child_full_name if case else None,
         "legal_status": legal_status,
     }
+
+
+@router.get("/patients/today", response_model=list[schemas.CabinetPatientEntry])
+def get_cabinet_patients_today(
+    _: models.User = Depends(require_practitioner),
+    db: Session = Depends(get_db),
+) -> list[schemas.CabinetPatientEntry]:
+    today = dt.datetime.utcnow().date()
+    appointments = (
+        db.query(models.Appointment)
+        .options(
+            joinedload(models.Appointment.procedure_case).joinedload(
+                models.ProcedureCase.document_signatures
+            )
+        )
+        .filter(models.Appointment.date == today)
+        .all()
+    )
+
+    results: list[schemas.CabinetPatientEntry] = []
+    for appt in appointments:
+        case = appt.procedure_case
+        if not case:
+            continue
+
+        docs = {doc.document_type: doc for doc in case.document_signatures or []}
+
+        def _is_completed(doc_type: str) -> bool:
+            doc_sig = docs.get(doc_type)
+            if not doc_sig:
+                return False
+            status_value = doc_sig.overall_status
+            if hasattr(status_value, "value"):
+                status_value = status_value.value
+            return str(status_value) == "completed"
+
+        appt_type = appt.appointment_type.value if hasattr(appt.appointment_type, "value") else appt.appointment_type
+
+        results.append(
+            schemas.CabinetPatientEntry(
+                id=case.id,
+                appointment_id=appt.id,
+                child_name=case.child_full_name or "",
+                appointment_date=appt.date,
+                appointment_time=appt.time,
+                appointment_type=appt_type,
+                authorization_signed=_is_completed("authorization"),
+                consent_signed=_is_completed("consent"),
+                fees_signed=_is_completed("fees"),
+            )
+        )
+
+    return results

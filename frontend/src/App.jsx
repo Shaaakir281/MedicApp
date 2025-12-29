@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import Home from './pages/Home.jsx';
 import Patient from './pages/Patient.jsx';
 import Praticien from './pages/Praticien.jsx';
+import DocumentsDashboard from './pages/practitioner/DocumentsDashboard.jsx';
+import CabinetSignaturePage from './pages/practitioner/CabinetSignaturePage.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import VerifyEmail from './pages/VerifyEmail.jsx';
@@ -37,6 +39,8 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/patient" element={<Patient />} />
             <Route path="/praticien" element={<Praticien />} />
+            <Route path="/praticien/documents" element={<DocumentsDashboard />} />
+            <Route path="/praticien/signature-cabinet" element={<CabinetSignaturePage />} />
             <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />
             <Route path="/auth/reset-password" element={<ResetPassword />} />
             <Route path="/auth/verify-email" element={<VerifyEmail />} />

@@ -8,7 +8,7 @@ import {
   getLegalCatalog,
   getLegalStatus,
 } from '../services/patientDashboard.api.js';
-import { getCabinetSession, startSignature } from '../lib/api.js';
+import { getCabinetSession } from '../lib/api.js';
 
 const roleLabel = (role) => {
   if (role === 'parent1') return 'Parent 1';
@@ -25,7 +25,6 @@ export default function TabletSession() {
   const [legalStatus, setLegalStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [signing, setSigning] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -86,32 +85,6 @@ export default function TabletSession() {
     }
   };
 
-  const handleStartSignature = async () => {
-    if (!sessionInfo?.appointment_id || !sessionInfo?.signer_role || !sessionCode) return;
-    setSigning(true);
-    setError(null);
-    try {
-      const response = await startSignature(null, {
-        appointmentId: sessionInfo.appointment_id,
-        signerRole: sessionInfo.signer_role,
-        mode: 'cabinet',
-        sessionCode,
-      });
-      const link = response?.signature_link;
-      if (link) {
-        window.open(link, '_blank', 'noopener,noreferrer');
-      } else {
-        setError('Lien de signature indisponible.');
-      }
-    } catch (err) {
-      setError(err?.message || 'Échec du démarrage de la signature.');
-    } finally {
-      setSigning(false);
-    }
-  };
-
-  const readyToSign = Boolean(legalStatus?.complete);
-
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto p-6 space-y-4">
@@ -167,14 +140,17 @@ export default function TabletSession() {
               key={doc.docType}
               doc={doc}
               token={null}
+              sessionCode={sessionCode}
               appointmentId={sessionInfo.appointment_id}
+              procedureCaseId={sessionInfo.case_id}
               overallLegalComplete={Boolean(legalStatus?.complete)}
               parentVerifiedByRole={{}}
               parentEmailByRole={{}}
               onAcknowledgeCase={handleAcknowledgeCase}
               submitting={submitting}
               fixedRole={sessionInfo.signer_role}
-              showSignatureActions={false}
+              showSignatureActions={true}
+              setError={setError}
             />
           ))}
         </div>
@@ -183,14 +159,6 @@ export default function TabletSession() {
       )}
 
       <div className="flex gap-3 flex-wrap">
-        <button
-          type="button"
-          className={`btn ${readyToSign ? 'btn-primary' : 'btn-disabled'}`}
-          onClick={handleStartSignature}
-          disabled={!readyToSign || signing}
-        >
-          {signing ? 'Ouverture…' : 'Signer maintenant'}
-        </button>
         <button type="button" className="btn btn-ghost" onClick={() => navigate('/')}>
           Terminer
         </button>
@@ -198,4 +166,3 @@ export default function TabletSession() {
     </div>
   );
 }
-

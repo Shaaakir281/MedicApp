@@ -305,6 +305,18 @@ class CabinetSessionResponse(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 
+class CabinetPatientEntry(BaseModel):
+    id: int
+    appointment_id: int
+    child_name: str
+    appointment_date: Optional[date] = None
+    appointment_time: Optional[time_type] = None
+    appointment_type: Optional[str] = None
+    authorization_signed: bool = False
+    consent_signed: bool = False
+    fees_signed: bool = False
+
+
 class SignatureStartPayload(BaseModel):
     appointment_id: int
     signer_role: SignerRole
@@ -561,3 +573,33 @@ class CaseDocumentSignaturesSummary(BaseModel):
     """Résumé des signatures pour un ProcedureCase."""
     procedure_case_id: int
     document_signatures: List[DocumentSignatureDetail] = Field(default_factory=list)
+
+
+class DocumentsDashboardDocumentStatus(BaseModel):
+    parent1_status: Optional[str] = None
+    parent2_status: Optional[str] = None
+
+
+class DocumentsDashboardCaseEntry(BaseModel):
+    id: int
+    appointment_id: Optional[int] = None
+    child_name: str
+    parent_email: Optional[str] = None
+    appointment_date: Optional[date] = None
+    appointment_time: Optional[time_type] = None
+    appointment_type: Optional[str] = None
+    authorization: Optional[DocumentsDashboardDocumentStatus] = None
+    consent: Optional[DocumentsDashboardDocumentStatus] = None
+    fees: Optional[DocumentsDashboardDocumentStatus] = None
+    has_signed_documents: bool = False
+
+
+class DocumentsDashboardStats(BaseModel):
+    complete: int = 0
+    incomplete: int = 0
+    reminders: int = 0
+
+
+class DocumentsDashboardResponse(BaseModel):
+    stats: DocumentsDashboardStats
+    cases: List[DocumentsDashboardCaseEntry] = Field(default_factory=list)

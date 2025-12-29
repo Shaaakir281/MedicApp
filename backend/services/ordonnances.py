@@ -257,15 +257,11 @@ def build_ordonnance_context(
     practitioner = DEFAULT_PRACTITIONER
     clinic = DEFAULT_CLINIC
 
-    if prescriptions:
-        line_items = _line_items_from_strings(prescriptions)
-    else:
-        rendered = _render_line_library(appointment_type, weight_value)
-        line_items = rendered
-        prescriptions = [entry["summary"] for entry in rendered]
+    normalized_prescriptions = list(prescriptions) if prescriptions is not None else []
+    line_items = _line_items_from_strings(normalized_prescriptions)
 
-    instructions_text = instructions or "\n".join(DEFAULT_INSTRUCTION_LINES)
-    instructions_list = _split_instructions(instructions_text) or DEFAULT_INSTRUCTION_LINES
+    instructions_text = instructions or ""
+    instructions_list = _split_instructions(instructions_text)
 
     settings = get_settings()
     verification_target = verification_url or f"{settings.app_base_url.rstrip('/')}/ordonnances/{reference}"
@@ -316,7 +312,7 @@ def build_ordonnance_context(
             "page_label": "Page 1 / 1",
         },
         "line_items": line_items,
-        "prescriptions": list(prescriptions),
+        "prescriptions": normalized_prescriptions,
         "instructions": instructions_text,
         "instructions_list": instructions_list,
         "signature_data_uri": _load_asset_data_uri("signature.png", _SIGNATURE_FALLBACK_SVG),

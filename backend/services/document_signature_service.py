@@ -401,6 +401,66 @@ def _send_document_notifications(
         )
 
 
+def send_document_reminder(
+    case: models.ProcedureCase,
+    doc_sig: models.DocumentSignature,
+    document_type: str,
+    parent_role: str,
+) -> bool:
+    """Resend signature notifications for one parent if a link exists."""
+    role = str(parent_role or "").lower()
+    if role not in {"parent1", "parent2"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Role parent invalide.",
+        )
+
+    document_type = normalize_document_type(document_type)
+    doc_labels = {
+        "authorization": "Autorisation d'intervention",
+        "consent": "Consentement eclaire",
+        "fees": "Honoraires",
+    }
+    doc_label = doc_labels.get(document_type, document_type)
+    reference = f"{case.id}-{document_type}"
+    app_name = get_settings().app_name
+
+    link = doc_sig.parent1_signature_link if role == "parent1" else doc_sig.parent2_signature_link
+    if not link:
+        return False
+
+    def _build_body() -> str:
+        return (
+            f"Vous avez un document medical a signer : {doc_label}.\n"
+            f"Reference : {reference}\n"
+            f"Lien de signature securise : {link}\n"
+            f"{app_name}"
+        )
+
+    if role == "parent1":
+        if case.parent1_sms_optin and case.parent1_phone:
+            send_sms(case.parent1_phone, _build_body())
+        if case.parent1_email:
+            email_service.send_signature_request_email(
+                case.parent1_email,
+                doc_label=doc_label,
+                signature_link=link,
+                reference=reference,
+            )
+    else:
+        if case.parent2_sms_optin and case.parent2_phone:
+            send_sms(case.parent2_phone, _build_body())
+        if case.parent2_email:
+            email_service.send_signature_request_email(
+                case.parent2_email,
+                doc_label=doc_label,
+                signature_link=link,
+                reference=reference,
+            )
+
+    return True
+
+
 
 def _download_and_store_artifacts(
     doc_sig: models.DocumentSignature,

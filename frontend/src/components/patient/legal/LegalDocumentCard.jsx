@@ -8,6 +8,7 @@ import { SignatureActions } from './SignatureActions.jsx';
 export function LegalDocumentCard({
   doc,
   token,
+  sessionCode,
   appointmentId,
   procedureCaseId,
   overallLegalComplete,
@@ -98,6 +99,7 @@ export function LegalDocumentCard({
             doc={doc}
             role={role}
             token={token}
+            sessionCode={sessionCode}
             appointmentId={appointmentId}
             procedureCaseId={procedureCaseId}
             parentVerified={Boolean(parentVerifiedByRole?.[role])}

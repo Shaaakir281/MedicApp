@@ -70,12 +70,12 @@ def start_document_signature(
         appointment = db.query(models.Appointment).filter(
             models.Appointment.id == session.appointment_id
         ).first()
-        if not appointment or not appointment.procedure_case_id:
+        if not appointment or not appointment.procedure_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Appointment ou case introuvable."
             )
-        procedure_case_id = appointment.procedure_case_id
+        procedure_case_id = appointment.procedure_id
         signer_role = session.signer_role
         mode = "cabinet"
 
@@ -90,7 +90,7 @@ def start_document_signature(
         appointment = db.query(models.Appointment).filter(
             models.Appointment.id == appointment_id
         ).first()
-        if not appointment or not appointment.procedure_case_id:
+        if not appointment or not appointment.procedure_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Appointment ou case introuvable."
@@ -100,7 +100,7 @@ def start_document_signature(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Accès refusé."
             )
-        procedure_case_id = appointment.procedure_case_id
+        procedure_case_id = appointment.procedure_id
 
     if procedure_case_id is None:
         raise HTTPException(

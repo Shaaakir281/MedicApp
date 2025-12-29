@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = Field(default=30, alias="REFRESH_TOKEN_EXPIRE_DAYS", ge=1)
     app_name: str = Field(default="MedicApp", alias="APP_NAME")
     app_base_url: str = Field(default="http://localhost:8000", alias="APP_BASE_URL")
+    frontend_base_url: str = Field(default="http://localhost:5173", alias="FRONTEND_BASE_URL")
     cors_allow_origins_raw: str | List[str] | None = Field(default=None, alias="BACKEND_CORS_ORIGINS")
 
     smtp_host: Optional[str] = Field(default=None, alias="SMTP_HOST")

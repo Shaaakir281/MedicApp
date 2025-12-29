@@ -20,11 +20,7 @@ from services.pdf import generate_ordonnance_pdf, ORDONNANCE_CATEGORY
 from services.email import send_prescription_signed_email
 from services.storage import StorageError, get_storage_backend
 from services import download_links, qr_codes
-from services.ordonnances import (
-    build_ordonnance_context,
-    default_items_for_type,
-    DEFAULT_INSTRUCTION_LINES,
-)
+from services.ordonnances import build_ordonnance_context
 from core.config import get_settings
 from pydantic import BaseModel, Field
 from dependencies.auth import get_current_user, require_practitioner
@@ -62,9 +58,6 @@ def _build_patient_download_url(prescription_id: int, *, channel: str) -> str:
     return f"{base_url}{access_path}?actor=patient&channel={channel}"
 
 
-DEFAULT_INSTRUCTIONS = "\n".join(DEFAULT_INSTRUCTION_LINES)
-
-
 def _build_prescription_context(
     db: Session,
     appointment: models.Appointment,
@@ -78,12 +71,8 @@ def _build_prescription_context(
 
     props = appointment.prescription
     weight_value = procedure.child_weight_kg if procedure else None
-    prescriptions = (
-        props.items
-        if props and props.items
-        else default_items_for_type(appointment.appointment_type.value, weight_value)
-    )
-    instructions = props.instructions if props and props.instructions else DEFAULT_INSTRUCTIONS
+    prescriptions = props.items if props and props.items is not None else []
+    instructions = props.instructions if props and props.instructions is not None else ""
 
     reference = (
         props.reference
@@ -800,7 +789,10 @@ def update_prescription(
     prescription.items = [item.strip() for item in payload.items if item.strip()]
     if not prescription.items:
         raise HTTPException(status_code=400, detail="Au moins une ligne de prescription est nécessaire.")
-    prescription.instructions = payload.instructions or DEFAULT_INSTRUCTIONS
+    instructions = payload.instructions
+    if instructions is not None:
+        instructions = instructions.strip()
+    prescription.instructions = instructions or None
 
     existing_qr = prescription.qr_codes[0] if prescription.qr_codes else None
     context, reference, qr_meta = _build_prescription_context(

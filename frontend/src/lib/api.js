@@ -360,6 +360,33 @@ export async function getCabinetSession(sessionCode) {
   return apiRequest(`/cabinet-sessions/${sessionCode}`, { method: 'GET', skipAuth: true });
 }
 
+export async function fetchCabinetPatientsToday(token) {
+  return apiRequest('/cabinet-sessions/patients/today', { method: 'GET', token });
+}
+
+export async function fetchDocumentsDashboard(token, filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.status) {
+    params.append('status', filters.status);
+  }
+  if (filters.dateRange) {
+    params.append('date_range', filters.dateRange);
+  }
+  const query = params.toString();
+  return apiRequest(`/practitioner/documents-dashboard${query ? `?${query}` : ''}`, {
+    method: 'GET',
+    token,
+  });
+}
+
+export async function resendDocumentsDashboard(token, caseId, parentRole) {
+  const query = new URLSearchParams({ parent_role: parentRole }).toString();
+  return apiRequest(`/practitioner/documents-dashboard/${caseId}/resend-documents?${query}`, {
+    method: 'POST',
+    token,
+  });
+}
+
 export async function downloadSignedConsent(token) {
   const resolvedToken = token || authSessionManager?.getAccessToken?.();
   const headers = resolvedToken ? { Authorization: `Bearer ${resolvedToken}` } : {};

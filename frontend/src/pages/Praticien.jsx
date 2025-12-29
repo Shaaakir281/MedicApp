@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
@@ -26,26 +27,20 @@ import { usePractitionerPrescriptions } from '../hooks/usePractitionerPrescripti
 
 const VIEW_OPTIONS = [1, 7, 14, 23];
 const ACT_ITEMS = [
-  'Antiseptique cutane type Biseptine 250 ml',
-  'Compresses steriles non tissees 5x5 cm',
-  'Pansements compressifs 3x3 cm',
-  "Paracetamol pediatrique (Doliprane 2,4 %) 15 mg/kg par prise (base sur le poids actualise de l'enfant)",
-  'Serum physiologique sterile 0,9 %',
-  'Gants steriles usage unique',
-  'Creme cicatrisante type Cicalfate',
+  'Antiseptique cutane Biseptine 250 ml  Soins biquotidiens pendant 5 jours',
+  'Compresses steriles 5x5 cm  10 paquets',
+  'Paracetamol pediatrique Doliprane 2,4%  15 mg/kg par prise toutes les 6h',
+  'Serum physiologique 0,9%  Flacons unidose x 10',
+  'Creme cicatrisante Cicalfate  Application fine 2x/jour pendant 7 jours',
 ];
 const PRECONSULT_ITEMS = [
-  "Carnet de sante de l'enfant - A presenter le jour de la consultation",
-  'Compte-rendu du pediatre ou medecin traitant - Moins de 6 mois',
-  "Thermometre electronique - Verifier l'absence de fievre",
-  "Paracetamol pediatrique (Doliprane 2,4 %) - 15 mg/kg par prise (base sur le poids actualise de l'enfant)",
+  'Paracetamol pediatrique Doliprane 2,4%  15 mg/kg par prise si besoin',
+  'Serum physiologique 0,9%  Flacons unidose x 5',
 ];
 const DEFAULT_INSTRUCTION_LINES = [
-  "Acheter l'ensemble du materiel au plus tard 48 h avant l'intervention et conserver les dispositifs steriles fermes.",
-  "Realiser une toilette soigneuse avec antiseptique la veille et le matin de l'acte.",
-  "Respecter la posologie des antalgiques adaptee au poids de l'enfant ; ne pas depasser 4 prises par 24 h.",
-  "Surveiller la plaie : rougeur anormale, saignement continu ou fievre >= 38 C necessitent un avis medical rapide.",
-  "En cas de doute ou d'effet indesirable, contacter immediatement le praticien via le numero d'astreinte communique.",
+  'Respecter la posologie indiquee et ne pas depasser 4 prises par 24 h.',
+  "Surveiller l'apparition d'effets indesirables et contacter le cabinet si necessaire.",
+  "Conserver les dispositifs steriles fermes jusqu'a utilisation.",
 ];
 const DEFAULT_INSTRUCTIONS = DEFAULT_INSTRUCTION_LINES.join('\n');
 
@@ -392,7 +387,17 @@ const Praticien = () => {
       <PractitionerHeader userEmail={user?.email} onLogout={logout} />
 
       <div className="max-w-6xl mx-auto px-6 pb-10 space-y-8">
-        <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+          <div className="flex gap-2">
+            <Link to="/praticien/documents" className="btn btn-sm btn-outline">
+              Suivi documents
+            </Link>
+            <Link to="/praticien/signature-cabinet" className="btn btn-sm btn-outline">
+              Signature cabinet
+            </Link>
+          </div>
+        </div>
 
         {error && <div className="alert alert-error shadow-lg">{error}</div>}
         {successMessage && <div className="alert alert-success shadow-lg">{successMessage}</div>}

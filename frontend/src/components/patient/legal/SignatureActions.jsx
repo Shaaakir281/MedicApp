@@ -10,6 +10,7 @@ export function SignatureActions({
   doc,
   role,
   token,
+  sessionCode,
   appointmentId,
   procedureCaseId,
   parentVerified,
@@ -24,6 +25,7 @@ export function SignatureActions({
 }) {
   const [signing, setSigning] = useState(false);
   const [downloadingEvidence, setDownloadingEvidence] = useState(false);
+  const hasAccess = Boolean(token || sessionCode);
 
   const parentState = doc?.byParent?.[role] || {
     completedCount: 0,
@@ -47,22 +49,24 @@ export function SignatureActions({
   const canSignCabinet = Boolean(
     signatureSupported &&
       appointmentId &&
-      checklistComplete
+      checklistComplete &&
+      hasAccess
       // overallLegalComplete removed - documents are independent
       // canSignAfterDelay removed for demo
   );
-  const canSignRemote = Boolean(canSignCabinet && parentVerified);
+  const canSignRemote = Boolean(canSignCabinet && parentVerified && token);
 
   const disabledReason = useMemo(() => {
     if (!signatureSupported) return LABELS_FR.patientSpace.documents.reasons.featureUnavailable;
     if (!appointmentId) return LABELS_FR.patientSpace.documents.reasons.missingAppointment;
     if (!checklistComplete) return LABELS_FR.patientSpace.documents.reasons.checklistIncomplete;
+    if (!hasAccess) return 'Session invalide.';
     // Removed: if (!overallLegalComplete) return 'Les 3 documents doivent être validés avant la signature.';
     return null;
-  }, [appointmentId, checklistComplete, signatureSupported]);
+  }, [appointmentId, checklistComplete, hasAccess, signatureSupported]);
 
   const handleStartSignature = async (mode) => {
-    if (!token) return;
+    if (!token && !sessionCode) return;
     if (!appointmentId) {
       setError?.(LABELS_FR.patientSpace.documents.reasons.missingAppointment);
       return;
@@ -76,6 +80,7 @@ export function SignatureActions({
         procedureCaseId,
         parentRole: role,
         mode,
+        sessionCode,
         token,
         docType: doc?.docType,
       });
@@ -151,13 +156,13 @@ export function SignatureActions({
         >
           {signing ? 'Ouverture…' : LABELS_FR.patientSpace.documents.signature.signRemote}
         </button>
-        {!parentVerified && signatureSupported && (
+        {!parentVerified && signatureSupported && token && (
           <span className="text-xs text-slate-500">{LABELS_FR.patientSpace.documents.reasons.phoneNotVerified}</span>
         )}
       </div>
 
       <div className="flex gap-3 flex-wrap text-sm">
-        {hasEvidence && (
+        {hasEvidence && token && (
           <button
             type="button"
             className="link link-primary"
@@ -169,7 +174,7 @@ export function SignatureActions({
         )}
       </div>
 
-      {signatureSupported && (
+      {signatureSupported && token && (
         <SignedDocumentActions
           token={token}
           enabled={Boolean(hasDocFile)}
@@ -185,7 +190,7 @@ export function SignatureActions({
         />
       )}
 
-      {signatureSupported && (
+      {signatureSupported && token && (
         <SendLinkPanel
           token={token}
           primaryLabel={LABELS_FR.patientSpace.guardians[role]}

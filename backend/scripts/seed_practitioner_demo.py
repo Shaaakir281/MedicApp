@@ -23,9 +23,10 @@ DEFAULT_PASSWORD_HASH = (
     "$2b$12$F0iUOJ6Q0iog8EPb28u16uJNmZQ7M1pJ2B8MblU5ZLsBLAiNrLyZu"  # "password"
 )
 DEMO_DOMAIN = "demo.medicapp"
-DEFAULT_START_DATE = dt.date.today() + dt.timedelta(days=1)
-DEFAULT_DAYS = 23
-PATIENTS_PER_DAY = 3
+DEFAULT_START_DATE = dt.date.today()
+DEFAULT_DAYS = 28
+MIN_PATIENTS_PER_DAY = 3
+MAX_PATIENTS_PER_DAY = 4
 
 PRECONSULT_TIMES = [
     dt.time(hour=8, minute=30),
@@ -40,6 +41,79 @@ ACT_TIMES = [
     dt.time(hour=17, minute=0),
     dt.time(hour=13, minute=45),
 ]
+
+
+def _build_time_grid(start: dt.time, end: dt.time, step_minutes: int) -> list[dt.time]:
+    times: list[dt.time] = []
+    cursor = dt.datetime.combine(dt.date.today(), start)
+    end_dt = dt.datetime.combine(dt.date.today(), end)
+    while cursor <= end_dt:
+        times.append(cursor.time())
+        cursor += dt.timedelta(minutes=step_minutes)
+    return times
+
+
+PRECONSULT_FALLBACK_TIMES = _build_time_grid(
+    dt.time(hour=8, minute=0),
+    dt.time(hour=12, minute=30),
+    30,
+)
+ACT_FALLBACK_TIMES = _build_time_grid(
+    dt.time(hour=13, minute=0),
+    dt.time(hour=18, minute=0),
+    30,
+)
+
+
+def _rotate_times(times: list[dt.time], offset: int) -> list[dt.time]:
+    if not times:
+        return []
+    return [times[(offset + idx) % len(times)] for idx in range(len(times))]
+
+
+def _dedupe_times(times: list[dt.time]) -> list[dt.time]:
+    seen: set[dt.time] = set()
+    deduped: list[dt.time] = []
+    for time_ in times:
+        if time_ in seen:
+            continue
+        seen.add(time_)
+        deduped.append(time_)
+    return deduped
+
+
+def _candidate_times(
+    day: dt.date,
+    day_index: int,
+    slot: int,
+    base_times: list[dt.time],
+    fallback_times: list[dt.time],
+) -> list[dt.time]:
+    times = _rotate_times(base_times, day_index + slot) + list(fallback_times)
+    if day == dt.date.today():
+        min_time = (dt.datetime.now().replace(second=0, microsecond=0) + dt.timedelta(minutes=30)).time()
+        times = [time_ for time_ in times if time_ >= min_time]
+    return _dedupe_times(times)
+
+
+def _patients_per_day(day_index: int) -> int:
+    span = MAX_PATIENTS_PER_DAY - MIN_PATIENTS_PER_DAY + 1
+    if span <= 0:
+        return MIN_PATIENTS_PER_DAY
+    return MIN_PATIENTS_PER_DAY + (day_index % span)
+
+
+def _create_appointment_with_retry(create_fn, db: Session, time_candidates: list[dt.time]):
+    for time_ in time_candidates:
+        try:
+            return create_fn(time_)
+        except ValueError as exc:
+            msg = str(exc).lower()
+            if "creneau" in msg or "passe" in msg:
+                db.rollback()
+                continue
+            raise
+    return None
 
 
 @dataclass
@@ -230,38 +304,87 @@ def seed_for_day(
     db: Session,
     day: dt.date,
     day_index: int,
+    slots: int,
     patient_counter: itertools.count,
 ) -> None:
-    for slot in range(PATIENTS_PER_DAY):
-        profile = PROFILES[(day_index * PATIENTS_PER_DAY + slot) % len(PROFILES)]
+    for slot in range(slots):
+        pre_fallback = PRECONSULT_FALLBACK_TIMES
+        if day == dt.date.today():
+            pre_fallback = PRECONSULT_FALLBACK_TIMES + ACT_FALLBACK_TIMES
+        pre_candidates = _candidate_times(day, day_index, slot, PRECONSULT_TIMES, pre_fallback)
+        if not pre_candidates:
+            continue
+
         patient_idx = next(patient_counter)
+        profile = PROFILES[(patient_idx - 1) % len(PROFILES)]
         patient = create_patient(db, patient_idx)
 
         payload = case_payload(patient_idx, profile, preconsult_date=day)
         case = crud.create_procedure_case(db=db, patient_id=patient.id, case_data=payload)
 
-        pre_time = PRECONSULT_TIMES[(day_index + slot) % len(PRECONSULT_TIMES)]
-        pre_appt = create_preconsultation(
-            db=db,
-            patient=patient,
-            case=case,
-            date_=day,
-            time_=pre_time,
-            mode=profile.preconsult_mode,
+        pre_appt = _create_appointment_with_retry(
+            lambda time_: create_preconsultation(
+                db=db,
+                patient=patient,
+                case=case,
+                date_=day,
+                time_=time_,
+                mode=profile.preconsult_mode,
+            ),
+            db,
+            pre_candidates,
         )
+        if pre_appt is None:
+            db.delete(case)
+            db.commit()
+            if not db.query(models.ProcedureCase).filter(
+                models.ProcedureCase.patient_id == patient.id
+            ).first():
+                db.delete(patient)
+                db.commit()
+            continue
+
         mark_reminder_sent(db, pre_appt, opened=(patient_idx % 2 == 0))
 
         if profile.act_offset_days is not None:
             acte_date = day + dt.timedelta(days=profile.act_offset_days)
-            act_time = ACT_TIMES[(day_index + slot) % len(ACT_TIMES)]
-            act_appt = create_act(db=db, patient=patient, case=case, date_=acte_date, time_=act_time)
-            mark_reminder_sent(db, act_appt, opened=(patient_idx % 3 != 0))
+            act_candidates = _candidate_times(acte_date, day_index, slot, ACT_TIMES, ACT_FALLBACK_TIMES)
+            act_appt = _create_appointment_with_retry(
+                lambda time_: create_act(
+                    db=db,
+                    patient=patient,
+                    case=case,
+                    date_=acte_date,
+                    time_=time_,
+                ),
+                db,
+                act_candidates,
+            )
+            if act_appt is not None:
+                mark_reminder_sent(db, act_appt, opened=(patient_idx % 3 != 0))
 
         mark_case_flags(db, case, profile)
 
 
 def clear_demo_data(db: Session) -> None:
     cases = db.query(models.ProcedureCase).filter(models.ProcedureCase.notes.contains(DEMO_TAG)).all()
+    case_ids = [case.id for case in cases]
+    if case_ids:
+        appointment_rows = (
+            db.query(models.Appointment.id)
+            .filter(models.Appointment.procedure_id.in_(case_ids))
+            .all()
+        )
+        appointment_ids = [row[0] for row in appointment_rows]
+        if appointment_ids:
+            db.query(models.SignatureCabinetSession).filter(
+                models.SignatureCabinetSession.appointment_id.in_(appointment_ids)
+            ).delete(synchronize_session=False)
+            db.query(models.LegalAcknowledgement).filter(
+                models.LegalAcknowledgement.appointment_id.in_(appointment_ids)
+            ).delete(synchronize_session=False)
+            db.commit()
+
     for case in cases:
         db.delete(case)
     db.commit()
@@ -286,7 +409,8 @@ def generate_demo(db: Session, days: int, reset: bool, start_date: dt.date) -> N
     patient_counter = itertools.count(1)
     for offset in range(days):
         day = start_date + dt.timedelta(days=offset)
-        seed_for_day(db, day, offset, patient_counter)
+        slots = _patients_per_day(offset)
+        seed_for_day(db, day, offset, slots, patient_counter)
 
     print(f"[seed] Données praticien insérées pour {days} jours à partir du {start_date}.")
     print(f"[seed] Connexion praticien : {practitioner_email(1)} / password")
@@ -298,7 +422,7 @@ def main() -> None:
         "--days",
         type=int,
         default=DEFAULT_DAYS,
-        help="Nombre de jours consécutifs à générer (par défaut 23).",
+        help="Nombre de jours consecutifs a generer (par defaut 28).",
     )
     parser.add_argument(
         "--reset",

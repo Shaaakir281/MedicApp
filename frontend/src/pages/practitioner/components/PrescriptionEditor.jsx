@@ -34,12 +34,11 @@ export function PrescriptionEditor({
 
   useEffect(() => {
     if (isOpen) {
-      const initial = (defaultItems || []).join('\n');
-      setItemsText(initial);
-      setInstructions(defaultInstructions || '');
-      setSelected(syncSelectedFromText(initial));
+      setItemsText('');
+      setInstructions('');
+      setSelected(new Set());
     }
-  }, [isOpen, defaultItems, defaultInstructions, syncSelectedFromText]);
+  }, [isOpen]);
 
   const toggleItem = (value) => {
     const key = normalizeKey(value);

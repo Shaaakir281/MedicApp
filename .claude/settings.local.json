@@ -15,7 +15,9 @@
       "Bash(timeout:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: implement user journey for medical procedure with dossier, appointments and document signatures\n\n## Summary\n- Added mandatory user journey information in Dossier tab with checkbox acknowledgement\n- Implemented 15-day reflection delay after pre-consultation before document signing\n- Added granular document signature architecture \\(1 signature request per document type\\)\n- Implemented guardian email verification system\n- Fixed ProcedureCase auto-creation from Dossier data\n\n## Backend Changes\n- Created `document_signatures` table for granular Yousign signature tracking\n- Added `guardian_email_verifications` table and verification service\n- Implemented automatic ProcedureCase creation when saving Dossier\n- Added `email_verified_at` column to guardians table\n- Created document signature service with neutral PDF templates for RGPD compliance\n- Fixed migration conflicts and merged Alembic heads\n\n## Frontend Changes\n- Added informational box in PatientTabDossier with 4-point user journey\n- Implemented mandatory checkbox: \"J 'ai pris connaissance du parcours de prise en charge\"\n- Added 15-day delay calculation and enforcement in TabLegalDocs\n- Updated signature flow to check pre-consultation date and delay\n- Improved user feedback messages for each journey step\n\n## Fixes\n- Fixed email verification URL \\(removed /api prefix\\)\n- Fixed Pydantic validation errors with default Child name values\n- Fixed ProcedureCase auto-creation by passing all guardians to sync function\n- Fixed checkbox state persistence after save\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(docker compose exec:*)"
+      "Bash(docker compose exec:*)",
+      "Bash(python -m scripts.seed_practitioner_demo:*)",
+      "Bash(ls:*)"
     ]
   }
 }

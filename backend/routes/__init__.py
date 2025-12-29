@@ -14,6 +14,7 @@ from .signature import router as signature_router  # noqa: F401
 from .document_signature import router as document_signature_router  # noqa: F401
 from .patient_dashboard import router as patient_dashboard_router  # noqa: F401
 from .dossier import router as dossier_router  # noqa: F401
+from .documents_dashboard import router as documents_dashboard_router  # noqa: F401
 
 # A convenience list of routers that can be included in the main app.  You can
 # import this in ``main.py`` to loop over and include routers dynamically.
@@ -32,4 +33,5 @@ all_routers = [
     document_signature_router,
     patient_dashboard_router,
     dossier_router,
+    documents_dashboard_router,
 ]
