@@ -56,13 +56,16 @@ export default function TabletSession() {
   }, [sessionCode]);
 
   const docsVm = useMemo(() => {
+    const procedureCase = {
+      document_signatures: sessionInfo?.document_signatures || [],
+    };
     return buildPatientDashboardVM({
-      procedureCase: null,
+      procedureCase,
       dashboard: null,
       legalCatalog: catalog,
       legalStatus,
     }).legalDocuments;
-  }, [catalog, legalStatus]);
+  }, [catalog, legalStatus, sessionInfo]);
 
   const handleAcknowledgeCase = async ({ docType, role, caseKey }) => {
     if (!sessionInfo?.appointment_id || !sessionCode) return;

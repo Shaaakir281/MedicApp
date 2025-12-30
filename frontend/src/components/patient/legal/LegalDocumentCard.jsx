@@ -9,6 +9,7 @@ export function LegalDocumentCard({
   doc,
   token,
   sessionCode,
+  cabinetStatus,
   appointmentId,
   procedureCaseId,
   overallLegalComplete,
@@ -100,6 +101,7 @@ export function LegalDocumentCard({
             role={role}
             token={token}
             sessionCode={sessionCode}
+            cabinetStatus={cabinetStatus}
             appointmentId={appointmentId}
             procedureCaseId={procedureCaseId}
             parentVerified={Boolean(parentVerifiedByRole?.[role])}

@@ -6,6 +6,7 @@ import {
   getLegalCatalog,
   getLegalStatus,
 } from '../../../services/patientDashboard.api.js';
+import { fetchCabinetActiveSessions } from '../../../lib/api.js';
 import { buildPatientDashboardVM } from '../../../services/patientDashboard.mapper.js';
 import { AppointmentContextSelector } from '../sections/AppointmentContextSelector.jsx';
 import { TabLegalDocsByParent } from './TabLegalDocsByParent.jsx';
@@ -14,6 +15,7 @@ export function TabLegalDocs({
   token,
   procedureCase,
   dashboard,
+  cabinetStatus,
   legalStatus,
   setLegalStatus,
   signatureAppointmentId,
@@ -31,6 +33,7 @@ export function TabLegalDocs({
   const [catalogError, setCatalogError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [activeParentRole, setActiveParentRole] = useState('parent1');
+  const [activeCabinetStatus, setActiveCabinetStatus] = useState(cabinetStatus || null);
 
   useEffect(() => {
     if (!signatureAppointmentId || !token) {
@@ -61,6 +64,24 @@ export function TabLegalDocs({
       cancelled = true;
     };
   }, [setLegalStatus, signatureAppointmentId, token]);
+
+  useEffect(() => {
+    if (!signatureAppointmentId || !token) {
+      setActiveCabinetStatus(null);
+      return;
+    }
+    let cancelled = false;
+    fetchCabinetActiveSessions(token, signatureAppointmentId)
+      .then((payload) => {
+        if (!cancelled) setActiveCabinetStatus(payload);
+      })
+      .catch(() => {
+        if (!cancelled) setActiveCabinetStatus(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [signatureAppointmentId, token]);
 
   const overallLegalComplete = Boolean(legalStatus?.complete);
 
@@ -178,6 +199,7 @@ export function TabLegalDocs({
         parentRole={activeParentRole}
         legalDocuments={vmWithDocs.legalDocuments || []}
         token={token}
+        cabinetStatus={activeCabinetStatus || cabinetStatus}
         appointmentId={signatureAppointmentId}
         procedureCaseId={procedureCase?.id}
         overallLegalComplete={overallLegalComplete}

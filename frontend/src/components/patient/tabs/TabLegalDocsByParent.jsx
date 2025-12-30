@@ -6,6 +6,7 @@ export function TabLegalDocsByParent({
   parentRole,
   legalDocuments,
   token,
+  cabinetStatus,
   appointmentId,
   procedureCaseId,
   overallLegalComplete,
@@ -45,6 +46,7 @@ export function TabLegalDocsByParent({
             key={doc.docType}
             doc={doc}
             token={token}
+            cabinetStatus={cabinetStatus}
             appointmentId={appointmentId}
             procedureCaseId={procedureCaseId}
             overallLegalComplete={overallLegalComplete}

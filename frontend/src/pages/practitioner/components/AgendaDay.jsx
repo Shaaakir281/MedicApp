@@ -168,6 +168,7 @@ export function AgendaDay({
                 <DocumentSignatureSection
                   documentSignatures={mapPractitionerProcedureCase(appointment.procedure).documentSignatures || []}
                   caseId={appointment.procedure.case_id}
+                  token={token}
                   onSend={handleSendSignature}
                   onRefresh={onRefreshAppointments}
                 />

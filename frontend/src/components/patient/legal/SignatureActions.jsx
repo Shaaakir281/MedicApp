@@ -11,6 +11,7 @@ export function SignatureActions({
   role,
   token,
   sessionCode,
+  cabinetStatus,
   appointmentId,
   procedureCaseId,
   parentVerified,
@@ -43,6 +44,19 @@ export function SignatureActions({
 
   const checklistComplete = parentState.total > 0 && parentState.completedCount === parentState.total;
   const signatureSupported = Boolean(doc?.signatureSupported);
+  const alreadySigned = Boolean(
+    parentState.signedAt ||
+      String(parentState.signatureStatus || '').toLowerCase() === 'signed',
+  );
+  const cabinetEnabled = Boolean(
+    sessionCode ||
+      (cabinetStatus && (role === 'parent1' ? cabinetStatus.parent1_active : cabinetStatus.parent2_active)),
+  );
+  const parent1Required = doc?.byParent?.parent1?.total > 0;
+  const parent2Required = doc?.byParent?.parent2?.total > 0;
+  const parent1Signed = String(doc?.byParent?.parent1?.signatureStatus || '').toLowerCase() === 'signed';
+  const parent2Signed = String(doc?.byParent?.parent2?.signatureStatus || '').toLowerCase() === 'signed';
+  const fullySigned = (!parent1Required || parent1Signed) && (!parent2Required || parent2Signed);
 
   // INDEPENDENT DOCUMENTS: Each document can be signed independently
   // Act-only: no preconsultation delay enforced
@@ -50,20 +64,33 @@ export function SignatureActions({
     signatureSupported &&
       appointmentId &&
       checklistComplete &&
-      hasAccess
+      hasAccess &&
+      cabinetEnabled &&
+      !alreadySigned
       // overallLegalComplete removed - documents are independent
       // canSignAfterDelay removed for demo
   );
-  const canSignRemote = Boolean(canSignCabinet && parentVerified && token);
+  const canSignRemote = Boolean(
+    signatureSupported && appointmentId && checklistComplete && parentVerified && token && !alreadySigned,
+  );
 
   const disabledReason = useMemo(() => {
     if (!signatureSupported) return LABELS_FR.patientSpace.documents.reasons.featureUnavailable;
     if (!appointmentId) return LABELS_FR.patientSpace.documents.reasons.missingAppointment;
     if (!checklistComplete) return LABELS_FR.patientSpace.documents.reasons.checklistIncomplete;
+    if (alreadySigned) return 'Document deja signe pour ce parent.';
     if (!hasAccess) return 'Session invalide.';
-    // Removed: if (!overallLegalComplete) return 'Les 3 documents doivent être validés avant la signature.';
+    // Removed: if (!overallLegalComplete) return 'Les 3 documents doivent etre valides avant la signature.';
     return null;
-  }, [appointmentId, checklistComplete, hasAccess, signatureSupported]);
+  }, [alreadySigned, appointmentId, checklistComplete, hasAccess, signatureSupported]);
+
+  const cabinetDisabledReason = useMemo(() => {
+    if (sessionCode) return null;
+    if (!cabinetEnabled && token) {
+      return 'Signature en cabinet non activee par le praticien.';
+    }
+    return null;
+  }, [cabinetEnabled, sessionCode, token]);
 
   const handleStartSignature = async (mode) => {
     if (!token && !sessionCode) return;
@@ -161,6 +188,10 @@ export function SignatureActions({
         )}
       </div>
 
+      {cabinetDisabledReason && (
+        <div className="text-xs text-slate-500">{cabinetDisabledReason}</div>
+      )}
+
       <div className="flex gap-3 flex-wrap text-sm">
         {hasEvidence && token && (
           <button
@@ -179,6 +210,7 @@ export function SignatureActions({
           token={token}
           enabled={Boolean(hasDocFile)}
           title={doc?.title}
+          fullySigned={fullySigned}
           setError={setError}
           setPreviewState={setPreviewState}
           documentSignatureId={doc?.documentSignatureId}

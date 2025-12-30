@@ -53,6 +53,9 @@ export class DocumentSignatureVM {
     this.parent2SignedAt = data.parent2_signed_at;
     this.parent2SignatureUrl = data.parent2_signature_url;
     this.downloadUrl = data.download_url;
+    this.finalPdfAvailable = Boolean(data.final_pdf_identifier);
+    this.signedPdfAvailable = Boolean(data.signed_pdf_identifier);
+    this.evidencePdfAvailable = Boolean(data.evidence_pdf_identifier);
     this.overallStatus = data.overall_status || 'draft';
     this.parent1Status = data.parent1_status || 'draft';
     this.parent2Status = data.parent2_status || 'draft';

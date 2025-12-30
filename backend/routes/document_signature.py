@@ -102,6 +102,28 @@ def start_document_signature(
             )
         procedure_case_id = appointment.procedure_id
 
+    if (
+        session is None
+        and mode == "cabinet"
+        and current_user
+        and current_user.role == models.UserRole.patient
+    ):
+        if appointment_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Appointment requis pour la signature en cabinet."
+            )
+        active_session = legal_service.get_active_session_for_appointment(
+            db,
+            appointment_id=appointment_id,
+            signer_role=signer_role,
+        )
+        if not active_session:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Signature en cabinet non activée par le praticien."
+            )
+
     if procedure_case_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -140,9 +162,22 @@ def start_document_signature(
         in_person=in_person,
     )
 
-    # Consommer session si cabinet
-    if session:
-        legal_service.consume_session(db, session)
+    status_attr = (
+        f"{signer_role.value}_status"
+        if hasattr(signer_role, "value")
+        else f"{signer_role}_status"
+    )
+    try:
+        if doc_sig.yousign_procedure_id and getattr(doc_sig, status_attr, None) != "signed":
+            doc_sig = document_signature_service.poll_and_fetch_document_signature(db, doc_sig)
+    except Exception:
+        # Avoid blocking signature creation if polling fails.
+        pass
+    if getattr(doc_sig, status_attr, None) == "signed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ce parent a déjà signé ce document."
+        )
 
     # Récupérer le lien de signature pour ce signer_role
     link_attr = f"{signer_role.value}_signature_link" if hasattr(signer_role, "value") else f"{signer_role}_signature_link"
@@ -297,6 +332,7 @@ def download_document_signature_file(
 
     doc_type = legal_documents_pdf.normalize_document_type(doc_sig.document_type)
     if file_kind == "final":
+        doc_sig = document_signature_service.ensure_final_document(db, doc_sig)
         identifier = doc_sig.final_pdf_identifier
         primary_category = legal_documents_pdf.final_category_for(doc_type)
         fallback_categories = [consent_pdf.FINAL_CONSENT_CATEGORY]

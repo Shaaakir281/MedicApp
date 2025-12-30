@@ -9,6 +9,7 @@ import {
   fetchDocumentsDashboard,
   resendDocumentsDashboard,
 } from '../../lib/api.js';
+import { downloadDocumentSignatureFile, downloadLegalDocumentPreview } from '../../services/documentSignature.api.js';
 import { PractitionerHeader, PractitionerLogin, StatCard } from './components';
 
 const STATUS_OPTIONS = [
@@ -97,10 +98,13 @@ export default function DocumentsDashboard() {
   const sessionMutation = useMutation({
     mutationFn: ({ appointmentId, parentRole }) =>
       createCabinetSession(token, { appointment_id: appointmentId, signer_role: parentRole }),
-    onSuccess: (payload) => {
+    onSuccess: (payload, variables) => {
+      const purpose = variables?.purpose || 'tablet';
       setActionError(null);
-      setActiveSession(payload || null);
-      setActionMessage('Session cabinet creee.');
+      setActiveSession(payload ? { ...payload, purpose } : null);
+      setActionMessage(
+        purpose === 'activation' ? 'Activation cabinet activee.' : 'Session tablette creee.',
+      );
     },
     onError: (err) => {
       setActionMessage(null);
@@ -116,12 +120,51 @@ export default function DocumentsDashboard() {
     resendMutation.mutate({ caseId, parentRole });
   };
 
-  const handleCreateSession = (appointmentId, parentRole) => {
+  const handleCreateSession = (appointmentId, parentRole, purpose) => {
     if (!appointmentId) {
       setActionError("Aucun rendez-vous associe a ce dossier.");
       return;
     }
-    sessionMutation.mutate({ appointmentId, parentRole });
+    sessionMutation.mutate({ appointmentId, parentRole, purpose });
+  };
+
+  const handlePreviewDocument = async ({ caseId, docType, docStatus }) => {
+    if (!token || !caseId) return;
+    try {
+      let blob = null;
+      const fullySigned =
+        String(docStatus?.parent1_status || '').toLowerCase() === 'signed' &&
+        String(docStatus?.parent2_status || '').toLowerCase() === 'signed';
+      if (fullySigned && docStatus?.document_signature_id) {
+        try {
+          blob = await downloadDocumentSignatureFile({
+            token,
+            documentSignatureId: docStatus.document_signature_id,
+            fileKind: 'final',
+            inline: true,
+          });
+        } catch (err) {
+          blob = null;
+        }
+      }
+      if (!blob) {
+        blob = await downloadLegalDocumentPreview({
+          token,
+          procedureCaseId: caseId,
+          documentType: docType,
+          inline: true,
+        });
+      }
+      if (!blob) {
+        setActionError('Document indisponible.');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) {
+      setActionError(err?.message || 'Document indisponible.');
+    }
   };
 
   if (!isAuthenticated) {
@@ -158,22 +201,33 @@ export default function DocumentsDashboard() {
 
         {activeSession && (
           <div className="bg-white border border-slate-200 rounded-2xl p-4 text-sm space-y-1">
-            <p className="font-semibold text-slate-700">Session cabinet active</p>
+            <p className="font-semibold text-slate-700">
+              {activeSession.purpose === 'activation' ? 'Activation cabinet activee' : 'Session cabinet active'}
+            </p>
             <p>Role : {activeSession.signer_role}</p>
-            <p>
-              Code : <span className="font-mono">{activeSession.session_code}</span>
-            </p>
-            <p>
-              Lien tablette :{' '}
-              <a
-                className="link link-primary break-all"
-                href={activeSession.tablet_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {activeSession.tablet_url}
-              </a>
-            </p>
+            {activeSession.purpose !== 'activation' && (
+              <>
+                <p>
+                  Code : <span className="font-mono">{activeSession.session_code}</span>
+                </p>
+                <p>
+                  Lien tablette :{' '}
+                  <a
+                    className="link link-primary break-all"
+                    href={activeSession.tablet_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {activeSession.tablet_url}
+                  </a>
+                </p>
+              </>
+            )}
+            {activeSession.expires_at && (
+              <p>
+                Expiration : {new Date(activeSession.expires_at).toLocaleString('fr-FR')}
+              </p>
+            )}
           </div>
         )}
 
@@ -228,6 +282,7 @@ export default function DocumentsDashboard() {
                   <th className="text-center">Autorisation</th>
                   <th className="text-center">Consentement</th>
                   <th className="text-center">Honoraires</th>
+                  <th className="text-center">Voir</th>
                   <th className="text-center">Actions</th>
                 </tr>
               </thead>
@@ -243,6 +298,34 @@ export default function DocumentsDashboard() {
                     <td><StatusCell status={row.authorization} /></td>
                     <td><StatusCell status={row.consent} /></td>
                     <td><StatusCell status={row.fees} /></td>
+                    <td className="text-center">
+                      <div className="flex flex-col gap-1 items-center">
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs"
+                          onClick={() => handlePreviewDocument({ caseId: row.id, docType: 'authorization', docStatus: row.authorization })}
+                          disabled={!token || !row.id}
+                        >
+                          Autorisation
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs"
+                          onClick={() => handlePreviewDocument({ caseId: row.id, docType: 'consent', docStatus: row.consent })}
+                          disabled={!token || !row.id}
+                        >
+                          Consentement
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs"
+                          onClick={() => handlePreviewDocument({ caseId: row.id, docType: 'fees', docStatus: row.fees })}
+                          disabled={!token || !row.id}
+                        >
+                          Honoraires
+                        </button>
+                      </div>
+                    </td>
                     <td className="text-center">
                       <div className="dropdown dropdown-end">
                         <button type="button" className="btn btn-xs btn-ghost">Actions</button>
@@ -269,19 +352,37 @@ export default function DocumentsDashboard() {
                           <li>
                             <button
                               type="button"
-                              onClick={() => handleCreateSession(row.appointment_id, 'parent1')}
+                              onClick={() => handleCreateSession(row.appointment_id, 'parent1', 'activation')}
                               disabled={sessionMutation.isLoading}
                             >
-                              Creer session Parent 1
+                              Activer cabinet Parent 1
                             </button>
                           </li>
                           <li>
                             <button
                               type="button"
-                              onClick={() => handleCreateSession(row.appointment_id, 'parent2')}
+                              onClick={() => handleCreateSession(row.appointment_id, 'parent2', 'activation')}
                               disabled={sessionMutation.isLoading}
                             >
-                              Creer session Parent 2
+                              Activer cabinet Parent 2
+                            </button>
+                          </li>
+                          <li>
+                            <button
+                              type="button"
+                              onClick={() => handleCreateSession(row.appointment_id, 'parent1', 'tablet')}
+                              disabled={sessionMutation.isLoading}
+                            >
+                              Session tablette Parent 1
+                            </button>
+                          </li>
+                          <li>
+                            <button
+                              type="button"
+                              onClick={() => handleCreateSession(row.appointment_id, 'parent2', 'tablet')}
+                              disabled={sessionMutation.isLoading}
+                            >
+                              Session tablette Parent 2
                             </button>
                           </li>
                         </ul>

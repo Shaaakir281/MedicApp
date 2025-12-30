@@ -12,7 +12,9 @@ RGPD/HDS:
 from __future__ import annotations
 
 import datetime as dt
+import io
 import logging
+import zipfile
 from typing import Optional
 
 from fastapi import HTTPException, status
@@ -509,19 +511,49 @@ def _download_and_store_artifacts(
     # Télécharger audit trail (priorité: URL > tous les signataires > par signataire)
     evidence_ids: list[str] = []
 
-    def _store_evidence(data: bytes, label: str | None = None) -> None:
-        if not data:
+    def _is_pdf_bytes(data: bytes) -> bool:
+        return bool(data) and data.startswith(b"%PDF")
+
+    def _store_evidence_pdf(data: bytes, label: str | None = None) -> None:
+        if not _is_pdf_bytes(data):
             return
         suffix = f"-{label}" if label else ""
         prefix = f"{doc_sig.procedure_case_id}-{doc_sig.document_type}-audit{suffix}"
         identifier = consent_pdf.store_pdf_bytes(evidence_category, prefix, data)
         evidence_ids.append(identifier)
 
+    def _store_evidence_bytes(data: bytes, label: str | None = None) -> None:
+        if not data:
+            return
+        if _is_pdf_bytes(data):
+            _store_evidence_pdf(data, label)
+            return
+        if zipfile.is_zipfile(io.BytesIO(data)):
+            try:
+                with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                    entries = [info for info in archive.infolist() if not info.is_dir()]
+                    for index, info in enumerate(entries, start=1):
+                        payload = archive.read(info)
+                        if not _is_pdf_bytes(payload):
+                            continue
+                        suffix = f"{label}-{index}" if label else f"zip-{index}"
+                        _store_evidence_pdf(payload, suffix)
+            except Exception:
+                logger.exception(
+                    "Failed to unpack audit zip for DocumentSignature %d",
+                    doc_sig.id,
+                )
+            return
+        logger.warning(
+            "Audit trail payload is not a PDF or ZIP for DocumentSignature %d",
+            doc_sig.id,
+        )
+
     if evidence_url:
         try:
             evidence_bytes = client.download_with_auth(evidence_url)
             if evidence_bytes:
-                _store_evidence(evidence_bytes, "url")
+                _store_evidence_bytes(evidence_bytes, "url")
         except Exception:
             logger.exception(
                 "Failed to download evidence URL for DocumentSignature %d",
@@ -532,22 +564,25 @@ def _download_and_store_artifacts(
         try:
             evidence_bytes = client.download_audit_trails_all(doc_sig.yousign_procedure_id)
             if evidence_bytes:
-                _store_evidence(evidence_bytes, "all")
+                _store_evidence_bytes(evidence_bytes, "all")
         except Exception:
             logger.exception(
                 "Failed to download audit trails (all) for DocumentSignature %d",
                 doc_sig.id
             )
 
-    if not evidence_ids:
-        signer_ids: list[str] = []
-        if signer_id:
-            signer_ids.append(signer_id)
-        else:
-            if doc_sig.parent1_yousign_signer_id:
-                signer_ids.append(doc_sig.parent1_yousign_signer_id)
-            if doc_sig.parent2_yousign_signer_id:
-                signer_ids.append(doc_sig.parent2_yousign_signer_id)
+    signer_ids: list[str] = []
+    if signer_id:
+        signer_ids.append(signer_id)
+    else:
+        if doc_sig.parent1_yousign_signer_id:
+            signer_ids.append(doc_sig.parent1_yousign_signer_id)
+        if doc_sig.parent2_yousign_signer_id:
+            signer_ids.append(doc_sig.parent2_yousign_signer_id)
+
+    # When both signers are involved, fetch per-signer audits even if "all" succeeded,
+    # to ensure both parents are represented in the final package.
+    if signer_ids and (not evidence_ids or signer_id is None):
         for candidate in signer_ids:
             try:
                 evidence_bytes = client.download_audit_trail_for_signer(
@@ -555,7 +590,7 @@ def _download_and_store_artifacts(
                     candidate
                 )
                 if evidence_bytes:
-                    _store_evidence(evidence_bytes, f"signer-{candidate}")
+                    _store_evidence_bytes(evidence_bytes, f"signer-{candidate}")
             except Exception:
                 logger.exception(
                     "Failed to download audit trail for signer %s (DocumentSignature %d)",
@@ -603,13 +638,40 @@ def _assemble_final_document(
     signed_category = legal_documents_pdf.signed_category_for(doc_sig.document_type)
     evidence_category = legal_documents_pdf.evidence_category_for(doc_sig.document_type)
 
-    signed_ids = consent_pdf.list_local_files_for_case(signed_category, doc_sig.procedure_case_id)
-    evidence_ids = consent_pdf.list_local_files_for_case(evidence_category, doc_sig.procedure_case_id)
+    doc_prefix = f"{doc_sig.procedure_case_id}-{doc_sig.document_type}"
+    signed_ids = [
+        identifier
+        for identifier in consent_pdf.list_local_files_for_case(signed_category, doc_sig.procedure_case_id)
+        if identifier.startswith(doc_prefix)
+    ]
+    evidence_ids = [
+        identifier
+        for identifier in consent_pdf.list_local_files_for_case(evidence_category, doc_sig.procedure_case_id)
+        if identifier.startswith(doc_prefix)
+    ]
 
-    if doc_sig.signed_pdf_identifier and doc_sig.signed_pdf_identifier not in signed_ids:
+    if doc_sig.signed_pdf_identifier and doc_sig.signed_pdf_identifier.startswith(doc_prefix) and doc_sig.signed_pdf_identifier not in signed_ids:
         signed_ids.append(doc_sig.signed_pdf_identifier)
-    if doc_sig.evidence_pdf_identifier and doc_sig.evidence_pdf_identifier not in evidence_ids:
+    if doc_sig.evidence_pdf_identifier and doc_sig.evidence_pdf_identifier.startswith(doc_prefix) and doc_sig.evidence_pdf_identifier not in evidence_ids:
         evidence_ids.append(doc_sig.evidence_pdf_identifier)
+
+    def _filter_valid_pdfs(category: str, identifiers: list[str]) -> list[str]:
+        valid: list[str] = []
+        for identifier in identifiers:
+            payload = consent_pdf.load_pdf_bytes(category, identifier)
+            if payload and payload.startswith(b"%PDF"):
+                valid.append(identifier)
+            else:
+                logger.warning(
+                    "Skipping non-PDF artifact %s for case=%d doc_type=%s",
+                    identifier,
+                    doc_sig.procedure_case_id,
+                    doc_sig.document_type,
+                )
+        return valid
+
+    signed_ids = _filter_valid_pdfs(signed_category, signed_ids)
+    evidence_ids = _filter_valid_pdfs(evidence_category, evidence_ids)
 
     if not signed_ids and not evidence_ids:
         return None
@@ -696,11 +758,6 @@ def update_document_signature_status(
         if stored_evidence:
             doc_sig.evidence_pdf_identifier = stored_evidence
 
-        # Assemblage partiel
-        assembled = _assemble_final_document(db, doc_sig)
-        if assembled:
-            doc_sig.final_pdf_identifier = assembled
-
     # Vérifier si les 2 parents ont signé
     both_signed = (
         doc_sig.parent1_status == "signed" and
@@ -729,12 +786,18 @@ def update_document_signature_status(
         doc_sig.completed_at = signed_at
 
         # Purge Yousign après récupération locale
-        try:
-            purge_document_signature(doc_sig)
-            doc_sig.yousign_purged_at = dt.datetime.utcnow()
-        except Exception:
-            logger.exception(
-                "Échec purge Yousign pour DocumentSignature %d",
+        if final_path:
+            try:
+                purge_document_signature(doc_sig)
+                doc_sig.yousign_purged_at = dt.datetime.utcnow()
+            except Exception:
+                logger.exception(
+                    "Échec purge Yousign pour DocumentSignature %d",
+                    doc_sig.id
+                )
+        else:
+            logger.warning(
+                "Final PDF missing, skipping Yousign purge for DocumentSignature %d",
                 doc_sig.id
             )
     elif doc_sig.parent1_status == "signed" or doc_sig.parent2_status == "signed":
@@ -816,12 +879,18 @@ def poll_and_fetch_document_signature(
         doc_sig.overall_status = models.DocumentSignatureStatus.completed
         doc_sig.completed_at = now
 
-        try:
-            purge_document_signature(doc_sig)
-            doc_sig.yousign_purged_at = dt.datetime.utcnow()
-        except Exception:
-            logger.exception(
-                "Echec purge Yousign pour DocumentSignature %d",
+        if final_path:
+            try:
+                purge_document_signature(doc_sig)
+                doc_sig.yousign_purged_at = dt.datetime.utcnow()
+            except Exception:
+                logger.exception(
+                    "Echec purge Yousign pour DocumentSignature %d",
+                    doc_sig.id,
+                )
+        else:
+            logger.warning(
+                "Final PDF missing, skipping Yousign purge for DocumentSignature %d",
                 doc_sig.id,
             )
     elif signed_parents:
@@ -842,10 +911,6 @@ def poll_and_fetch_document_signature(
             if stored_evidence:
                 doc_sig.evidence_pdf_identifier = stored_evidence
 
-        assembled = _assemble_final_document(db, doc_sig)
-        if assembled:
-            doc_sig.final_pdf_identifier = assembled
-
         doc_sig.overall_status = models.DocumentSignatureStatus.partially_signed
     else:
         doc_sig.overall_status = models.DocumentSignatureStatus.sent
@@ -853,6 +918,35 @@ def poll_and_fetch_document_signature(
     db.add(doc_sig)
     db.commit()
     db.refresh(doc_sig)
+    return doc_sig
+
+
+def ensure_final_document(
+    db: Session,
+    doc_sig: models.DocumentSignature,
+) -> models.DocumentSignature:
+    """Ensure the final assembled PDF is up to date after both signatures."""
+    status_value = doc_sig.overall_status
+    if hasattr(status_value, "value"):
+        status_value = status_value.value
+    if str(status_value) != "completed":
+        return doc_sig
+
+    final_path = _assemble_final_document(db, doc_sig)
+    if final_path:
+        doc_sig.final_pdf_identifier = final_path
+        if doc_sig.yousign_procedure_id and not doc_sig.yousign_purged_at:
+            try:
+                purge_document_signature(doc_sig)
+                doc_sig.yousign_purged_at = dt.datetime.utcnow()
+            except Exception:
+                logger.exception(
+                    "Echec purge Yousign pour DocumentSignature %d",
+                    doc_sig.id,
+                )
+        db.add(doc_sig)
+        db.commit()
+        db.refresh(doc_sig)
     return doc_sig
 
 

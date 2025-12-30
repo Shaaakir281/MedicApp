@@ -174,6 +174,7 @@ export function PatientSpacePage({
           token={token}
           procedureCase={controller.procedure.procedureCase}
           dashboard={controller.dashboard}
+          cabinetStatus={controller.cabinetStatus}
           legalStatus={controller.legalStatus}
           setLegalStatus={controller.setLegalStatus}
           legalComplete={controller.vm.legalComplete}

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { fetchPatientDashboard } from '../lib/api.js';
+import { fetchCabinetActiveSessions, fetchPatientDashboard } from '../lib/api.js';
 
 export function usePatientDashboard({ token, appointmentId }) {
   const [dashboard, setDashboard] = useState(null);
+  const [cabinetStatus, setCabinetStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const loadingRef = useRef(false);
@@ -13,6 +14,7 @@ export function usePatientDashboard({ token, appointmentId }) {
   const reload = useCallback(async () => {
     if (!appointmentId || !token) {
       setDashboard(null);
+      setCabinetStatus(null);
       return;
     }
     if (loadingRef.current) {
@@ -25,6 +27,12 @@ export function usePatientDashboard({ token, appointmentId }) {
     try {
       const payload = await fetchPatientDashboard(appointmentId, token);
       setDashboard(payload);
+      try {
+        const cabinetPayload = await fetchCabinetActiveSessions(token, appointmentId);
+        setCabinetStatus(cabinetPayload);
+      } catch (cabinetErr) {
+        setCabinetStatus(null);
+      }
     } catch (err) {
       setError(err?.message || 'Impossible de charger le tableau de bord patient.');
     } finally {
@@ -53,5 +61,5 @@ export function usePatientDashboard({ token, appointmentId }) {
     return () => clearInterval(interval);
   }, [appointmentId, token, reload]);
 
-  return { dashboard, loading, error, reload, setDashboard };
+  return { dashboard, cabinetStatus, loading, error, reload, setDashboard };
 }

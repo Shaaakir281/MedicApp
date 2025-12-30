@@ -305,6 +305,14 @@ class CabinetSessionResponse(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 
+class CabinetSessionActiveResponse(BaseModel):
+    appointment_id: int
+    parent1_active: bool = False
+    parent2_active: bool = False
+    parent1_expires_at: Optional[datetime] = None
+    parent2_expires_at: Optional[datetime] = None
+
+
 class CabinetPatientEntry(BaseModel):
     id: int
     appointment_id: int
@@ -578,6 +586,9 @@ class CaseDocumentSignaturesSummary(BaseModel):
 class DocumentsDashboardDocumentStatus(BaseModel):
     parent1_status: Optional[str] = None
     parent2_status: Optional[str] = None
+    document_signature_id: Optional[int] = None
+    final_pdf_available: bool = False
+    signed_pdf_available: bool = False
 
 
 class DocumentsDashboardCaseEntry(BaseModel):

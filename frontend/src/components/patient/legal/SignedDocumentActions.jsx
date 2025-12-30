@@ -8,6 +8,7 @@ export function SignedDocumentActions({
   token,
   enabled,
   title,
+  fullySigned = false,
   filename = 'document-signe.pdf',
   setError,
   setPreviewState,
@@ -20,7 +21,7 @@ export function SignedDocumentActions({
 }) {
   const [downloading, setDownloading] = useState(false);
   const canPreviewBase = Boolean(procedureCaseId && documentType);
-  const canPreviewSigned = Boolean(hasFinalPdf || hasSignedPdf);
+  const canPreviewSigned = Boolean(hasFinalPdf || hasSignedPdf || fullySigned);
   const canPreview = Boolean(enabled || canPreviewBase || canPreviewSigned);
 
   const getSignedBlob = async (fileKind) => {
@@ -42,8 +43,16 @@ export function SignedDocumentActions({
     try {
       let blob = null;
       if (canPreviewSigned) {
-        const fileKind = hasFinalPdf ? 'final' : 'signed';
-        blob = await getSignedBlob(fileKind);
+        if (fullySigned || hasFinalPdf) {
+          try {
+            blob = await getSignedBlob('final');
+          } catch (err) {
+            blob = null;
+          }
+        }
+        if (!blob && hasSignedPdf) {
+          blob = await getSignedBlob('signed');
+        }
       } else if (canPreviewBase) {
         blob = await downloadLegalDocumentPreview({
           token,
@@ -102,9 +111,9 @@ export function SignedDocumentActions({
       </button>
       <button
         type="button"
-        className={`btn btn-xs ${hasFinalPdf ? 'btn-outline' : 'btn-disabled'}`}
+        className={`btn btn-xs ${hasFinalPdf || fullySigned ? 'btn-outline' : 'btn-disabled'}`}
         onClick={handleDownload}
-        disabled={!hasFinalPdf || downloading}
+        disabled={(!hasFinalPdf && !fullySigned) || downloading}
         title={!hasFinalPdf ? 'Telechargement disponible apres signature complete' : ''}
       >
         {downloading ? LABELS_FR.common.loading : LABELS_FR.patientSpace.documents.signature.downloadSigned}

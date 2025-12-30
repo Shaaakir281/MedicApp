@@ -6,7 +6,7 @@ import { IconDocument, IconMail } from './icons';
 /**
  * Affiche un document de signature avec son statut et ses actions
  */
-export function DocumentSignatureCard({ document, onSend, onDownload, isSending }) {
+export function DocumentSignatureCard({ document, onSend, onPreview, isSending }) {
   const statusVariant = {
     completed: 'success',
     partial: 'warning',
@@ -39,6 +39,14 @@ export function DocumentSignatureCard({ document, onSend, onDownload, isSending 
       <div className="flex gap-2">
         <button
           type="button"
+          className="btn btn-xs btn-outline"
+          onClick={onPreview}
+          disabled={!onPreview}
+        >
+          Voir
+        </button>
+        <button
+          type="button"
           className="btn btn-xs btn-outline flex items-center gap-1"
           onClick={onSend}
           disabled={isSending}
@@ -46,15 +54,6 @@ export function DocumentSignatureCard({ document, onSend, onDownload, isSending 
           <IconMail className="w-3 h-3" />
           {isSending ? 'Envoi...' : 'Envoyer signature'}
         </button>
-        {document.downloadUrl && (
-          <button
-            type="button"
-            className="btn btn-xs btn-ghost"
-            onClick={onDownload}
-          >
-            Télécharger PDF
-          </button>
-        )}
       </div>
     </div>
   );

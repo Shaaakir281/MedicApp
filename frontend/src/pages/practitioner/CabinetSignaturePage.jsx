@@ -13,7 +13,7 @@ const hasAllSigned = (patient) =>
 
 export default function CabinetSignaturePage() {
   const { isAuthenticated, login, logout, token, user, loading: authLoading } = useAuth();
-  const [pinInput, setPinInput] = useState('');
+  const [pinInput, setPinInput] = useState(PRACTITIONER_PIN);
   const [unlocked, setUnlocked] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [sessionCreated, setSessionCreated] = useState(null);
@@ -42,10 +42,10 @@ export default function CabinetSignaturePage() {
     if (pinInput === PRACTITIONER_PIN) {
       setError(null);
       setUnlocked(true);
-      setPinInput('');
+      setPinInput(PRACTITIONER_PIN);
     } else {
       setError('Code PIN incorrect.');
-      setPinInput('');
+      setPinInput(PRACTITIONER_PIN);
     }
   };
 

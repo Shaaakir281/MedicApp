@@ -7,7 +7,6 @@ import { CaseForm } from './CaseForm.jsx';
 import { ScheduleForm } from './ScheduleForm.jsx';
 import { CaseStatus } from './CaseStatus.jsx';
 import { PrescriptionsSection } from './PrescriptionsSection.jsx';
-import { DocumentSignatureSection } from './DocumentSignatureSection.jsx';
 import { practitionerSendSignature } from '../../../services/documentSignature.api.js';
 import { mapPractitionerProcedureCase } from '../../../services/patientDashboard.mapper.js';
 
@@ -131,17 +130,18 @@ export function PatientDetailsDrawer({
   onSend,
   onDownloadConsent,
   onNavigateDate,
-  onInitiateConsent,
-  onRemindConsent,
   sendingId,
   updatingCase = false,
   updatingAppointment = false,
   creatingAppointment = false,
-  consentActionLoading = false,
   prescriptionHistory = [],
 }) {
   const currentAppointment = appointment || {};
   const { procedure, patient } = currentAppointment;
+  const procedureWithSignatures = useMemo(
+    () => (procedure ? mapPractitionerProcedureCase(procedure) : procedure),
+    [procedure],
+  );
 
   const latestHistoryByType = (type) => {
     const entries = (prescriptionHistory || []).filter((entry) => entry.appointment_type === type);
@@ -167,6 +167,7 @@ export function PatientDetailsDrawer({
   const [slotsError, setSlotsError] = useState(null);
   const [editedAppointmentId, setEditedAppointmentId] = useState(appointment?.appointment_id ?? null);
   const [cabinetSession, setCabinetSession] = useState(null);
+  const [cabinetPurpose, setCabinetPurpose] = useState(null);
   const [creatingCabinetRole, setCreatingCabinetRole] = useState(null);
   const [cabinetError, setCabinetError] = useState(null);
 
@@ -177,6 +178,12 @@ export function PatientDetailsDrawer({
       return acc;
     }, {});
   }, [procedure?.appointments_overview]);
+
+  const signatureAppointmentId = useMemo(() => {
+    const summaries = procedure?.appointments_overview ?? [];
+    const actSummary = summaries.find((entry) => entry.appointment_type === 'act');
+    return actSummary?.appointment_id || appointment?.appointment_id || null;
+  }, [appointment, procedure?.appointments_overview]);
 
   useEffect(() => {
     const nextCaseForm = buildCaseForm(procedure, patient);
@@ -194,6 +201,7 @@ export function PatientDetailsDrawer({
     setSlotsError(null);
     setEditedAppointmentId(appointment?.appointment_id ?? null);
     setCabinetSession(null);
+    setCabinetPurpose(null);
     setCabinetError(null);
     setCreatingCabinetRole(null);
   }, [appointment]);
@@ -363,18 +371,19 @@ export function PatientDetailsDrawer({
     await practitionerSendSignature(token, caseId, documentType);
   };
 
-  const handleCreateCabinetSession = async (role) => {
-    if (!token || !appointment?.appointment_id) return;
+  const handleCreateCabinetSession = async (role, purpose) => {
+    if (!token || !signatureAppointmentId) return;
     setCabinetError(null);
     setCreatingCabinetRole(role);
     try {
       const session = await createCabinetSession(token, {
-        appointment_id: appointment.appointment_id,
+        appointment_id: signatureAppointmentId,
         signer_role: role,
       });
       setCabinetSession(session);
+      setCabinetPurpose(purpose || null);
     } catch (err) {
-      setCabinetError(err?.message || 'Echec de création de la session tablette.');
+      setCabinetError(err?.message || 'Echec de creation de la session tablette.');
     } finally {
       setCreatingCabinetRole(null);
     }
@@ -439,74 +448,106 @@ export function PatientDetailsDrawer({
         <CaseStatus
           appointment={appointment}
           procedure={procedure}
+          documentSignatures={procedureWithSignatures?.documentSignatures || []}
+          caseId={procedure?.case_id}
+          token={token}
+          onSendDocumentSignature={handleSendSignature}
           onNavigateDate={onNavigateDate}
-          onInitiateConsent={onInitiateConsent}
-          onRemindConsent={onRemindConsent}
-          consentActionLoading={consentActionLoading}
         />
 
-        {procedure && (
-          <div className="bg-white border rounded-2xl p-4">
-            <DocumentSignatureSection
-              documentSignatures={mapPractitionerProcedureCase(procedure).documentSignatures || []}
-              caseId={procedure.case_id}
-              onSend={handleSendSignature}
-              onRefresh={() => {
-                // Refresh sera géré par le parent via onUpdateCase ou un refetch
-              }}
-            />
-          </div>
-        )}
 
-        <div className="bg-slate-50 border rounded-2xl p-4 text-sm text-slate-700 space-y-2">
-          <div className="flex items-center justify-between">
-            <h4 className="font-semibold text-slate-700">Session tablette (cabinet)</h4>
-            {cabinetSession && <span className="badge badge-success">Active</span>}
-          </div>
-          <p className="text-sm text-slate-600">
-            Générer un code pour faire signer sur tablette en cabinet (OTP désactivé).
-          </p>
-          <div className="flex gap-2 flex-wrap">
-            {['parent1', 'parent2'].map((role) => (
-              <button
-                key={role}
-                type="button"
-                className="btn btn-outline btn-xs"
-                onClick={() => handleCreateCabinetSession(role)}
-                disabled={!token || creatingCabinetRole === role}
-              >
-                {creatingCabinetRole === role
-                  ? 'Création...'
-                  : `Créer session ${role === 'parent1' ? 'Parent 1' : 'Parent 2'}`}
-              </button>
-            ))}
-          </div>
-          {cabinetError && <p className="text-sm text-red-600">{cabinetError}</p>}
-          {cabinetSession && (
-            <div className="space-y-1">
-              <p>Role : {cabinetSession.signer_role}</p>
-              <p>
-                Code : <span className="font-mono">{cabinetSession.session_code}</span>
-              </p>
-              <p>
-                Lien tablette :{' '}
-                <a
-                  className="link link-primary break-all"
-                  href={cabinetSession.tablet_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {cabinetSession.tablet_url}
-                </a>
-              </p>
-              <p>
-                Expiration :{' '}
-                {cabinetSession.expires_at
-                  ? new Date(cabinetSession.expires_at).toLocaleString('fr-FR')
-                  : '—'}
-              </p>
+        <div className="bg-slate-50 border rounded-2xl p-4 text-sm text-slate-700 space-y-3">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-slate-700">Activation cabinet (telephone parent)</h4>
+              {cabinetSession && cabinetPurpose === 'activation' && (
+                <span className="badge badge-success">Active</span>
+              )}
             </div>
-          )}
+            <p className="text-sm text-slate-600">
+              Active la signature en cabinet depuis le telephone du parent (sans verification SMS).
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {['parent1', 'parent2'].map((role) => (
+                <button
+                  key={role}
+                  type="button"
+                  className="btn btn-outline btn-xs"
+                  onClick={() => handleCreateCabinetSession(role, 'activation')}
+                  disabled={!token || creatingCabinetRole === role}
+                >
+                  {creatingCabinetRole === role
+                    ? 'Activation...'
+                    : `Activer Parent ${role === 'parent1' ? '1' : '2'}`}
+                </button>
+              ))}
+            </div>
+            {cabinetSession && cabinetPurpose === 'activation' && (
+              <div className="space-y-1">
+                <p>Role : {cabinetSession.signer_role}</p>
+                <p>
+                  Expiration :{' '}
+                  {cabinetSession.expires_at
+                    ? new Date(cabinetSession.expires_at).toLocaleString('fr-FR')
+                    : '-'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-slate-200 pt-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-slate-700">Session tablette (cabinet)</h4>
+              {cabinetSession && cabinetPurpose === 'tablet' && (
+                <span className="badge badge-success">Active</span>
+              )}
+            </div>
+            <p className="text-sm text-slate-600">
+              Genere un code pour faire signer sur tablette en cabinet.
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {['parent1', 'parent2'].map((role) => (
+                <button
+                  key={role}
+                  type="button"
+                  className="btn btn-outline btn-xs"
+                  onClick={() => handleCreateCabinetSession(role, 'tablet')}
+                  disabled={!token || creatingCabinetRole === role}
+                >
+                  {creatingCabinetRole === role
+                    ? 'Creation...'
+                    : `Session Parent ${role === 'parent1' ? '1' : '2'}`}
+                </button>
+              ))}
+            </div>
+            {cabinetSession && cabinetPurpose === 'tablet' && (
+              <div className="space-y-1">
+                <p>Role : {cabinetSession.signer_role}</p>
+                <p>
+                  Code : <span className="font-mono">{cabinetSession.session_code}</span>
+                </p>
+                <p>
+                  Lien tablette :{' '}
+                  <a
+                    className="link link-primary break-all"
+                    href={cabinetSession.tablet_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {cabinetSession.tablet_url}
+                  </a>
+                </p>
+                <p>
+                  Expiration :{' '}
+                  {cabinetSession.expires_at
+                    ? new Date(cabinetSession.expires_at).toLocaleString('fr-FR')
+                    : '-'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {cabinetError && <p className="text-sm text-red-600">{cabinetError}</p>}
         </div>
 
         <PrescriptionsSection

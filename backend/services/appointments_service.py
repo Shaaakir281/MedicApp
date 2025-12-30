@@ -120,6 +120,11 @@ def compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCaseS
         for appt in sorted(case.appointments, key=lambda a: (a.date, a.time))
     ]
 
+    document_signatures_payload = [
+        schemas.DocumentSignatureDetail.model_validate(doc_sig)
+        for doc_sig in (case.document_signatures or [])
+    ]
+
     return schemas.PractitionerCaseStatus(
         case_id=case.id,
         child_birthdate=case.child_birthdate,
@@ -171,6 +176,7 @@ def compute_case_status(case: models.ProcedureCase) -> schemas.PractitionerCaseS
         latest_prescription_id=(
             latest_signed_prescription.id if latest_signed_prescription else None
         ),
+        document_signatures=document_signatures_payload,
     )
 
 
@@ -290,6 +296,7 @@ def get_new_patients(
         .options(
             joinedload(models.ProcedureCase.patient),
             joinedload(models.ProcedureCase.appointments),
+            joinedload(models.ProcedureCase.document_signatures),
         )
         .filter(models.ProcedureCase.created_at >= cutoff_date)
         .order_by(models.ProcedureCase.created_at.desc())
@@ -377,7 +384,11 @@ def update_case(
 
     case = (
         db.query(models.ProcedureCase)
-        .options(joinedload(models.ProcedureCase.appointments), joinedload(models.ProcedureCase.patient))
+        .options(
+            joinedload(models.ProcedureCase.appointments),
+            joinedload(models.ProcedureCase.patient),
+            joinedload(models.ProcedureCase.document_signatures),
+        )
         .filter(models.ProcedureCase.id == case_id)
         .first()
     )

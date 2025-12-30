@@ -149,6 +149,9 @@ def get_documents_dashboard(
             return schemas.DocumentsDashboardDocumentStatus(
                 parent1_status=_normalize_status(doc_sig.parent1_status),
                 parent2_status=_normalize_status(doc_sig.parent2_status),
+                document_signature_id=doc_sig.id,
+                final_pdf_available=bool(doc_sig.final_pdf_identifier),
+                signed_pdf_available=bool(doc_sig.signed_pdf_identifier),
             )
 
         entries.append(

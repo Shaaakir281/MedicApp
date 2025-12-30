@@ -18,7 +18,7 @@ from domain.legal_documents.types import DocumentType, LegalDocumentCase, Signer
 
 logger = logging.getLogger("uvicorn.error")
 
-CABINET_SESSION_TTL_MINUTES = 10
+CABINET_SESSION_TTL_MINUTES = 15
 
 
 def _get_appointment(db: Session, appointment_id: int) -> models.Appointment:
@@ -326,6 +326,36 @@ def get_active_session(db: Session, token: str) -> models.SignatureCabinetSessio
             db.commit()
         return None
     if session.status != models.SignatureCabinetSessionStatus.active:
+        return None
+    return session
+
+
+def get_active_session_for_appointment(
+    db: Session,
+    *,
+    appointment_id: int,
+    signer_role: SignerRole,
+) -> models.SignatureCabinetSession | None:
+    now = dt.datetime.utcnow()
+    session = (
+        db.query(models.SignatureCabinetSession)
+        .options(
+            joinedload(models.SignatureCabinetSession.appointment).joinedload(models.Appointment.procedure_case)
+        )
+        .filter(
+            models.SignatureCabinetSession.appointment_id == appointment_id,
+            models.SignatureCabinetSession.signer_role == signer_role,
+            models.SignatureCabinetSession.status == models.SignatureCabinetSessionStatus.active,
+        )
+        .order_by(models.SignatureCabinetSession.created_at.desc())
+        .first()
+    )
+    if not session:
+        return None
+    if session.expires_at and session.expires_at < now:
+        session.status = models.SignatureCabinetSessionStatus.expired
+        db.add(session)
+        db.commit()
         return None
     return session
 

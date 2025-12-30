@@ -364,6 +364,11 @@ export async function fetchCabinetPatientsToday(token) {
   return apiRequest('/cabinet-sessions/patients/today', { method: 'GET', token });
 }
 
+export async function fetchCabinetActiveSessions(token, appointmentId) {
+  const query = new URLSearchParams({ appointment_id: String(appointmentId) }).toString();
+  return apiRequest(`/cabinet-sessions/active?${query}`, { method: 'GET', token });
+}
+
 export async function fetchDocumentsDashboard(token, filters = {}) {
   const params = new URLSearchParams();
   if (filters.status) {

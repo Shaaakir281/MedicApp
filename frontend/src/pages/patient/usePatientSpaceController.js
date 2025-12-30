@@ -167,6 +167,7 @@ export function usePatientSpaceController({ token, procedureSelection }) {
     setActiveAppointmentId,
     appointmentOptions,
     dashboard: dashboardQuery.dashboard,
+    cabinetStatus: dashboardQuery.cabinetStatus,
     dashboardLoading: dashboardQuery.loading,
     dashboardError: dashboardQuery.error,
     reloadDashboard: dashboardQuery.reload,

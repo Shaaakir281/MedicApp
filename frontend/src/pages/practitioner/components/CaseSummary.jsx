@@ -57,16 +57,6 @@ export const CaseSummary = ({ appointment, onDownloadConsent }) => {
         <p>
           <span className="font-semibold">Telephones :</span> {procedure?.parent1_phone || '-'} / {procedure?.parent2_phone || '-'}
         </p>
-        <p>
-          <span className="font-semibold">Consentement :</span>{' '}
-          {procedure?.consent_download_url ? (
-            <button type="button" className="btn btn-xs btn-outline" onClick={onDownloadConsent}>
-              Ouvrir
-            </button>
-          ) : (
-            'Non disponible'
-          )}
-        </p>
       </div>
     </div>
   );

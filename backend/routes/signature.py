@@ -55,6 +55,22 @@ def start_signature(
     appointment = _get_appointment_with_case(db, appointment_id)
     if current_user and current_user.role == models.UserRole.patient and appointment.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès refusé.")
+    if (
+        session is None
+        and mode == "cabinet"
+        and current_user
+        and current_user.role == models.UserRole.patient
+    ):
+        active_session = legal_service.get_active_session_for_appointment(
+            db,
+            appointment_id=appointment.id,
+            signer_role=signer_role,
+        )
+        if not active_session:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Signature en cabinet non activée par le praticien.",
+            )
 
     if settings.feature_enforce_legal_checklist:
         legal_status = legal_service.compute_status(db, appointment.id)
@@ -73,8 +89,6 @@ def start_signature(
 
     in_person = mode == "cabinet"
     updated_case = consents_service.initiate_consent(db, case, in_person=in_person)
-    if session:
-        legal_service.consume_session(db, session)
 
     link_attr = f"{signer_role.value}_signature_link" if hasattr(signer_role, "value") else f"{signer_role}_signature_link"
     signature_link = getattr(updated_case, link_attr, None)
