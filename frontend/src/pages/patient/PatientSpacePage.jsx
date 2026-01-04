@@ -8,6 +8,7 @@ import { TabAppointments } from '../../components/patient/tabs/TabAppointments.j
 import { TabDossier } from '../../components/patient/tabs/TabDossier.jsx';
 import { TabPrescriptions } from '../../components/patient/tabs/TabPrescriptions.jsx';
 import { TabLegalDocs } from '../../components/patient/tabs/TabLegalDocs.jsx';
+import { FourteenDayRuleModal } from '../../components/patient/FourteenDayRuleModal.jsx';
 import { LABELS_FR } from '../../constants/labels.fr.js';
 import { useDossier } from '../../hooks/useDossier.js';
 import { PatientTabDossierView } from './PatientTabDossier.jsx';
@@ -29,7 +30,25 @@ export function PatientSpacePage({
 }) {
   const enableNewDossier = String(import.meta.env.VITE_FEATURE_NEW_DOSSIER || '').toLowerCase() === 'true';
   const dossier = useDossier({ token: enableNewDossier ? token : null });
-  const controller = usePatientSpaceController({ token, procedureSelection });
+  const [fourteenDayModal, setFourteenDayModal] = useState({
+    open: false,
+    title: 'Regle des 14 jours',
+    message: '',
+  });
+  const controller = usePatientSpaceController({
+    token,
+    procedureSelection,
+    dossierForm: enableNewDossier ? dossier.formState : null,
+    dossierVm: enableNewDossier ? dossier.vm : null,
+    onShow14DayModal: (payload) => {
+      if (!payload) return;
+      setFourteenDayModal({
+        open: true,
+        title: payload.title || 'Regle des 14 jours',
+        message: payload.message || '',
+      });
+    },
+  });
   const [activeTab, setActiveTab] = useState(TABS.file);
   const [pendingPrescriptionId, setPendingPrescriptionId] = useState(null);
 
@@ -37,6 +56,13 @@ export function PatientSpacePage({
     setActiveTab(nextTab);
     if (nextTab !== TABS.prescriptions) {
       setPendingPrescriptionId(null);
+    }
+    if (nextTab === TABS.appointments) {
+      if (enableNewDossier) {
+        dossier.load?.();
+      }
+      controller.procedure.loadProcedureCase?.();
+      controller.reloadDashboard?.();
     }
   };
 
@@ -155,6 +181,8 @@ export function PatientSpacePage({
           setActiveAppointmentId={controller.setActiveAppointmentId}
           appointments={controller.appointments}
           showScheduling={controller.showScheduling}
+          appointmentMissingFields={controller.appointmentMissingFields}
+          appointmentNeedsSave={controller.appointmentNeedsSave}
           setError={controller.setError}
           setPreviewState={controller.setPreviewState}
           onViewPrescription={handleViewPrescription}
@@ -194,6 +222,12 @@ export function PatientSpacePage({
         message={controller.successMessage}
         isVisible={Boolean(controller.successMessage)}
         onClose={() => controller.setSuccessMessage(null)}
+      />
+      <FourteenDayRuleModal
+        isOpen={fourteenDayModal.open}
+        onClose={() => setFourteenDayModal((prev) => ({ ...prev, open: false }))}
+        title={fourteenDayModal.title}
+        message={fourteenDayModal.message}
       />
       <PdfPreviewModal
         isOpen={controller.previewState.open}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-import { InputField } from '../../ui';
+import { BlockingNotice, InputField } from '../../ui';
 import { PhoneInput } from './PhoneInput.jsx';
 
 export function GuardianForm({
@@ -30,11 +30,25 @@ export function GuardianForm({
   const isEmailVerified = guardianData?.emailVerifiedAt || (isUserAccount && userEmailVerified);
   const canSendCode = formState[`${prefix}Phone`] && !sending;
   const showCodeInput = verificationState?.step === 'sent' && !isPhoneVerified;
+  const hasValue = (value) => Boolean(String(value || '').trim());
+
+  const requiredMark = required ? ' *' : '';
 
   // Check if email changed compared to verified/sent email
   const currentEmail = formState[`${prefix}Email`] || '';
   const verifiedEmail = guardianData?.email || '';
   const emailChanged = currentEmail !== verifiedEmail;
+  const hasGuardianId = Boolean(guardianData?.id);
+  const missingForEmailVerification = [];
+  if (!hasGuardianId) {
+    if (!hasValue(formState.childFirstName)) missingForEmailVerification.push('Prenom enfant');
+    if (!hasValue(formState.childLastName)) missingForEmailVerification.push('Nom enfant');
+    if (!hasValue(formState.birthDate)) missingForEmailVerification.push('Date de naissance');
+    if (!hasValue(formState.parent1FirstName)) missingForEmailVerification.push('Prenom parent 1');
+    if (!hasValue(formState.parent1LastName)) missingForEmailVerification.push('Nom parent 1');
+    if (!hasValue(formState.parent1Email)) missingForEmailVerification.push('Email parent 1');
+  }
+  const hasMissingForEmailVerification = missingForEmailVerification.length > 0;
 
   // Email verification states
   const emailSentPending = guardianData?.emailSentAt && !guardianData?.emailVerifiedAt;
@@ -95,7 +109,7 @@ export function GuardianForm({
 
       <div className="grid gap-3 md:grid-cols-2">
         <InputField
-          label="Prénom"
+          label={`Prénom${requiredMark}`}
           placeholder="Prénom"
           value={formState[`${prefix}FirstName`] || ''}
           onChange={(e) => onChange(`${prefix}FirstName`, e.target.value)}
@@ -103,7 +117,7 @@ export function GuardianForm({
           disabled={disabled}
         />
         <InputField
-          label="Nom"
+          label={`Nom${requiredMark}`}
           placeholder="Nom"
           value={formState[`${prefix}LastName`] || ''}
           onChange={(e) => onChange(`${prefix}LastName`, e.target.value)}
@@ -207,6 +221,20 @@ export function GuardianForm({
               La vérification email permet la signature électronique à distance.
             </p>
           </div>
+          {!hasGuardianId && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+              <p className="text-xs text-blue-800">
+                L'envoi declenchera un enregistrement automatique du dossier.
+              </p>
+            </div>
+          )}
+          {!hasGuardianId && hasMissingForEmailVerification && (
+            <BlockingNotice
+              title="Envoi impossible pour l'instant"
+              message="Le dossier doit être enregistré avant d'envoyer l'email. Champs manquants :"
+              items={missingForEmailVerification}
+            />
+          )}
           {emailChanged && guardianData?.emailVerifiedAt && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-2 mb-2">
               <p className="text-xs text-orange-800">
@@ -218,7 +246,12 @@ export function GuardianForm({
             type="button"
             className="btn btn-sm btn-secondary w-full"
             onClick={onSendEmailVerification}
-            disabled={sendingEmail}
+            disabled={sendingEmail || (!hasGuardianId && hasMissingForEmailVerification)}
+            title={
+              !hasGuardianId && hasMissingForEmailVerification
+                ? 'Completez les champs requis avant envoi.'
+                : ''
+            }
           >
             {sendingEmail ? 'Envoi en cours...' : (emailChanged && emailSentPending) ? "Renvoyer l'email de vérification" : "Envoyer l'email de vérification"}
           </button>

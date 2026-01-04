@@ -22,6 +22,7 @@ export const AppointmentEditModal = ({
   onSelectDate,
   onSelectSlot,
   onConfirm,
+  errorMessage = null,
 }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
@@ -45,6 +46,18 @@ export const AppointmentEditModal = ({
           onSelectSlot={onSelectSlot}
           onConfirm={onConfirm}
           confirmLabel="Confirmer les modifications"
+          actionNotice={
+            errorMessage ? (
+              <div className="pt-2">
+                <div className="alert alert-warning">
+                  <div className="text-xs space-y-1">
+                    <p className="font-semibold">Rendez-vous indisponible</p>
+                    <p>{errorMessage}</p>
+                  </div>
+                </div>
+              </div>
+            ) : null
+          }
           renderActions={({ onConfirm: confirm, isConfirmDisabled }) => (
             <div className="flex gap-3">
               <button type="button" className="btn" onClick={onClose}>

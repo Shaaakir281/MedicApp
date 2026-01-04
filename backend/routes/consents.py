@@ -144,7 +144,8 @@ async def yousign_webhook(
 
     if doc_sig:
         if "signature_request" in event_name and any(token in event_name for token in ("done", "completed")):
-            document_signature_service.poll_and_fetch_document_signature(db, doc_sig)
+            doc_sig = document_signature_service.poll_and_fetch_document_signature(db, doc_sig)
+            document_signature_service.ensure_final_document(db, doc_sig)
             return {"detail": "ok"}
 
         if "signer" in event_name and any(token in event_name for token in ("signed", "done", "completed")):
@@ -158,7 +159,7 @@ async def yousign_webhook(
                 document_signature_service.poll_and_fetch_document_signature(db, doc_sig)
                 return {"detail": "ok"}
 
-            document_signature_service.update_document_signature_status(
+            doc_sig = document_signature_service.update_document_signature_status(
                 db,
                 doc_sig.id,
                 parent_label=parent_label,
@@ -168,6 +169,8 @@ async def yousign_webhook(
                 signed_file_url=signed_file_url,
                 evidence_url=evidence_url,
             )
+            if doc_sig.parent1_status == "signed" and doc_sig.parent2_status == "signed":
+                document_signature_service.ensure_final_document(db, doc_sig)
         return {"detail": "ok"}
 
     if procedure_id:

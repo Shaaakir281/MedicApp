@@ -8,36 +8,36 @@ import { Button, Card, InputField, SectionHeading, PasswordStrengthMeter } from 
 import { MIN_LENGTH, validatePasswordPolicy } from '../../../lib/passwordStrength.js';
 
 const loginSchema = z.object({
-  email: z.string().email('Email invalide'),
-  password: z.string().min(1, 'Mot de passe requis'),
+  login_email: z.string().email('Email invalide'),
+  login_password: z.string().min(1, 'Mot de passe requis'),
 });
 
 const registerSchema = z
   .object({
-    email: z.string().email('Email invalide'),
-    password: z
+    register_email: z.string().email('Email invalide'),
+    register_password: z
       .string()
       .min(MIN_LENGTH, `Au moins ${MIN_LENGTH} caractères`)
       .refine((value) => validatePasswordPolicy(value), {
         message: 'Maj + min + chiffre + caractère spécial requis',
       }),
-    password_confirm: z.string().min(MIN_LENGTH, `Au moins ${MIN_LENGTH} caractères`),
+    register_password_confirm: z.string().min(MIN_LENGTH, `Au moins ${MIN_LENGTH} caractères`),
   })
-  .refine((data) => data.password === data.password_confirm, {
-    path: ['password_confirm'],
+  .refine((data) => data.register_password === data.register_password_confirm, {
+    path: ['register_password_confirm'],
     message: 'Les mots de passe doivent correspondre',
   });
 
 export function AuthPanel({ onLogin, onRegister, loading, registerFeedback, error }) {
   const loginForm = useForm({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { login_email: '', login_password: '' },
   });
   const registerForm = useForm({
     resolver: zodResolver(registerSchema),
-    defaultValues: { email: '', password: '', password_confirm: '' },
+    defaultValues: { register_email: '', register_password: '', register_password_confirm: '' },
   });
-  const watchedPassword = registerForm.watch('password');
+  const watchedPassword = registerForm.watch('register_password');
 
   const {
     handleSubmit: handleLoginSubmit,
@@ -53,14 +53,21 @@ export function AuthPanel({ onLogin, onRegister, loading, registerFeedback, erro
   } = registerForm;
 
   const submitLogin = handleLoginSubmit(async (values) => {
-    const success = await onLogin(values);
+    const success = await onLogin({
+      email: values.login_email,
+      password: values.login_password,
+    });
     if (success) {
       resetLogin();
     }
   });
 
   const submitRegister = handleRegisterSubmit(async (values) => {
-    const success = await onRegister(values);
+    const success = await onRegister({
+      email: values.register_email,
+      password: values.register_password,
+      password_confirm: values.register_password_confirm,
+    });
     if (success) {
       resetRegister();
     }
@@ -70,22 +77,24 @@ export function AuthPanel({ onLogin, onRegister, loading, registerFeedback, erro
     <section className="grid gap-6 md:grid-cols-2">
       <Card className="space-y-4">
         <SectionHeading title="Créer un compte patient" />
-        <form className="space-y-3" onSubmit={submitRegister} noValidate>
+        <form id="registration-form" className="space-y-3" onSubmit={submitRegister} noValidate>
           <InputField
             label="Email"
             type="email"
+            id="register-email"
             autoComplete="email"
-            {...registerRegister('email')}
-            error={registerErrors.email?.message}
+            {...registerRegister('register_email')}
+            error={registerErrors.register_email?.message}
             required
           />
           <InputField
             label="Mot de passe"
             type="password"
+            id="register-password"
             autoComplete="new-password"
             showVisibilityCheckbox
-            {...registerRegister('password')}
-            error={registerErrors.password?.message}
+            {...registerRegister('register_password')}
+            error={registerErrors.register_password?.message}
             required
           >
             <PasswordStrengthMeter value={watchedPassword} />
@@ -93,10 +102,11 @@ export function AuthPanel({ onLogin, onRegister, loading, registerFeedback, erro
           <InputField
             label="Confirmer le mot de passe"
             type="password"
+            id="register-password-confirm"
             autoComplete="new-password"
             showVisibilityCheckbox
-            {...registerRegister('password_confirm')}
-            error={registerErrors.password_confirm?.message}
+            {...registerRegister('register_password_confirm')}
+            error={registerErrors.register_password_confirm?.message}
             required
           />
           <Button type="submit" className="w-full" disabled={loading}>
@@ -116,22 +126,24 @@ export function AuthPanel({ onLogin, onRegister, loading, registerFeedback, erro
 
       <Card className="space-y-4">
         <SectionHeading title="Se connecter" />
-        <form className="space-y-3" onSubmit={submitLogin} noValidate>
+        <form id="login-form" className="space-y-3" onSubmit={submitLogin} noValidate>
           <InputField
             label="Email"
             type="email"
-            autoComplete="email"
-            {...registerLogin('email')}
-            error={loginErrors.email?.message}
+            id="login-email"
+            autoComplete="username"
+            {...registerLogin('login_email')}
+            error={loginErrors.login_email?.message}
             required
           />
           <InputField
             label="Mot de passe"
             type="password"
+            id="login-password"
             autoComplete="current-password"
             showVisibilityCheckbox
-            {...registerLogin('password')}
-            error={loginErrors.password?.message}
+            {...registerLogin('login_password')}
+            error={loginErrors.login_password?.message}
             required
           />
           <div className="text-right">

@@ -7,7 +7,7 @@ export function ChildIdentityForm({ formState, onChange, disabled = false }) {
     <div className="space-y-3">
       <div className="grid gap-4 md:grid-cols-2">
         <InputField
-          label="Prénom"
+          label="Prénom *"
           placeholder="Prénom"
           value={formState.childFirstName || ''}
           onChange={(e) => onChange('childFirstName', e.target.value)}
@@ -15,7 +15,7 @@ export function ChildIdentityForm({ formState, onChange, disabled = false }) {
           disabled={disabled}
         />
         <InputField
-          label="Nom"
+          label="Nom *"
           placeholder="Nom"
           value={formState.childLastName || ''}
           onChange={(e) => onChange('childLastName', e.target.value)}
@@ -24,7 +24,7 @@ export function ChildIdentityForm({ formState, onChange, disabled = false }) {
         />
       </div>
       <InputField
-        label="Date de naissance"
+        label="Date de naissance *"
         type="date"
         value={formState.birthDate || ''}
         onChange={(e) => onChange('birthDate', e.target.value)}

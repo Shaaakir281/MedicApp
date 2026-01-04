@@ -11,8 +11,6 @@ export const AppointmentCard = ({
   onEdit,
   onCancel,
   isCanceling,
-  onSelect,
-  selected = false,
   onViewPrescription,
 }) => {
   const label = appt?.appointment_type === 'act' ? 'Acte' : 'Pre-consultation';
@@ -23,7 +21,7 @@ export const AppointmentCard = ({
   const containerClass =
     variant === 'past'
       ? 'border rounded-lg p-3 space-y-1 bg-slate-50'
-      : `border rounded-lg p-3 space-y-1 ${selected ? 'border-blue-400 shadow-sm' : ''}`;
+      : 'border rounded-lg p-3 space-y-1';
 
   return (
     <div className={containerClass}>
@@ -46,11 +44,6 @@ export const AppointmentCard = ({
         {prescription?.signed && onViewPrescription && (
           <button type="button" className="btn btn-xs btn-primary" onClick={onViewPrescription}>
             Voir l'ordonnance
-          </button>
-        )}
-        {onSelect && (
-          <button type="button" className="btn btn-xs btn-outline" onClick={onSelect}>
-            {selected ? 'Sélectionné' : 'Voir dans le dashboard'}
           </button>
         )}
         <button type="button" className="btn btn-xs btn-ghost" onClick={onEdit}>

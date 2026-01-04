@@ -4,7 +4,6 @@ import { Badge } from '../../../components/ui/Badge';
 import { StatusDot } from '../../../components/ui/StatusDot';
 import { IconChevronRight } from './icons';
 import { DocumentSignatureSection } from './DocumentSignatureSection';
-import { practitionerSendSignature } from '../../../services/documentSignature.api';
 import { mapPractitionerProcedureCase } from '../../../services/patientDashboard.mapper';
 
 const dossierChecks = (procedure, appointment) => {
@@ -53,13 +52,6 @@ export function AgendaDay({
   onRefreshAppointments,
   token,
 }) {
-  const handleSendSignature = async (caseId, documentType) => {
-    if (!token) {
-      console.error('Token manquant pour envoyer signature');
-      return;
-    }
-    await practitionerSendSignature(token, caseId, documentType);
-  };
   const dateLabel = new Intl.DateTimeFormat('fr-FR', {
     weekday: 'long',
     day: 'numeric',
@@ -169,8 +161,6 @@ export function AgendaDay({
                   documentSignatures={mapPractitionerProcedureCase(appointment.procedure).documentSignatures || []}
                   caseId={appointment.procedure.case_id}
                   token={token}
-                  onSend={handleSendSignature}
-                  onRefresh={onRefreshAppointments}
                 />
               )}
             </div>

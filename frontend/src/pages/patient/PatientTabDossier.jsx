@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { InfoBanner } from '../../components/patient/dossier/InfoBanner.jsx';
 import { ChildIdentityForm } from '../../components/patient/dossier/ChildIdentityForm.jsx';
 import { GuardianForm } from '../../components/patient/dossier/GuardianForm.jsx';
-import { Button, Card, SectionHeading } from '../../components/ui';
+import { BlockingNotice, Button, Card, SectionHeading } from '../../components/ui';
 import { useDossier } from '../../hooks/useDossier.js';
 
 export function PatientTabDossierView({ dossier, currentUser }) {
@@ -16,14 +16,27 @@ export function PatientTabDossierView({ dossier, currentUser }) {
     dossier.vm?.guardians?.PARENT_1?.emailVerifiedAt || userEmailVerified,
   );
   const parent1PhoneVerified = Boolean(dossier.vm?.guardians?.PARENT_1?.phoneVerifiedAt);
-  const formComplete = Boolean(
-    dossier.formState?.childFirstName &&
-      dossier.formState?.childLastName &&
-      dossier.formState?.birthDate &&
-      dossier.formState?.parent1FirstName &&
-      dossier.formState?.parent1LastName &&
-      dossier.formState?.parent1Email
-  );
+  const missingRequiredFields = [];
+  const hasValue = (value) => Boolean(String(value || '').trim());
+  if (!hasValue(dossier.formState?.childFirstName)) missingRequiredFields.push("Prenom de l'enfant");
+  if (!hasValue(dossier.formState?.childLastName)) missingRequiredFields.push("Nom de l'enfant");
+  if (!hasValue(dossier.formState?.birthDate)) missingRequiredFields.push('Date de naissance');
+  if (!hasValue(dossier.formState?.parent1FirstName)) missingRequiredFields.push('Prenom du parent 1');
+  if (!hasValue(dossier.formState?.parent1LastName)) missingRequiredFields.push('Nom du parent 1');
+  if (!hasValue(dossier.formState?.parent1Email)) {
+    missingRequiredFields.push('Email du parent 1');
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dossier.formState?.parent1Email)) {
+    missingRequiredFields.push('Email du parent 1 invalide');
+  }
+  const canAcknowledge =
+    missingRequiredFields.length === 0 || dossier.formState?.procedure_info_acknowledged;
+  const canSave =
+    !dossier.saving &&
+    !dossier.loading &&
+    dossier.formState &&
+    dossier.formState.procedure_info_acknowledged &&
+    missingRequiredFields.length === 0;
+
 
   useEffect(() => {
     if (autoFilledEmailRef.current) return;
@@ -54,6 +67,8 @@ export function PatientTabDossierView({ dossier, currentUser }) {
     await dossier.sendEmailVerification(role);
     setSendingEmailRole(null);
   };
+
+
 
   return (
     <div className="space-y-4">
@@ -165,6 +180,13 @@ export function PatientTabDossierView({ dossier, currentUser }) {
           {dossier.isEditing && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-blue-900">Parcours de prise en charge</h3>
+              {missingRequiredFields.length > 0 && (
+                <BlockingNotice
+                  title="Dossier incomplet"
+                  message="Pour cocher la case et enregistrer, completez :"
+                  items={missingRequiredFields}
+                />
+              )}
               <ul className="text-sm text-blue-800 space-y-2 list-disc list-inside">
                 <li>Un rendez-vous de pré-consultation est <strong>obligatoire</strong> avant toute intervention</li>
                 <li>
@@ -182,7 +204,7 @@ export function PatientTabDossierView({ dossier, currentUser }) {
                   id="procedure-info-ack"
                   checked={dossier.formState?.procedure_info_acknowledged || false}
                   onChange={(e) => dossier.updateForm('procedure_info_acknowledged', e.target.checked)}
-                  disabled={!formComplete && !dossier.formState?.procedure_info_acknowledged}
+                  disabled={!canAcknowledge}
                   className="checkbox checkbox-primary mt-0.5"
                 />
                 <label htmlFor="procedure-info-ack" className="text-sm text-blue-900 cursor-pointer">
@@ -201,12 +223,7 @@ export function PatientTabDossierView({ dossier, currentUser }) {
             {dossier.isEditing && (
               <Button
                 type="button"
-                disabled={
-                  dossier.saving ||
-                  dossier.loading ||
-                  !dossier.formState ||
-                  !dossier.formState.procedure_info_acknowledged
-                }
+                disabled={!canSave}
                 onClick={dossier.save}
               >
                 {dossier.saving ? 'Enregistrement…' : 'Enregistrer'}

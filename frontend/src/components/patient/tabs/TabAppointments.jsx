@@ -13,6 +13,8 @@ export function TabAppointments({
   setActiveAppointmentId,
   appointments,
   showScheduling,
+  appointmentMissingFields = [],
+  appointmentNeedsSave = false,
   setError,
   setPreviewState,
   onViewPrescription,
@@ -73,7 +75,13 @@ export function TabAppointments({
         onViewPrescription={onViewPrescription}
       />
 
-      <ScheduleAppointment appointments={appointments} show={showScheduling} />
+      <ScheduleAppointment
+        appointments={appointments}
+        show={showScheduling}
+        missingFields={appointmentMissingFields}
+        needsSave={appointmentNeedsSave}
+        errorMessage={appointments.scheduleError}
+      />
 
       <AppointmentEditModal
         isOpen={appointments.editModalOpen}
@@ -96,6 +104,7 @@ export function TabAppointments({
           appointments.setSelectedSlot(slot === appointments.selectedSlot ? null : slot)
         }
         onConfirm={appointments.handleConfirmEdit}
+        errorMessage={appointments.scheduleError}
       />
     </div>
   );

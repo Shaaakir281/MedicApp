@@ -15,6 +15,7 @@ export function usePatientAppointments({
   setError,
   setSuccessMessage,
   onReloadDashboard,
+  onShow14DayModal,
 }) {
   const today = useMemo(() => new Date(), []);
   const [currentMonth, setCurrentMonth] = useState(
@@ -26,6 +27,7 @@ export function usePatientAppointments({
   const [appointmentType, setAppointmentType] = useState('preconsultation');
   const [appointmentMode, setAppointmentMode] = useState('visio');
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingAppointmentId, setEditingAppointmentId] = useState(null);
   const [cancelingId, setCancelingId] = useState(null);
@@ -88,6 +90,19 @@ export function usePatientAppointments({
   }, [appointmentType, hasPreconsultation]);
 
   useEffect(() => {
+    if (
+      appointmentType === 'preconsultation' &&
+      hasPreconsultation &&
+      !hasAct &&
+      !editingAppointmentId
+    ) {
+      setAppointmentType('act');
+      setAppointmentMode('presentiel');
+      setScheduleError(null);
+    }
+  }, [appointmentType, hasPreconsultation, hasAct, editingAppointmentId]);
+
+  useEffect(() => {
     if (appointmentType === 'act' && appointmentMode !== 'presentiel') {
       setAppointmentMode('presentiel');
     }
@@ -96,6 +111,12 @@ export function usePatientAppointments({
   useEffect(() => {
     setSelectedSlot(null);
   }, [appointmentType]);
+
+  useEffect(() => {
+    if (scheduleError) {
+      setScheduleError(null);
+    }
+  }, [appointmentType, appointmentMode, selectedDate, selectedSlot]);
 
   const handlePrevMonth = () => {
     setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -108,6 +129,9 @@ export function usePatientAppointments({
   const handleDateSelect = (date) => {
     setSelectedDate(date);
     setSelectedSlot(null);
+    if (scheduleError) {
+      setScheduleError(null);
+    }
   };
 
   const handleCreateAppointment = useCallback(async () => {
@@ -122,6 +146,7 @@ export function usePatientAppointments({
     }
     setError?.(null);
     setSuccessMessage?.(null);
+    setScheduleError(null);
 
     const currentAppointments = procedureCase?.appointments || [];
     const preconsultationAppt = currentAppointments.find(
@@ -129,7 +154,7 @@ export function usePatientAppointments({
     );
     if (appointmentType === 'act') {
       if (!preconsultationAppt) {
-        setError?.("Planifiez d'abord la pre-consultation avant l'acte.");
+        setScheduleError("Planifiez d'abord la consultation pre-operatoire avant l'acte.");
         return;
       }
       const preDate = preconsultationAppt.date ? parseISODateLocal(preconsultationAppt.date) : null;
@@ -137,9 +162,33 @@ export function usePatientAppointments({
         ? (selectedDate.getTime() - preDate.getTime()) / (1000 * 60 * 60 * 24)
         : null;
       if (diffDays !== null && diffDays < 14) {
-        setError?.("L'acte doit etre au moins 14 jours apres la pre-consultation.");
+        if (onShow14DayModal && preDate) {
+          const preConsultDateFormatted = preDate.toLocaleDateString('fr-FR');
+          const earliestActDate = new Date(preDate);
+          earliestActDate.setDate(earliestActDate.getDate() + 14);
+          const earliestActDateFormatted = earliestActDate.toLocaleDateString('fr-FR');
+          onShow14DayModal({
+            title: 'Regle des 14 jours',
+            message:
+              "Pour des raisons medicales et legales, l'acte doit etre realise au minimum 14 jours apres la pre-consultation.\n\n" +
+              `Votre pre-consultation : ${preConsultDateFormatted}\n` +
+              `Date la plus tot pour l'acte : ${earliestActDateFormatted}\n\n` +
+              'Veuillez selectionner une date ulterieure.',
+          });
+        } else {
+          setScheduleError("L'acte doit etre au moins 14 jours apres la pre-consultation.");
+        }
         return;
       }
+    }
+
+    if (
+      appointmentType === 'preconsultation' &&
+      hasPreconsultation &&
+      !editingAppointmentId
+    ) {
+      setScheduleError('Une consultation pre-operatoire est deja planifiee.');
+      return;
     }
 
     try {
@@ -166,7 +215,7 @@ export function usePatientAppointments({
       await onReloadDashboard?.();
       return true;
     } catch (err) {
-      setError?.(err.message);
+      setScheduleError(err?.message || 'Impossible de planifier ce rendez-vous.');
       return false;
     }
   }, [
@@ -178,8 +227,10 @@ export function usePatientAppointments({
     appointmentType,
     appointmentMode,
     editingAppointmentId,
+    hasPreconsultation,
     loadProcedureCase,
     onReloadDashboard,
+    onShow14DayModal,
     setError,
     setSuccessMessage,
   ]);
@@ -197,6 +248,7 @@ export function usePatientAppointments({
       setSelectedDate(parsedDate || new Date());
       setSelectedSlot(appt.time ? appt.time.slice(0, 5) : null);
       setEditModalOpen(true);
+      setScheduleError(null);
     },
     [setError, setSuccessMessage],
   );
@@ -230,6 +282,7 @@ export function usePatientAppointments({
     setEditModalOpen(false);
     setEditingAppointmentId(null);
     setSelectedSlot(null);
+    setScheduleError(null);
   };
 
   const handleConfirmEdit = async () => {
@@ -270,6 +323,7 @@ export function usePatientAppointments({
     appointmentType,
     appointmentMode,
     slotsLoading,
+    scheduleError,
     editModalOpen,
     editingAppointmentId,
     cancelingId,

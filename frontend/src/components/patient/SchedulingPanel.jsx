@@ -25,6 +25,7 @@ export const SchedulingPanel = ({
   confirmLabel = 'Confirmer le rendez-vous',
   disabledConfirm = false,
   renderActions,
+  actionNotice,
 }) => {
   const isConfirmDisabled = disabledConfirm || !selectedSlot;
 
@@ -92,6 +93,7 @@ export const SchedulingPanel = ({
               onSelectSlot={(slot) => onSelectSlot?.(slot)}
             />
           )}
+          {actionNotice ? <div className="pt-2">{actionNotice}</div> : null}
           {renderActions ? (
             renderActions({ onConfirm, isConfirmDisabled })
           ) : (

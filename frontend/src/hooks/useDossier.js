@@ -144,6 +144,42 @@ export function useDossier({ token }) {
     setFormState((prev) => ({ ...(prev || {}), [field]: value }));
   };
 
+  const autoSaveForVerification = async () => {
+    if (!token || !formState) return null;
+    const requiredFields = [
+      ['Prenom enfant', formState.childFirstName],
+      ['Nom enfant', formState.childLastName],
+      ['Date de naissance', formState.birthDate],
+      ['Prenom parent 1', formState.parent1FirstName],
+      ['Nom parent 1', formState.parent1LastName],
+      ['Email parent 1', formState.parent1Email],
+    ];
+    const missing = requiredFields.filter(([, val]) => !String(val || '').trim()).map(([label]) => label);
+    if (missing.length) {
+      setError(`Pour verifier l'email, completez d'abord : ${missing.join(', ')}`);
+      return null;
+    }
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const payload = formToPayload(formState);
+      const data = await saveDossier({ token, payload });
+      const nextVm = toDossierVM(data);
+      setVm(nextVm);
+      vmRef.current = nextVm;
+      const updatedForm = vmToForm(nextVm);
+      updatedForm.procedure_info_acknowledged = formState.procedure_info_acknowledged;
+      setFormState(updatedForm);
+      return nextVm;
+    } catch (err) {
+      setError(err?.message || 'Enregistrement impossible.');
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const save = async () => {
     if (!token || !formState) return;
     const requiredFields = [
@@ -265,9 +301,12 @@ export function useDossier({ token }) {
   };
 
   const sendEmailVerification = async (role) => {
-    const guardianId = vm?.guardians?.[role]?.id;
+    let guardianId = vm?.guardians?.[role]?.id;
     if (!guardianId) {
-      setError('Identifiant parent manquant.');
+      const nextVm = await autoSaveForVerification();
+      guardianId = nextVm?.guardians?.[role]?.id;
+    }
+    if (!guardianId) {
       return;
     }
     const emailField = role === 'PARENT_2' ? 'parent2Email' : 'parent1Email';

@@ -32,6 +32,21 @@ function sanitizeName(value) {
   return trimmed;
 }
 
+function isPlaceholderName(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return false;
+  const normalized = trimmed.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return normalized === 'prenom' || normalized === 'nom';
+}
+
+function getTodayLocalISO() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function optionalString(value) {
   const trimmed = String(value || '').trim();
   return trimmed ? trimmed : null;
@@ -40,6 +55,15 @@ function optionalString(value) {
 export function toDossierVM(apiResponse) {
   const guardiansMap = buildGuardianDefaults();
   const verification = buildVerificationDefaults();
+  const rawChild = apiResponse?.child || {};
+  const rawFirstName = rawChild.first_name || '';
+  const rawLastName = rawChild.last_name || '';
+  const rawBirthDate = rawChild.birth_date || null;
+  const hideBirthDate =
+    rawBirthDate &&
+    rawBirthDate === getTodayLocalISO() &&
+    isPlaceholderName(rawFirstName) &&
+    isPlaceholderName(rawLastName);
 
   (apiResponse?.guardians || []).forEach((g) => {
     const role = g.role || 'PARENT_1';
@@ -62,9 +86,9 @@ export function toDossierVM(apiResponse) {
   return {
     child: {
       id: apiResponse?.child?.id || null,
-      firstName: apiResponse?.child?.first_name || '',
-      lastName: apiResponse?.child?.last_name || '',
-      birthDate: apiResponse?.child?.birth_date || '',
+      firstName: rawFirstName,
+      lastName: rawLastName,
+      birthDate: hideBirthDate ? null : rawBirthDate,
       weightKg: apiResponse?.child?.weight_kg ?? '',
       medicalNotes: apiResponse?.child?.medical_notes || '',
     },
@@ -78,7 +102,7 @@ export function vmToForm(vm) {
   return {
     childFirstName: sanitizeName(vm?.child?.firstName),
     childLastName: sanitizeName(vm?.child?.lastName),
-    birthDate: vm?.child?.birthDate || '',
+    birthDate: vm?.child?.birthDate || null,
     weightKg: vm?.child?.weightKg ?? '',
     medicalNotes: vm?.child?.medicalNotes || '',
     parent1FirstName: sanitizeName(vm?.guardians?.PARENT_1?.firstName),
@@ -101,7 +125,7 @@ export function formToPayload(formState) {
   const child = {
     first_name: (formState.childFirstName || '').trim(),
     last_name: (formState.childLastName || '').trim(),
-    birth_date: formState.birthDate || '',
+    birth_date: formState.birthDate || null,
     weight_kg: Number.isNaN(weightValue) ? null : weightValue,
     medical_notes: formState.medicalNotes || '',
   };

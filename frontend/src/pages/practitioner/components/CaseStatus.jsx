@@ -10,7 +10,6 @@ export const CaseStatus = ({
   documentSignatures = [],
   caseId = null,
   token,
-  onSendDocumentSignature,
   onNavigateDate,
 }) => {
   return (
@@ -69,7 +68,6 @@ export const CaseStatus = ({
           documentSignatures={documentSignatures}
           caseId={caseId}
           token={token}
-          onSend={onSendDocumentSignature}
         />
       </div>
 

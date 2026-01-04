@@ -10,10 +10,17 @@ import { buildPatientDashboardVM } from '../../services/patientDashboard.mapper.
 import { formatChildAge } from '../../utils/child.js';
 import { parseISODateLocal, sortAppointments } from '../../utils/date.js';
 import { LABELS_FR } from '../../constants/labels.fr.js';
+import { getAppointmentBookingMissingFields, isAppointmentBookingComplete } from '../../utils/appointmentValidation.js';
 
 const previewInitialState = { open: false, url: null, downloadUrl: null, title: null, type: null };
 
-export function usePatientSpaceController({ token, procedureSelection }) {
+export function usePatientSpaceController({
+  token,
+  procedureSelection,
+  dossierForm = null,
+  dossierVm = null,
+  onShow14DayModal = null,
+}) {
   const formMethods = useForm({
     resolver: zodResolver(patientProcedureSchema),
     defaultValues: defaultProcedureValues,
@@ -49,6 +56,7 @@ export function usePatientSpaceController({ token, procedureSelection }) {
     setError,
     setSuccessMessage,
     onReloadDashboard: dashboardQuery.reload,
+    onShow14DayModal,
   });
 
   const appointmentOptions = useMemo(
@@ -108,12 +116,49 @@ export function usePatientSpaceController({ token, procedureSelection }) {
   );
 
   const procedureCase = procedure.procedureCase;
-  const hasValue = (value) => Boolean(String(value || '').trim());
-  const hasChildName = hasValue(procedureCase?.child_full_name) ||
-    (hasValue(procedureCase?.child_first_name) && hasValue(procedureCase?.child_last_name));
-  const hasParent1Name = hasValue(procedureCase?.parent1_name) ||
-    (hasValue(procedureCase?.parent1_first_name) && hasValue(procedureCase?.parent1_last_name));
-  const canSchedule = Boolean(procedureCase && hasChildName && hasParent1Name);
+  const appointmentSnapshot = useMemo(() => {
+    if (dossierForm) {
+      return {
+        childFirstName: dossierForm.childFirstName,
+        childLastName: dossierForm.childLastName,
+        birthDate: dossierForm.birthDate,
+        parent1FirstName: dossierForm.parent1FirstName,
+        parent1LastName: dossierForm.parent1LastName,
+        parent1Email: dossierForm.parent1Email,
+      };
+    }
+    if (dossierVm) {
+      return {
+        childFirstName: dossierVm.child?.firstName,
+        childLastName: dossierVm.child?.lastName,
+        birthDate: dossierVm.child?.birthDate,
+        parent1FirstName: dossierVm.guardians?.PARENT_1?.firstName,
+        parent1LastName: dossierVm.guardians?.PARENT_1?.lastName,
+        parent1Email: dossierVm.guardians?.PARENT_1?.email,
+      };
+    }
+    if (procedureCase) {
+      return {
+        childFullName: procedureCase.child_full_name,
+        childFirstName: procedureCase.child_first_name,
+        childLastName: procedureCase.child_last_name,
+        birthDate: procedureCase.child_birthdate,
+        parent1Name: procedureCase.parent1_name,
+        parent1FirstName: procedureCase.parent1_first_name,
+        parent1LastName: procedureCase.parent1_last_name,
+        parent1Email: procedureCase.parent1_email,
+      };
+    }
+    return null;
+  }, [dossierForm, dossierVm, procedureCase]);
+  const appointmentMissingFields = useMemo(
+    () => (appointmentSnapshot ? getAppointmentBookingMissingFields(appointmentSnapshot) : []),
+    [appointmentSnapshot],
+  );
+  const canSchedule = Boolean(
+    procedureCase && appointmentSnapshot && isAppointmentBookingComplete(appointmentSnapshot),
+  );
+  const appointmentNeedsSave = Boolean(!procedureCase && appointmentSnapshot && appointmentMissingFields.length === 0);
   const showScheduling = canSchedule && (!appointments.bothAppointmentsBooked || appointments.editingAppointmentId);
 
   const childBirthdateString = watch('child_birthdate') || procedure.procedureCase?.child_birthdate || null;
@@ -176,6 +221,8 @@ export function usePatientSpaceController({ token, procedureSelection }) {
     actionRequired,
     signatureAppointmentId,
     showScheduling,
+    appointmentMissingFields,
+    appointmentNeedsSave,
     childAgeDisplay,
     procedure,
     appointments,

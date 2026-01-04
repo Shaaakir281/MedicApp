@@ -7,32 +7,59 @@ import { CaseForm } from './CaseForm.jsx';
 import { ScheduleForm } from './ScheduleForm.jsx';
 import { CaseStatus } from './CaseStatus.jsx';
 import { PrescriptionsSection } from './PrescriptionsSection.jsx';
-import { practitionerSendSignature } from '../../../services/documentSignature.api.js';
 import { mapPractitionerProcedureCase } from '../../../services/patientDashboard.mapper.js';
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString('fr-FR') : '--');
 const toInputDate = (value) => (value ? new Date(value).toISOString().split('T')[0] : '');
 const truncateTime = (value) => (value ? value.slice(0, 5) : '');
+const normalizeNamePart = (value) => (typeof value === 'string' ? value.trim() : '');
+const combineNames = (firstName, lastName) => {
+  const parts = [normalizeNamePart(firstName), normalizeNamePart(lastName)].filter(Boolean);
+  return parts.join(' ');
+};
+const splitFullName = (value) => {
+  const cleaned = normalizeNamePart(value);
+  if (!cleaned) {
+    return { firstName: '', lastName: '' };
+  }
+  const parts = cleaned.split(/\s+/);
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: '' };
+  }
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+};
 
-const buildCaseForm = (procedure, patient) => ({
-  child_full_name: procedure?.child_full_name || patient?.child_full_name || '',
-  child_birthdate: toInputDate(procedure?.child_birthdate),
-  child_weight_kg: procedure?.child_weight_kg?.toString() ?? '',
-  parent1_name: procedure?.parent1_name || '',
-  parent1_first_name: procedure?.parent1_first_name || '',
-  parent1_last_name: procedure?.parent1_last_name || '',
-  parent1_email: procedure?.parent1_email || '',
-  parent2_name: procedure?.parent2_name || '',
-  parent2_first_name: procedure?.parent2_first_name || '',
-  parent2_last_name: procedure?.parent2_last_name || '',
-  parent2_email: procedure?.parent2_email || '',
-  parent1_phone: procedure?.parent1_phone || '',
-  parent2_phone: procedure?.parent2_phone || '',
-  parent1_sms_optin: Boolean(procedure?.parent1_sms_optin),
-  parent2_sms_optin: Boolean(procedure?.parent2_sms_optin),
-  parental_authority_ack: Boolean(procedure?.parental_authority_ack),
-  notes: procedure?.notes || '',
-});
+const buildCaseForm = (procedure, patient) => {
+  const parent1Split = splitFullName(procedure?.parent1_name);
+  const parent1First = procedure?.parent1_first_name || parent1Split.firstName;
+  const parent1Last = procedure?.parent1_last_name || parent1Split.lastName;
+  const parent1Name = procedure?.parent1_name || combineNames(parent1First, parent1Last);
+
+  const parent2Split = splitFullName(procedure?.parent2_name);
+  const parent2First = procedure?.parent2_first_name || parent2Split.firstName;
+  const parent2Last = procedure?.parent2_last_name || parent2Split.lastName;
+  const parent2Name = procedure?.parent2_name || combineNames(parent2First, parent2Last);
+
+  return {
+    child_full_name: procedure?.child_full_name || patient?.child_full_name || '',
+    child_birthdate: toInputDate(procedure?.child_birthdate),
+    child_weight_kg: procedure?.child_weight_kg?.toString() ?? '',
+    parent1_name: parent1Name || '',
+    parent1_first_name: parent1First || '',
+    parent1_last_name: parent1Last || '',
+    parent1_email: procedure?.parent1_email || '',
+    parent2_name: parent2Name || '',
+    parent2_first_name: parent2First || '',
+    parent2_last_name: parent2Last || '',
+    parent2_email: procedure?.parent2_email || '',
+    parent1_phone: procedure?.parent1_phone || '',
+    parent2_phone: procedure?.parent2_phone || '',
+    parent1_sms_optin: Boolean(procedure?.parent1_sms_optin),
+    parent2_sms_optin: Boolean(procedure?.parent2_sms_optin),
+    parental_authority_ack: Boolean(procedure?.parental_authority_ack),
+    notes: procedure?.notes || '',
+  };
+};
 
 const buildScheduleForm = (appointment) => ({
   date: appointment?.date || '',
@@ -58,15 +85,18 @@ const sanitizeCaseValues = (form) => {
   }
   const trimmedChildName =
     typeof form.child_full_name === 'string' ? form.child_full_name.trim() : form.child_full_name || '';
+  const combinedParent1Name = combineNames(form.parent1_first_name, form.parent1_last_name);
+  const combinedParent2Name = combineNames(form.parent2_first_name, form.parent2_last_name);
+
   return {
     child_full_name: trimmedChildName || '',
     child_birthdate: form.child_birthdate || null,
     child_weight_kg: parsedWeight,
-    parent1_name: nullable(form.parent1_name),
+    parent1_name: combinedParent1Name || nullable(form.parent1_name),
     parent1_first_name: nullable(form.parent1_first_name),
     parent1_last_name: nullable(form.parent1_last_name),
     parent1_email: nullable(form.parent1_email),
-    parent2_name: nullable(form.parent2_name),
+    parent2_name: combinedParent2Name || nullable(form.parent2_name),
     parent2_first_name: nullable(form.parent2_first_name),
     parent2_last_name: nullable(form.parent2_last_name),
     parent2_email: nullable(form.parent2_email),
@@ -363,14 +393,6 @@ export function PatientDetailsDrawer({
     }
   };
 
-  const handleSendSignature = async (caseId, documentType) => {
-    if (!token) {
-      console.error('Token manquant pour envoyer signature');
-      return;
-    }
-    await practitionerSendSignature(token, caseId, documentType);
-  };
-
   const handleCreateCabinetSession = async (role, purpose) => {
     if (!token || !signatureAppointmentId) return;
     setCabinetError(null);
@@ -451,7 +473,6 @@ export function PatientDetailsDrawer({
           documentSignatures={procedureWithSignatures?.documentSignatures || []}
           caseId={procedure?.case_id}
           token={token}
-          onSendDocumentSignature={handleSendSignature}
           onNavigateDate={onNavigateDate}
         />
 

@@ -1,12 +1,12 @@
 import React from 'react';
 import { Badge } from '../../../components/ui/Badge';
 import { StatusDot } from '../../../components/ui/StatusDot';
-import { IconDocument, IconMail } from './icons';
+import { IconDocument } from './icons';
 
 /**
  * Affiche un document de signature avec son statut et ses actions
  */
-export function DocumentSignatureCard({ document, onSend, onPreview, isSending }) {
+export function DocumentSignatureCard({ document, onPreview }) {
   const statusVariant = {
     completed: 'success',
     partial: 'warning',
@@ -44,15 +44,6 @@ export function DocumentSignatureCard({ document, onSend, onPreview, isSending }
           disabled={!onPreview}
         >
           Voir
-        </button>
-        <button
-          type="button"
-          className="btn btn-xs btn-outline flex items-center gap-1"
-          onClick={onSend}
-          disabled={isSending}
-        >
-          <IconMail className="w-3 h-3" />
-          {isSending ? 'Envoi...' : 'Envoyer signature'}
         </button>
       </div>
     </div>
