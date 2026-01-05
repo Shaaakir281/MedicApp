@@ -66,14 +66,24 @@ class RegisterRequest(BaseModel):
         return values
 
 
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+def _get_frontend_base_url() -> str:
+    settings = get_settings()
+    base_url = settings.frontend_base_url or settings.app_base_url
+    return base_url.rstrip("/")
+
+
 def _build_verification_link(token: str) -> str:
-    base_url = get_settings().app_base_url.rstrip("/")
+    base_url = _get_frontend_base_url()
     query = urlencode({"token": token})
     return f"{base_url}/auth/verify-email?{query}"
 
 
 def _build_password_reset_link(token: str) -> str:
-    base_url = get_settings().app_base_url.rstrip("/")
+    base_url = _get_frontend_base_url()
     query = urlencode({"token": token})
     return f"{base_url}/auth/reset-password?{query}"
 
@@ -132,6 +142,22 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> schemas
         send_verification_email(user.email, verification_link)
 
     return schemas.User.from_orm(user)
+
+
+@router.post("/verify-email/resend", response_model=schemas.Message, status_code=status.HTTP_200_OK)
+def resend_verification_email(
+    payload: ResendVerificationRequest,
+    db: Session = Depends(get_db),
+) -> schemas.Message:
+    """Resend a verification email for patient accounts."""
+    user = auth_service.get_user_by_email(db, payload.email)
+    if not user or user.email_verified or user.role != models.UserRole.patient:
+        return schemas.Message(detail="Si un compte existe, un e-mail a ete envoye.")
+
+    token = auth_service.create_email_verification_token(db, user)
+    verification_link = _build_verification_link(token.token)
+    send_verification_email(user.email, verification_link)
+    return schemas.Message(detail="Si un compte existe, un e-mail a ete envoye.")
 
 
 @router.get("/verify-email", response_model=schemas.Message)

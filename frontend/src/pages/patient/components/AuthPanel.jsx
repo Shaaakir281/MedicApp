@@ -28,7 +28,17 @@ const registerSchema = z
     message: 'Les mots de passe doivent correspondre',
   });
 
-export function AuthPanel({ onLogin, onRegister, loading, registerFeedback, error }) {
+export function AuthPanel({
+  onLogin,
+  onRegister,
+  onResendVerification,
+  loading,
+  registerFeedback,
+  resendFeedback,
+  resendLoading,
+  lastRegisterEmail,
+  error,
+}) {
   const loginForm = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: { login_email: '', login_password: '' },
@@ -121,6 +131,28 @@ export function AuthPanel({ onLogin, onRegister, loading, registerFeedback, erro
           >
             {registerFeedback.message}
           </p>
+        )}
+        {registerFeedback?.type === 'success' && (
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              disabled={resendLoading || !lastRegisterEmail}
+              onClick={() => onResendVerification?.(lastRegisterEmail)}
+            >
+              {resendLoading ? 'Envoi en cours...' : "Renvoyer l'email de validation"}
+            </Button>
+            {resendFeedback && (
+              <p
+                className={`text-xs ${
+                  resendFeedback.type === 'success' ? 'text-green-600' : 'text-red-600'
+                }`}
+              >
+                {resendFeedback.message}
+              </p>
+            )}
+          </div>
         )}
       </Card>
 

@@ -320,6 +320,14 @@ export async function verifyEmailToken(token) {
   });
 }
 
+export async function resendVerificationEmail(email) {
+  return apiRequest('/auth/verify-email/resend', {
+    method: 'POST',
+    body: { email },
+    skipAuth: true,
+  });
+}
+
 export async function deleteAppointment(token, appointmentId, options = {}) {
   const { cascadeAct = true } = options;
   return apiRequest(`/appointments/${appointmentId}?cascade_act=${cascadeAct}`, {
