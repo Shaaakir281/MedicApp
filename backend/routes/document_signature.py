@@ -183,6 +183,24 @@ def start_document_signature(
     link_attr = f"{signer_role.value}_signature_link" if hasattr(signer_role, "value") else f"{signer_role}_signature_link"
     signature_link = getattr(doc_sig, link_attr, None)
 
+    if not signature_link and in_person:
+        doc_sig = document_signature_service.ensure_missing_signer_link(
+            db,
+            doc_sig,
+            signer_role.value if hasattr(signer_role, "value") else signer_role,
+            in_person=True,
+        )
+        signature_link = getattr(doc_sig, link_attr, None)
+
+    if not signature_link and in_person:
+        doc_sig = document_signature_service.recreate_signature_request_for_role(
+            db,
+            doc_sig,
+            signer_role.value if hasattr(signer_role, "value") else signer_role,
+            in_person=True,
+        )
+        signature_link = getattr(doc_sig, link_attr, None)
+
     if not signature_link:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

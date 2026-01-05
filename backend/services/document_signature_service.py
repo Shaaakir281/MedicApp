@@ -115,26 +115,88 @@ def get_or_create_document_signature(
     return doc_sig
 
 
+def _ensure_email_value(
+    email: str | None,
+    phone: str | None,
+    label: str,
+    *,
+    allow_placeholder: bool,
+    case_id: int,
+) -> str | None:
+    if email:
+        return email
+    if phone:
+        safe = phone.replace("+", "").replace(" ", "").replace("-", "")
+        return f"{safe}@{label}.consent.test"
+    if allow_placeholder:
+        return f"{label}-{case_id}@medicapp.invalid"
+    return None
+
+
+def _build_single_signer_payload(
+    case: models.ProcedureCase,
+    role: str,
+    auth_mode: str,
+    allow_placeholder: bool,
+) -> Optional[dict]:
+    role = str(role or "").lower()
+    if role not in {"parent1", "parent2"}:
+        return None
+    if role == "parent1":
+        if not case.parent1_name:
+            return None
+        email = _ensure_email_value(
+            case.parent1_email,
+            case.parent1_phone,
+            "parent1",
+            allow_placeholder=allow_placeholder,
+            case_id=case.id,
+        )
+        phone = case.parent1_phone
+        last_name = "1"
+    else:
+        if not case.parent2_name:
+            return None
+        email = _ensure_email_value(
+            case.parent2_email,
+            case.parent2_phone,
+            "parent2",
+            allow_placeholder=allow_placeholder,
+            case_id=case.id,
+        )
+        phone = case.parent2_phone
+        last_name = "2"
+    if not email and not allow_placeholder:
+        return None
+    return {
+        "label": role,
+        "email": email,
+        "phone": phone,
+        "auth_mode": auth_mode,
+        "first_name": "Parent",
+        "last_name": last_name,
+    }
+
+
 def _build_signers_payload(
     case: models.ProcedureCase,
-    auth_mode: str = "otp_sms"
+    auth_mode: str = "otp_sms",
+    allow_placeholder: bool = False,
 ) -> list[dict]:
     """
     Build signers payload pour Yousign.
 
     RGPD: Pseudonymisation des noms de parents.
     """
-    def _ensure_email(email: str | None, phone: str | None, label: str) -> str | None:
-        if email:
-            return email
-        if phone:
-            safe = phone.replace("+", "").replace(" ", "").replace("-", "")
-            return f"{safe}@{label}.consent.test"
-        return None
-
     signers = []
-    if case.parent1_name and (case.parent1_email or case.parent1_phone):
-        email = _ensure_email(case.parent1_email, case.parent1_phone, "parent1")
+    if case.parent1_name and (case.parent1_email or case.parent1_phone or allow_placeholder):
+        email = _ensure_email_value(
+            case.parent1_email,
+            case.parent1_phone,
+            "parent1",
+            allow_placeholder=allow_placeholder,
+            case_id=case.id,
+        )
         signers.append({
             "label": "parent1",
             "email": email,
@@ -144,8 +206,14 @@ def _build_signers_payload(
             "first_name": "Parent",
             "last_name": "1",
         })
-    if case.parent2_name and (case.parent2_email or case.parent2_phone):
-        email = _ensure_email(case.parent2_email, case.parent2_phone, "parent2")
+    if case.parent2_name and (case.parent2_email or case.parent2_phone or allow_placeholder):
+        email = _ensure_email_value(
+            case.parent2_email,
+            case.parent2_phone,
+            "parent2",
+            allow_placeholder=allow_placeholder,
+            case_id=case.id,
+        )
         signers.append({
             "label": "parent2",
             "email": email,
@@ -168,6 +236,217 @@ def _validate_contacts(case: models.ProcedureCase) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Coordonnées SMS manquantes : {', '.join(missing)}"
         )
+
+
+def ensure_missing_signer_link(
+    db: Session,
+    doc_sig: models.DocumentSignature,
+    role: str,
+    *,
+    in_person: bool,
+) -> models.DocumentSignature:
+    role = str(role or "").lower()
+    if role not in {"parent1", "parent2"}:
+        return doc_sig
+    if not doc_sig.yousign_procedure_id or doc_sig.yousign_purged_at:
+        return doc_sig
+    link_attr = f"{role}_signature_link"
+    if getattr(doc_sig, link_attr, None):
+        return doc_sig
+
+    case = db.query(models.ProcedureCase).filter(
+        models.ProcedureCase.id == doc_sig.procedure_case_id
+    ).first()
+    if not case:
+        return doc_sig
+
+    auth_mode = "no_otp" if in_person else "otp_sms"
+    signer_payload = _build_single_signer_payload(
+        case,
+        role,
+        auth_mode=auth_mode,
+        allow_placeholder=in_person,
+    )
+    if not signer_payload:
+        return doc_sig
+
+    client = YousignClient()
+    if client.mock_mode:
+        created = client.add_signers(doc_sig.yousign_procedure_id, "mock", [signer_payload])
+    else:
+        try:
+            documents = client.fetch_documents(doc_sig.yousign_procedure_id)
+            document_id = None
+            if documents:
+                first = documents[0]
+                if isinstance(first, dict):
+                    document_id = first.get("id")
+            if not document_id:
+                return doc_sig
+        except Exception:
+            logger.exception(
+                "Failed to fetch documents for Yousign SR %s (DocumentSignature %d)",
+                doc_sig.yousign_procedure_id,
+                doc_sig.id,
+            )
+            return doc_sig
+        try:
+            created = client.add_signers(doc_sig.yousign_procedure_id, document_id, [signer_payload])
+        except Exception:
+            logger.exception(
+                "Failed to add signer %s for DocumentSignature %d",
+                role,
+                doc_sig.id,
+            )
+            return doc_sig
+
+    if not created:
+        return doc_sig
+
+    signer = created[0]
+    if not signer.signature_link and not client.mock_mode:
+        try:
+            payload = client.fetch_signer(str(signer.signer_id))
+            signer = YousignSigner(
+                signer_id=signer.signer_id,
+                signature_link=payload.get("signature_url") or payload.get("signature_link") or "",
+                email=(payload.get("info") or {}).get("email") or payload.get("email") or signer.email,
+                phone=(payload.get("info") or {}).get("phone_number") or payload.get("phone") or signer.phone,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to fetch signer details for DocumentSignature %d",
+                doc_sig.id,
+            )
+    setattr(doc_sig, f"{role}_yousign_signer_id", signer.signer_id)
+    setattr(doc_sig, link_attr, signer.signature_link)
+    status_attr = f"{role}_status"
+    sent_at_attr = f"{role}_sent_at"
+    if getattr(doc_sig, status_attr, None) != "signed":
+        setattr(doc_sig, status_attr, "sent")
+        setattr(doc_sig, sent_at_attr, dt.datetime.utcnow())
+        doc_sig.overall_status = models.DocumentSignatureStatus.sent
+
+    db.add(doc_sig)
+    db.commit()
+    db.refresh(doc_sig)
+    return doc_sig
+
+
+def _start_signature_request_for_signers(
+    case: models.ProcedureCase,
+    document_type: str,
+    signers: list[dict],
+    *,
+    in_person: bool,
+) -> tuple[Optional[object], Optional[str]]:
+    doc_type_enum = legal_documents_pdf.normalize_document_type(document_type)
+    document_version = LEGAL_CATALOG[doc_type_enum].version
+    consent_hash = None
+
+    base_doc_id = legal_documents_pdf.ensure_legal_document_pdf(case, doc_type_enum)
+    base_category = legal_documents_pdf.base_category_for(doc_type_enum)
+    pdf_bytes = consent_pdf.load_pdf_bytes(base_category, base_doc_id)
+    if pdf_bytes:
+        consent_hash = consent_pdf.compute_pdf_sha256(pdf_bytes)
+
+    neutral_pdf_path = consent_pdf.render_neutral_document_pdf(
+        document_type=document_type,
+        consent_id=str(case.id),
+        document_version=document_version,
+        consent_hash=consent_hash,
+    )
+
+    doc_labels = {
+        "authorization": "Autorisation d'intervention",
+        "consent": "Consentement eclaire",
+        "fees": "Honoraires et modalites financieres",
+    }
+    procedure_label = f"MedScript - {doc_labels.get(document_type, document_type)}"
+    delivery_mode = "none" if in_person else "email"
+
+    try:
+        client = YousignClient()
+        procedure = start_neutral_signature_request(
+            client=client,
+            neutral_pdf_path=str(neutral_pdf_path),
+            signers=signers,
+            procedure_label=procedure_label,
+            delivery_mode=delivery_mode,
+        )
+    except (YousignConfigurationError, RuntimeError):
+        logger.exception(
+            "Failed to start signature request for case=%d doc_type=%s",
+            case.id,
+            document_type,
+        )
+        return None, None
+
+    return procedure, document_version
+
+
+def recreate_signature_request_for_role(
+    db: Session,
+    doc_sig: models.DocumentSignature,
+    role: str,
+    *,
+    in_person: bool,
+) -> models.DocumentSignature:
+    role = str(role or "").lower()
+    if role not in {"parent1", "parent2"}:
+        return doc_sig
+
+    case = db.query(models.ProcedureCase).filter(
+        models.ProcedureCase.id == doc_sig.procedure_case_id
+    ).first()
+    if not case:
+        return doc_sig
+
+    auth_mode = "no_otp" if in_person else "otp_sms"
+    signer_payload = _build_single_signer_payload(
+        case,
+        role,
+        auth_mode=auth_mode,
+        allow_placeholder=in_person,
+    )
+    if not signer_payload:
+        return doc_sig
+
+    procedure, document_version = _start_signature_request_for_signers(
+        case,
+        doc_sig.document_type,
+        [signer_payload],
+        in_person=in_person,
+    )
+    if not procedure or not procedure.signers:
+        return doc_sig
+
+    signer = procedure.signers[0]
+    now = dt.datetime.utcnow()
+    doc_sig.yousign_procedure_id = procedure.procedure_id
+    doc_sig.yousign_purged_at = None
+    if document_version:
+        doc_sig.document_version = document_version
+
+    status_attr = f"{role}_status"
+    sent_at_attr = f"{role}_sent_at"
+    setattr(doc_sig, f"{role}_yousign_signer_id", signer.signer_id)
+    setattr(doc_sig, f"{role}_signature_link", signer.signature_link)
+    if getattr(doc_sig, status_attr, None) != "signed":
+        setattr(doc_sig, status_attr, "sent")
+        setattr(doc_sig, sent_at_attr, now)
+
+    if doc_sig.parent1_status == "signed" and doc_sig.parent2_status == "signed":
+        doc_sig.overall_status = models.DocumentSignatureStatus.completed
+    elif doc_sig.parent1_status == "signed" or doc_sig.parent2_status == "signed":
+        doc_sig.overall_status = models.DocumentSignatureStatus.partially_signed
+    else:
+        doc_sig.overall_status = models.DocumentSignatureStatus.sent
+
+    db.add(doc_sig)
+    db.commit()
+    db.refresh(doc_sig)
+    return doc_sig
 
 
 def initiate_document_signature(
@@ -200,7 +479,8 @@ def initiate_document_signature(
         )
 
     document_type = normalize_document_type(document_type)
-    _validate_contacts(case)
+    if not in_person:
+        _validate_contacts(case)
 
     # 2. Récupérer ou créer DocumentSignature
     doc_sig = get_or_create_document_signature(db, procedure_case_id, document_type)
@@ -216,7 +496,7 @@ def initiate_document_signature(
 
     # 3. Mode d'authentification Yousign
     auth_mode = "no_otp" if in_person else "otp_sms"
-    signers = _build_signers_payload(case, auth_mode=auth_mode)
+    signers = _build_signers_payload(case, auth_mode=auth_mode, allow_placeholder=in_person)
 
     if not signers:
         raise HTTPException(

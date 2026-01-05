@@ -41,7 +41,11 @@ def compute_signature_open_at(case: models.ProcedureCase) -> Optional[dt.date]:
     return pre_date + dt.timedelta(days=15)
 
 
-def _build_signers_payload(case: models.ProcedureCase, auth_mode: str = "otp_sms") -> list[dict]:
+def _build_signers_payload(
+    case: models.ProcedureCase,
+    auth_mode: str = "otp_sms",
+    allow_placeholder: bool = False,
+) -> list[dict]:
     """Build signers payload; fallback email generated from phone if missing."""
 
     def _ensure_email(email: str | None, phone: str | None, label: str) -> str | None:
@@ -50,10 +54,12 @@ def _build_signers_payload(case: models.ProcedureCase, auth_mode: str = "otp_sms
         if phone:
             safe = phone.replace("+", "").replace(" ", "").replace("-", "")
             return f"{safe}@{label}.consent.test"
+        if allow_placeholder:
+            return f"{label}-{case.id}@medicapp.invalid"
         return None
 
     signers = []
-    if case.parent1_name and (case.parent1_email or case.parent1_phone):
+    if case.parent1_name and (case.parent1_email or case.parent1_phone or allow_placeholder):
         email = _ensure_email(case.parent1_email, case.parent1_phone, "parent1")
         signers.append(
             {
@@ -63,7 +69,7 @@ def _build_signers_payload(case: models.ProcedureCase, auth_mode: str = "otp_sms
                 "auth_mode": auth_mode,
             }
         )
-    if case.parent2_name and (case.parent2_email or case.parent2_phone):
+    if case.parent2_name and (case.parent2_email or case.parent2_phone or allow_placeholder):
         email = _ensure_email(case.parent2_email, case.parent2_phone, "parent2")
         signers.append(
             {
@@ -90,10 +96,11 @@ def _validate_contacts(case: models.ProcedureCase) -> None:
 def initiate_consent(db: Session, case: models.ProcedureCase, *, in_person: bool = False) -> models.ProcedureCase:
     """Create the Yousign procedure (or mock) and send initial notifications."""
     signature_open_at = compute_signature_open_at(case)
-    _validate_contacts(case)
+    if not in_person:
+        _validate_contacts(case)
     # Yousign v3 accepte : otp_sms, otp_email, no_otp. En face à face on supprime l'OTP.
     auth_mode = "no_otp" if in_person else "otp_sms"
-    signers = _build_signers_payload(case, auth_mode=auth_mode)
+    signers = _build_signers_payload(case, auth_mode=auth_mode, allow_placeholder=in_person)
     if not signers:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Aucun parent n'est renseigne.")
 
