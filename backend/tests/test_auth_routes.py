@@ -48,8 +48,8 @@ def test_register_creates_user_and_sends_email(
 
     payload = {
         "email": "new.user@example.com",
-        "password": "secure-pass",
-        "password_confirm": "secure-pass",
+        "password": "StrongPass1!",
+        "password_confirm": "StrongPass1!",
         "role": models.UserRole.patient.value,
     }
     response = client.post("/auth/register", json=payload)

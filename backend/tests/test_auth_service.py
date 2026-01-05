@@ -32,13 +32,13 @@ def test_register_user_creates_new_account(db_session: Session) -> None:
     user = auth_service.register_user(
         db_session,
         email="new-user@example.com",
-        password="strong-password",
+        password="StrongPass1!",
         role=models.UserRole.patient,
     )
 
     assert user.id is not None
     assert user.email == "new-user@example.com"
-    assert security.verify_password("strong-password", user.hashed_password)
+    assert security.verify_password("StrongPass1!", user.hashed_password)
 
 
 def test_register_user_raises_for_duplicate_email(db_session: Session) -> None:
@@ -48,7 +48,7 @@ def test_register_user_raises_for_duplicate_email(db_session: Session) -> None:
         auth_service.register_user(
             db_session,
             email="duplicate@example.com",
-            password="another-password",
+            password="AnotherPass1!",
             role=models.UserRole.patient,
         )
 

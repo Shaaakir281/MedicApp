@@ -7,6 +7,7 @@ from collections import defaultdict
 from typing import Dict, Iterable, List, Optional
 
 from fastapi import HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 import crud
@@ -358,11 +359,21 @@ def get_stats(db: Session, target_date: dt.date) -> schemas.PractitionerStats:
         .count()
     )
 
-    follow_ups_required = (
+    cases_for_day = (
         db.query(models.ProcedureCase)
-        .filter(models.ProcedureCase.notes.isnot(None))
-        .count()
+        .join(
+            models.Appointment,
+            models.Appointment.procedure_id == models.ProcedureCase.id,
+        )
+        .options(joinedload(models.ProcedureCase.appointments))
+        .filter(
+            models.Appointment.date >= start_dt.date(),
+            models.Appointment.date <= end_dt.date(),
+        )
+        .all()
     )
+
+    follow_ups_required = sum(1 for case in cases_for_day if compute_case_status(case).needs_follow_up)
 
     return schemas.PractitionerStats(
         date=target_date,
@@ -375,10 +386,18 @@ def get_stats(db: Session, target_date: dt.date) -> schemas.PractitionerStats:
     )
 
 
+def _normalize_updates(updates: Dict | BaseModel) -> Dict:
+    if isinstance(updates, BaseModel):
+        return updates.model_dump(exclude_unset=True)
+    if hasattr(updates, "model_dump"):
+        return updates.model_dump(exclude_unset=True)
+    return dict(updates)
+
+
 def update_case(
     db: Session,
     case_id: int,
-    updates: Dict,
+    updates: Dict | BaseModel,
 ) -> schemas.PractitionerCaseStatus:
     """Apply partial updates to a procedure case."""
 
@@ -395,6 +414,7 @@ def update_case(
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dossier introuvable.")
 
+    updates = _normalize_updates(updates)
     for field, value in updates.items():
         if hasattr(case, field):
             setattr(case, field, value)
@@ -409,7 +429,7 @@ def update_case(
 def reschedule_appointment(
     db: Session,
     appointment_id: int,
-    updates: Dict,
+    updates: Dict | BaseModel,
 ) -> schemas.PractitionerAppointmentEntry:
     """Update an appointment timing or mode."""
 
@@ -422,6 +442,7 @@ def reschedule_appointment(
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rendez-vous introuvable.")
 
+    updates = _normalize_updates(updates)
     if "mode" in updates:
         mode_value = updates["mode"]
         if mode_value is None:

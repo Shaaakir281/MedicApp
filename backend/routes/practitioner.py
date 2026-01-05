@@ -101,7 +101,7 @@ def reschedule_appointment(
     return appointments_service.reschedule_appointment(
         db=db,
         appointment_id=appointment_id,
-        payload=payload,
+        updates=payload,
     )
 
 
