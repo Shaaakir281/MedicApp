@@ -1,42 +1,9 @@
 import React from 'react';
-import clsx from 'clsx';
 import { Badge } from '../../../components/ui/Badge';
-import { StatusDot } from '../../../components/ui/StatusDot';
 import { IconChevronRight } from './icons';
 import { DocumentSignatureSection } from './DocumentSignatureSection';
+import { DocumentStatusBadge } from './DocumentStatusBadge';
 import { mapPractitionerProcedureCase } from '../../../services/patientDashboard.mapper';
-
-const dossierChecks = (procedure, appointment) => {
-  if (!procedure) return [];
-
-  const patient = appointment?.patient || {};
-
-  // Calculer le statut des 3 documents
-  const docSignatures = procedure.documentSignatures || [];
-  const authDoc = docSignatures.find((d) => d.documentType === 'authorization' || d.documentType === 'surgical_authorization_minor');
-  const consentDoc = docSignatures.find((d) => d.documentType === 'consent' || d.documentType === 'informed_consent');
-  const feesDoc = docSignatures.find((d) => d.documentType === 'fees' || d.documentType === 'fees_consent_quote');
-
-  const authStatus = authDoc?.status === 'completed';
-  const consentStatus = consentDoc?.status === 'completed';
-  const feesStatus = feesDoc?.status === 'completed';
-
-  return [
-    { label: 'Identite', ok: Boolean(patient.child_full_name && procedure.child_birthdate), tone: 'ok' },
-    { label: 'Poids', ok: Boolean(procedure.child_weight_kg), tone: 'ok' },
-    { label: 'Autorite parentale', ok: procedure.parental_authority_ack, tone: 'ok' },
-    { label: 'Autorisation', ok: authStatus, tone: authStatus ? 'ok' : 'warn' },
-    { label: 'Consentement', ok: consentStatus, tone: consentStatus ? 'ok' : 'warn' },
-    { label: 'Frais', ok: feesStatus, tone: feesStatus ? 'ok' : 'warn' },
-    {
-      label: appointment?.appointment_type === 'act' ? 'Ordonnance acte' : 'Ordonnance pre-consultation',
-      ok: procedure.has_ordonnance,
-      tone: 'ok',
-    },
-    { label: 'Rdv pre-consultation', ok: procedure.has_preconsultation, tone: 'ok' },
-    { label: 'Rdv acte', ok: procedure.has_act_planned, tone: 'ok' },
-  ];
-};
 
 export function AgendaDay({
   day,
@@ -126,7 +93,13 @@ export function AgendaDay({
               <p className="text-sm text-slate-500">Notes : {appointment.notes}</p>
             )}
             <div className="flex flex-col gap-3 pt-2">
-              <DossierStatus procedure={appointment.procedure ? mapPractitionerProcedureCase(appointment.procedure) : null} reminder={appointment} appointment={appointment} />
+              {/* Badge compact de statut documents */}
+              {appointment.procedure && (
+                <DocumentStatusBadge
+                  documentSignatures={mapPractitionerProcedureCase(appointment.procedure).documentSignatures || []}
+                />
+              )}
+
               <div className="border rounded-lg p-3 bg-slate-50 space-y-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Ordonnances</div>
                 <div className="flex flex-wrap gap-2">
@@ -166,66 +139,6 @@ export function AgendaDay({
             </div>
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function DossierStatus({ procedure, reminder }) {
-  if (!procedure) return null;
-  const indicators = dossierChecks(procedure, reminder);
-  const missing = indicators.filter((item) => !item.ok);
-  const completedCount = indicators.filter((item) => item.ok).length;
-  const requiredCount = indicators.length;
-
-  // Mapper les tones vers variants
-  const toneToVariant = {
-    ok: 'success',
-    warn: 'warning',
-    danger: 'danger',
-    muted: 'neutral',
-  };
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-1.5 text-xs items-center">
-        <Badge variant="neutral" size="xs">
-          Dossier : {completedCount}/{requiredCount}
-        </Badge>
-        {indicators.map((item) => (
-          <span key={item.label} className="inline-flex items-center gap-1">
-            <StatusDot status={item.ok ? 'done' : item.tone} />
-            <Badge variant={item.ok ? 'success' : toneToVariant[item.tone]} size="xs">
-              {item.label}
-            </Badge>
-          </span>
-        ))}
-      </div>
-      {missing.length > 0 && (
-        <p className="text-[11px] text-rose-600">
-          A completer : {missing.map((item) => item.label.toLowerCase()).join(', ')}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-500">
-        {reminder.reminder_sent_at ? (
-          <Badge variant="info" size="xs">
-            Rappel envoyé {reminder.reminder_opened_at ? 'et confirmé' : '(en attente)'}
-          </Badge>
-        ) : (
-          <Badge variant="warning" size="xs">
-            Rappel non envoyé
-          </Badge>
-        )}
-        {reminder.prescription_sent_at && (
-          <Badge variant="info" size="xs">
-            Ordonnance envoyée
-          </Badge>
-        )}
-        {reminder.prescription_download_count > 0 && (
-          <Badge variant="neutral" size="xs">
-            {reminder.prescription_download_count} téléchargement(s)
-          </Badge>
-        )}
       </div>
     </div>
   );

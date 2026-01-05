@@ -33,6 +33,7 @@ export const AgendaView = ({
         onChangeLength={onChangeLength}
         onRefresh={onRefresh}
         loading={loadingData}
+        token={token}
       />
 
       <section className="space-y-8">

@@ -26,6 +26,7 @@ from services import consent_pdf
 from services import legal_documents_pdf
 from services import email as email_service
 from services.sms import send_sms
+from services.storage import get_storage_backend
 from services.yousign import YousignClient, YousignConfigurationError, start_neutral_signature_request
 from domain.legal_documents import LEGAL_CATALOG
 from services.yousign.models import YousignSigner
@@ -931,6 +932,31 @@ def ensure_final_document(
         status_value = status_value.value
     if str(status_value) != "completed":
         return doc_sig
+
+    if doc_sig.final_pdf_identifier:
+        storage = get_storage_backend()
+        doc_type = legal_documents_pdf.normalize_document_type(doc_sig.document_type)
+        final_category = legal_documents_pdf.final_category_for(doc_type)
+        try:
+            if storage.exists(final_category, doc_sig.final_pdf_identifier):
+                if doc_sig.yousign_procedure_id and not doc_sig.yousign_purged_at:
+                    try:
+                        purge_document_signature(doc_sig)
+                        doc_sig.yousign_purged_at = dt.datetime.utcnow()
+                        db.add(doc_sig)
+                        db.commit()
+                        db.refresh(doc_sig)
+                    except Exception:
+                        logger.exception(
+                            "Echec purge Yousign pour DocumentSignature %d",
+                            doc_sig.id,
+                        )
+                return doc_sig
+        except Exception:
+            logger.exception(
+                "Echec verification fichier final pour DocumentSignature %d",
+                doc_sig.id,
+            )
 
     final_path = _assemble_final_document(db, doc_sig)
     if final_path:

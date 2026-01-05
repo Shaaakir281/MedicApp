@@ -72,6 +72,16 @@ class Settings(BaseSettings):
     )
     require_guardian_2: bool = Field(default=False, alias="REQUIRE_GUARDIAN_2")
 
+    # Vérification quotidienne documents
+    document_verification_recipient_email: Optional[str] = Field(
+        default=None,
+        alias="DOCUMENT_VERIFICATION_RECIPIENT_EMAIL"
+    )
+    document_verification_enabled: bool = Field(
+        default=True,
+        alias="DOCUMENT_VERIFICATION_ENABLED"
+    )
+
     @field_validator("jwt_secret_key")
     @classmethod
     def validate_jwt_secret(cls, value: str) -> str:

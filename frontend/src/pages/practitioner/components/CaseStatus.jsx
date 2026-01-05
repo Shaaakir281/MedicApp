@@ -1,5 +1,4 @@
 import React from 'react';
-import { DocumentSignatureSection } from './DocumentSignatureSection.jsx';
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString('fr-FR') : '--');
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString('fr-FR') : '--');
@@ -7,9 +6,6 @@ const formatDateTime = (value) => (value ? new Date(value).toLocaleString('fr-FR
 export const CaseStatus = ({
   appointment,
   procedure,
-  documentSignatures = [],
-  caseId = null,
-  token,
   onNavigateDate,
 }) => {
   return (
@@ -63,14 +59,6 @@ export const CaseStatus = ({
         )}
       </div>
 
-      <div className="bg-slate-50 border rounded-xl p-4 text-sm text-slate-600 space-y-2 md:col-span-2">
-        <DocumentSignatureSection
-          documentSignatures={documentSignatures}
-          caseId={caseId}
-          token={token}
-        />
-      </div>
-
       {procedure?.notes && (
         <div className="bg-slate-50 border rounded-xl p-4 text-sm text-slate-600 md:col-span-2">
           <strong>Notes :</strong> {procedure.notes}
@@ -79,10 +67,7 @@ export const CaseStatus = ({
 
       <div className="bg-slate-50 border rounded-xl p-4 text-sm text-slate-600 space-y-1">
         <strong>Rappel rendez-vous</strong>
-        <p>Envoye : {formatDate(appointment.reminder_sent_at)}</p>
-        <p>
-          Ouvert : {appointment.reminder_opened_at ? formatDateTime(appointment.reminder_opened_at) : 'Non lu'}
-        </p>
+        <p>Envoye : {formatDate(appointment.reminder_sent_at) || 'Non envoye'}</p>
       </div>
       <div className="bg-slate-50 border rounded-xl p-4 text-sm text-slate-600 space-y-1">
         <strong>Ordonnance</strong>
@@ -93,7 +78,6 @@ export const CaseStatus = ({
             : 'Non signee'}
         </p>
         <p>Envoyee : {formatDate(appointment.prescription_sent_at)}</p>
-        <p>Telechargements : {appointment.prescription_download_count || 0}</p>
       </div>
     </div>
   );

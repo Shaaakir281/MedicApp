@@ -7,6 +7,9 @@ import { CaseForm } from './CaseForm.jsx';
 import { ScheduleForm } from './ScheduleForm.jsx';
 import { CaseStatus } from './CaseStatus.jsx';
 import { PrescriptionsSection } from './PrescriptionsSection.jsx';
+import { NextActionBanner } from './NextActionBanner.jsx';
+import { AppointmentSummary } from './AppointmentSummary.jsx';
+import { DocumentSignatureSection } from './DocumentSignatureSection.jsx';
 import { mapPractitionerProcedureCase } from '../../../services/patientDashboard.mapper.js';
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString('fr-FR') : '--');
@@ -427,6 +430,27 @@ export function PatientDetailsDrawer({
           isEditingSchedule={isEditingSchedule}
         />
 
+        {/* Section 2: Prochaine Action Banner */}
+        <NextActionBanner
+          procedure={procedure}
+          documentSignatures={procedureWithSignatures?.documentSignatures || []}
+        />
+
+        {/* Section 3: Résumé Rendez-vous */}
+        <AppointmentSummary
+          procedure={procedure}
+          onNavigateDate={onNavigateDate}
+        />
+
+        {/* Section 4: Documents de Signature */}
+        <div className="bg-slate-50 border rounded-lg p-4">
+          <DocumentSignatureSection
+            documentSignatures={procedureWithSignatures?.documentSignatures || []}
+            caseId={procedure?.case_id}
+            token={token}
+          />
+        </div>
+
         {!isEditingCase && (
           <CaseSummary
             appointment={appointment}
@@ -470,9 +494,6 @@ export function PatientDetailsDrawer({
         <CaseStatus
           appointment={appointment}
           procedure={procedure}
-          documentSignatures={procedureWithSignatures?.documentSignatures || []}
-          caseId={procedure?.case_id}
-          token={token}
           onNavigateDate={onNavigateDate}
         />
 

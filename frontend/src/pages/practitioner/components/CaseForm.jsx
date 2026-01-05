@@ -97,16 +97,6 @@ export const CaseForm = ({ caseForm, onChange }) => {
               placeholder="+33700000000"
             />
           </label>
-          <label className="form-control">
-            <span className="label-text">Optin SMS</span>
-            <input
-              type="checkbox"
-              name="parent1_sms_optin"
-              className="toggle toggle-primary"
-              checked={caseForm.parent1_sms_optin}
-              onChange={onChange}
-            />
-          </label>
         </div>
       </div>
 
@@ -155,31 +145,7 @@ export const CaseForm = ({ caseForm, onChange }) => {
               placeholder="+33700000000"
             />
           </label>
-          <label className="form-control">
-            <span className="label-text">Optin SMS</span>
-            <input
-              type="checkbox"
-              name="parent2_sms_optin"
-              className="toggle toggle-primary"
-              checked={caseForm.parent2_sms_optin}
-              onChange={onChange}
-            />
-          </label>
         </div>
-      </div>
-
-      {/* Section Notes */}
-      <div>
-        <label className="form-control">
-          <span className="label-text">Notes</span>
-          <textarea
-            name="notes"
-            className="textarea textarea-bordered"
-            rows={3}
-            value={caseForm.notes}
-            onChange={onChange}
-          />
-        </label>
       </div>
     </div>
   );
