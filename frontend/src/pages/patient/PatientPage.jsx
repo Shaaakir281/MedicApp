@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { AuthPanel } from './components/AuthPanel.jsx';
 import { PatientSpacePage } from './PatientSpacePage.jsx';
@@ -6,18 +6,72 @@ import { ProcedureChoice } from '../../components/patient/ProcedureChoice.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { LABELS_FR } from '../../constants/labels.fr.js';
 
+const PROCEDURE_STORAGE_PREFIX = 'medicapp.patient.procedureSelection';
+
+const isValidProcedureSelection = (value) => value === 'circumcision' || value === 'autre';
+
+const buildProcedureStorageKey = (user) => {
+  const userKey = user?.id ?? user?.email;
+  if (!userKey) {
+    return null;
+  }
+  return `${PROCEDURE_STORAGE_PREFIX}.${userKey}`;
+};
+
 export default function PatientPage() {
   const { isAuthenticated, login, register: registerUser, token, user, logout, loading } = useAuth();
 
   const [procedureSelection, setProcedureSelection] = useState(null);
   const [registerFeedback, setRegisterFeedback] = useState(null);
   const [authError, setAuthError] = useState(null);
+  const storageKeyRef = useRef(null);
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
     if (!isAuthenticated) {
       setProcedureSelection(null);
+      if (storageKeyRef.current) {
+        window.localStorage.removeItem(storageKeyRef.current);
+        storageKeyRef.current = null;
+      }
+      return;
     }
-  }, [isAuthenticated]);
+    const storageKey = buildProcedureStorageKey(user);
+    storageKeyRef.current = storageKey;
+    if (!storageKey || procedureSelection != null) {
+      return;
+    }
+    const storedSelection = window.localStorage.getItem(storageKey);
+    if (isValidProcedureSelection(storedSelection)) {
+      setProcedureSelection(storedSelection);
+    }
+  }, [isAuthenticated, user?.id, user?.email, procedureSelection]);
+
+  const handleProcedureSelection = (nextSelection) => {
+    setProcedureSelection(nextSelection);
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const storageKey = buildProcedureStorageKey(user);
+    if (!storageKey || !isValidProcedureSelection(nextSelection)) {
+      return;
+    }
+    window.localStorage.setItem(storageKey, nextSelection);
+  };
+
+  const clearProcedureSelection = () => {
+    setProcedureSelection(null);
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const storageKey = buildProcedureStorageKey(user);
+    if (!storageKey) {
+      return;
+    }
+    window.localStorage.removeItem(storageKey);
+  };
 
   const handleLoginSubmit = async (credentials) => {
     setAuthError(null);
@@ -71,8 +125,8 @@ export default function PatientPage() {
     return (
       <div className="max-w-6xl mx-auto space-y-8 pb-16">
         <ProcedureChoice
-          onSelectCircumcision={() => setProcedureSelection('circumcision')}
-          onSelectOther={() => setProcedureSelection('autre')}
+          onSelectCircumcision={() => handleProcedureSelection('circumcision')}
+          onSelectOther={() => handleProcedureSelection('autre')}
         />
       </div>
     );
@@ -88,7 +142,7 @@ export default function PatientPage() {
             plus d&apos;informations.
           </p>
           <div className="pt-4">
-            <button type="button" className="btn btn-outline" onClick={() => setProcedureSelection(null)}>
+            <button type="button" className="btn btn-outline" onClick={clearProcedureSelection}>
               Changer
             </button>
           </div>
@@ -103,8 +157,7 @@ export default function PatientPage() {
       user={user}
       onLogout={logout}
       procedureSelection={procedureSelection}
-      onChangeProcedure={() => setProcedureSelection(null)}
+      onChangeProcedure={clearProcedureSelection}
     />
   );
 }
-
