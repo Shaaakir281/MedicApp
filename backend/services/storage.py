@@ -206,7 +206,25 @@ class AzureBlobStorageBackend:
         return f"{self._container.url}/{blob_name}?{sas}"
 
     def get_local_path(self, category: str, identifier: str) -> Path:
-        raise StorageError("Local path is not available for Azure storage.")
+        import tempfile
+        import uuid
+        from azure.core.exceptions import ResourceNotFoundError
+
+        if not identifier:
+            raise StorageError("Missing identifier for Azure blob.")
+        blob_name = self._blob_name(category, identifier)
+        blob = self._container.get_blob_client(blob_name)
+        try:
+            downloader = blob.download_blob()
+            data = downloader.readall()
+        except ResourceNotFoundError as exc:
+            raise StorageError(f"Blob {blob_name} is missing") from exc
+
+        temp_dir = Path(tempfile.mkdtemp(prefix="medicapp-blob-"))
+        filename = f"{uuid.uuid4().hex}.pdf"
+        path = temp_dir / filename
+        path.write_bytes(data)
+        return path
 
 
 def _default_local_root() -> Path:

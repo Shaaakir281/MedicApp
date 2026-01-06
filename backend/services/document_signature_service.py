@@ -607,8 +607,56 @@ def initiate_document_signature(
     doc_sig.document_version = document_version
     now = dt.datetime.utcnow()
 
-    for idx, signer in enumerate(procedure.signers):
-        label = signers[idx].get("label") if idx < len(signers) else None
+    def _normalize_email(value: str | None) -> str | None:
+        if not value:
+            return None
+        return value.strip().lower()
+
+    def _normalize_phone(value: str | None) -> str | None:
+        if not value:
+            return None
+        digits = "".join(ch for ch in value if ch.isdigit())
+        return digits or None
+
+    label_by_email: dict[str, str] = {}
+    label_by_phone: dict[str, str] = {}
+    ordered_labels: list[str] = []
+    for signer_payload in signers:
+        label = signer_payload.get("label")
+        if not label:
+            continue
+        ordered_labels.append(label)
+        email = _normalize_email(signer_payload.get("email"))
+        phone = _normalize_phone(signer_payload.get("phone"))
+        if email:
+            label_by_email[email] = label
+        if phone:
+            label_by_phone[phone] = label
+
+    assigned: set[str] = set()
+    for signer in procedure.signers:
+        label = None
+        email = _normalize_email(signer.email)
+        phone = _normalize_phone(signer.phone)
+        if email:
+            candidate = label_by_email.get(email)
+            if candidate and candidate not in assigned:
+                label = candidate
+        if not label and phone:
+            candidate = label_by_phone.get(phone)
+            if candidate and candidate not in assigned:
+                label = candidate
+        if not label:
+            label = next((value for value in ordered_labels if value not in assigned), None)
+        if not label:
+            logger.warning(
+                "Unable to map Yousign signer %s for case=%d doc_type=%s",
+                signer.signer_id,
+                case.id,
+                document_type,
+            )
+            continue
+        assigned.add(label)
         if label == "parent1":
             doc_sig.parent1_yousign_signer_id = signer.signer_id
             doc_sig.parent1_status = "sent"
@@ -930,6 +978,10 @@ def _assemble_final_document(
         for identifier in consent_pdf.list_local_files_for_case(evidence_category, doc_sig.procedure_case_id)
         if identifier.startswith(doc_prefix)
     ]
+    if not signed_ids and doc_sig.signed_pdf_identifier:
+        signed_ids = [doc_sig.signed_pdf_identifier]
+    if not evidence_ids and doc_sig.evidence_pdf_identifier:
+        evidence_ids = [doc_sig.evidence_pdf_identifier]
 
     if doc_sig.signed_pdf_identifier and doc_sig.signed_pdf_identifier.startswith(doc_prefix) and doc_sig.signed_pdf_identifier not in signed_ids:
         signed_ids.append(doc_sig.signed_pdf_identifier)
