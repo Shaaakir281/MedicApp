@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { fetchNewPatients, fetchPractitionerAgenda, fetchPractitionerStats } from '../lib/api.js';
@@ -48,11 +48,28 @@ export function usePractitionerData({ token, viewMode }) {
     refetchIntervalInBackground: false,
   });
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
+    if (!token) return;
     setRefreshIndex((prev) => prev + 1);
     queryClient.invalidateQueries({ queryKey: ['practitionerAgenda'] });
     queryClient.invalidateQueries({ queryKey: ['practitionerStats'] });
-  };
+  }, [queryClient, token]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    const handleFocus = () => handleRefresh();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleRefresh();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [handleRefresh, token]);
 
   const displayedDays = useMemo(() => {
     const days = agendaQuery.data?.days ?? [];

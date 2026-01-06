@@ -20,7 +20,7 @@ const secretSource =
     : null;
 
 const secretBytes = secretSource && encoder ? encoder.encode(secretSource.padEnd(64, '#').slice(0, 64)) : null;
-const persistenceEnabled = Boolean(hasBrowserAPIs && secretBytes);
+const persistenceEnabled = Boolean(hasBrowserAPIs);
 let warnedMissingSecret = false;
 
 function xorCipher(bytes) {
@@ -66,9 +66,9 @@ function decodeValue(payload) {
 }
 
 function ensurePersistence() {
-  if (!persistenceEnabled && !warnedMissingSecret && hasBrowserAPIs) {
+  if (!secretBytes && !warnedMissingSecret && hasBrowserAPIs) {
     console.warn(
-      'Secure auth storage is disabled. Set VITE_AUTH_STORAGE_SECRET (24+ chars, not the default) to persist sessions.',
+      'Secure auth storage is running without encryption. Set VITE_AUTH_STORAGE_SECRET (24+ chars) to protect sessions.',
     );
     warnedMissingSecret = true;
   }

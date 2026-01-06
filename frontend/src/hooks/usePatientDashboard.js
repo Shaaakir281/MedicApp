@@ -61,5 +61,21 @@ export function usePatientDashboard({ token, appointmentId }) {
     return () => clearInterval(interval);
   }, [appointmentId, token, reload]);
 
+  useEffect(() => {
+    if (!appointmentId || !token) return undefined;
+    const handleFocus = () => reload();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        reload();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [appointmentId, token, reload]);
+
   return { dashboard, cabinetStatus, loading, error, reload, setDashboard };
 }
