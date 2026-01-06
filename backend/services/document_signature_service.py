@@ -966,16 +966,37 @@ def _assemble_final_document(
 
     signed_category = legal_documents_pdf.signed_category_for(doc_sig.document_type)
     evidence_category = legal_documents_pdf.evidence_category_for(doc_sig.document_type)
+    storage = get_storage_backend()
 
     doc_prefix = f"{doc_sig.procedure_case_id}-{doc_sig.document_type}"
+    def _list_case_files(category: str) -> list[str]:
+        prefix = f"{category}/{doc_sig.procedure_case_id}-"
+        container = getattr(storage, "_container", None)
+        if container and hasattr(container, "list_blobs"):
+            try:
+                items = []
+                for blob in container.list_blobs(name_starts_with=prefix):
+                    name = getattr(blob, "name", None)
+                    if not isinstance(name, str) or not name.startswith(prefix):
+                        continue
+                    items.append(name[len(category) + 1 :])
+                return items
+            except Exception:
+                logger.exception(
+                    "Failed to list blobs for category=%s case=%d",
+                    category,
+                    doc_sig.procedure_case_id,
+                )
+        return consent_pdf.list_local_files_for_case(category, doc_sig.procedure_case_id)
+
     signed_ids = [
         identifier
-        for identifier in consent_pdf.list_local_files_for_case(signed_category, doc_sig.procedure_case_id)
+        for identifier in _list_case_files(signed_category)
         if identifier.startswith(doc_prefix)
     ]
     evidence_ids = [
         identifier
-        for identifier in consent_pdf.list_local_files_for_case(evidence_category, doc_sig.procedure_case_id)
+        for identifier in _list_case_files(evidence_category)
         if identifier.startswith(doc_prefix)
     ]
     if not signed_ids and doc_sig.signed_pdf_identifier:
