@@ -112,31 +112,31 @@ export function PatientSpacePage({
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="tabs tabs-boxed">
+        <div className="tabs tabs-boxed flex-wrap gap-1">
           <button
             type="button"
-            className={`tab ${activeTab === TABS.file ? 'tab-active' : ''}`}
+            className={`tab ${activeTab === TABS.file ? 'tab-active' : ''} text-sm whitespace-normal leading-[1.1] h-auto px-3 py-2`}
             onClick={() => handleTabChange(TABS.file)}
           >
             {LABELS_FR.patientSpace.tabs.file}
           </button>
           <button
             type="button"
-            className={`tab ${activeTab === TABS.appointments ? 'tab-active' : ''}`}
+            className={`tab ${activeTab === TABS.appointments ? 'tab-active' : ''} text-sm whitespace-normal leading-[1.1] h-auto px-3 py-2`}
             onClick={() => handleTabChange(TABS.appointments)}
           >
             {LABELS_FR.patientSpace.tabs.appointments}
           </button>
           <button
             type="button"
-            className={`tab ${activeTab === TABS.prescriptions ? 'tab-active' : ''}`}
+            className={`tab ${activeTab === TABS.prescriptions ? 'tab-active' : ''} text-sm whitespace-normal leading-[1.1] h-auto px-3 py-2`}
             onClick={() => handleTabChange(TABS.prescriptions)}
           >
             {LABELS_FR.patientSpace.tabs.prescriptions}
           </button>
           <button
             type="button"
-            className={`tab ${activeTab === TABS.documents ? 'tab-active' : ''}`}
+            className={`tab ${activeTab === TABS.documents ? 'tab-active' : ''} text-sm whitespace-normal leading-[1.1] h-auto px-3 py-2`}
             onClick={() => handleTabChange(TABS.documents)}
           >
             {LABELS_FR.patientSpace.tabs.documents}
