@@ -298,19 +298,6 @@ def preview_legal_document(
     storage = get_storage_backend()
     download_name = f"case-{case.id}-{doc_type.value}.pdf"
 
-    if storage.supports_presigned_urls:
-        try:
-            url = storage.generate_presigned_url(
-                base_category,
-                identifier,
-                download_name=download_name,
-                expires_in_seconds=600,
-                inline=inline,
-            )
-            return RedirectResponse(url, status_code=307)
-        except StorageError:
-            pass
-
     try:
         return storage.build_file_response(
             base_category,

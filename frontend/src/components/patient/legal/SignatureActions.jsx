@@ -225,6 +225,7 @@ export function SignatureActions({
       {signatureSupported && token && (
         <SendLinkPanel
           token={token}
+          documentType={doc?.docType}
           primaryLabel={LABELS_FR.patientSpace.guardians[role]}
           primaryEmail={parentEmail}
           secondaryLabel={

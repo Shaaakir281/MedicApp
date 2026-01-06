@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from datetime import date as date_cls, datetime, timedelta
 import random
+import secrets
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Body, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,7 @@ from database import get_db
 from dependencies.auth import get_current_user, get_optional_user
 from core.config import get_settings
 import logging
+from domain.legal_documents import LEGAL_CATALOG
 from services import pdf as pdf_service
 from services import email as email_service
 from services import download_links
@@ -26,6 +28,8 @@ from services.sms import send_sms
 from services import consents as consents_service
 from services import legal as legal_service
 from services import consent_pdf
+from services import legal_documents_pdf
+from services import document_signature_service
 
 
 router = APIRouter(prefix="/procedures", tags=["procedures"])
@@ -76,6 +80,11 @@ class PhoneOtpVerify(BaseModel):
 class ConsentSendCustom(BaseModel):
     email: EmailStr
     parent: str | None = Field(default=None, pattern="^(parent1|parent2)?$")
+
+
+class DocumentSendCustom(BaseModel):
+    email: EmailStr
+    document_type: str
 
 
 class StartSignaturePayload(BaseModel):
@@ -460,6 +469,74 @@ def download_consent_pdf(
         ) from exc
 
 
+@router.get("/{token}/documents/{document_type}.pdf")
+def download_legal_document(
+    token: str,
+    document_type: str,
+    request: Request,
+    kind: str = Query(default="base", pattern="^(base|final|signed|evidence)$"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_optional_user),
+) -> Response:
+    case = crud.get_procedure_case_by_token(db, token)
+    if case is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document introuvable.",
+        )
+    if current_user and current_user.role == models.UserRole.patient and case.patient_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acces refuse.")
+
+    doc_type = legal_documents_pdf.normalize_document_type(document_type)
+    inline = request.query_params.get("inline") == "true"
+    storage = get_storage_backend()
+    download_name = f"case-{case.id}-{doc_type.value}-{kind}.pdf"
+
+    if kind == "base":
+        identifier = legal_documents_pdf.ensure_legal_document_pdf(case, doc_type)
+        category = legal_documents_pdf.base_category_for(doc_type)
+    else:
+        signature_doc_type = document_signature_service.normalize_document_type(document_type)
+        doc_sig = db.query(models.DocumentSignature).filter(
+            models.DocumentSignature.procedure_case_id == case.id,
+            models.DocumentSignature.document_type == signature_doc_type,
+        ).first()
+        if not doc_sig:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document signe introuvable.",
+            )
+        if kind == "final":
+            doc_sig = document_signature_service.ensure_final_document(db, doc_sig)
+            identifier = doc_sig.final_pdf_identifier
+            category = legal_documents_pdf.final_category_for(doc_type)
+        elif kind == "signed":
+            identifier = doc_sig.signed_pdf_identifier
+            category = legal_documents_pdf.signed_category_for(doc_type)
+        else:
+            identifier = doc_sig.evidence_pdf_identifier
+            category = legal_documents_pdf.evidence_category_for(doc_type)
+
+        if not identifier:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document signe indisponible.",
+            )
+
+    try:
+        return storage.build_file_response(
+            category,
+            identifier,
+            download_name,
+            inline=inline,
+        )
+    except StorageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Fichier manquant sur le serveur.",
+        ) from exc
+
+
 @router.post("/send-consent-link-custom", response_model=schemas.Message)
 def send_consent_link_custom(
     payload: ConsentSendCustom,
@@ -487,6 +564,47 @@ def send_consent_link_custom(
             detail="Echec d'envoi du lien de consentement.",
         ) from exc
     return schemas.Message(detail="Lien de consentement envoye.")
+
+
+@router.post("/send-document-link", response_model=schemas.Message)
+def send_document_link(
+    payload: DocumentSendCustom,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> schemas.Message:
+    case = _get_case_for_user(db, current_user.id)
+    if not case.consent_download_token:
+        case.consent_download_token = secrets.token_urlsafe(24)
+        db.add(case)
+        db.commit()
+        db.refresh(case)
+
+    doc_type = legal_documents_pdf.normalize_document_type(payload.document_type)
+    signature_doc_type = document_signature_service.normalize_document_type(payload.document_type)
+    doc_sig = db.query(models.DocumentSignature).filter(
+        models.DocumentSignature.procedure_case_id == case.id,
+        models.DocumentSignature.document_type == signature_doc_type,
+    ).first()
+
+    kind = "base"
+    if doc_sig:
+        doc_sig = document_signature_service.ensure_final_document(db, doc_sig)
+        if doc_sig.final_pdf_identifier:
+            kind = "final"
+
+    base_url = get_settings().app_base_url.rstrip("/")
+    download_url = (
+        f"{base_url}/procedures/{case.consent_download_token}/documents/{doc_type.value}.pdf?kind={kind}"
+    )
+    document_title = LEGAL_CATALOG[doc_type].title
+    email_service.send_legal_document_download_email(
+        payload.email,
+        child_name=case.child_full_name,
+        document_title=document_title,
+        download_url=download_url,
+        is_final=kind == "final",
+    )
+    return schemas.Message(detail="Lien du document envoye.")
 
 
 @router.post("/phone-otp/request", response_model=schemas.ProcedureCase)

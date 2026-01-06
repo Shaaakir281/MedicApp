@@ -7,7 +7,7 @@ import {
   fetchLegalStatus,
   fetchPatientDashboard,
   requestPhoneOtp,
-  sendConsentLinkCustom,
+  sendDocumentLinkCustom,
   startSignature,
   verifyPhoneOtp,
 } from '../lib/api.js';
@@ -101,8 +101,8 @@ export async function startDocumentSignature({
   return startSignature(token, { appointmentId, signerRole: parentRole, mode, sessionCode });
 }
 
-export async function sendConsentSignatureLinkByEmail({ token, email }) {
-  return sendConsentLinkCustom(token, { email });
+export async function sendDocumentLinkByEmail({ token, email, documentType }) {
+  return sendDocumentLinkCustom(token, { email, document_type: documentType });
 }
 
 export async function downloadSignedConsentBlob({ token }) {
