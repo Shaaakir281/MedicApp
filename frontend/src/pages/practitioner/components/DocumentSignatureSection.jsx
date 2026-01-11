@@ -112,7 +112,7 @@ export function DocumentSignatureSection({ documentSignatures, caseId, token }) 
   const mergedDocs = baseDocuments.map((doc) => docsByType.get(doc.documentType) || doc);
 
   // Ordre d'affichage
-  const orderedTypes = ['authorization', 'consent', 'fees', 'surgical_authorization_minor', 'informed_consent', 'fees_consent_quote'];
+  const orderedTypes = ['authorization', 'consent', 'fees'];
   const sortedDocs = [...mergedDocs].sort(
     (a, b) => orderedTypes.indexOf(a.documentType) - orderedTypes.indexOf(b.documentType)
   );

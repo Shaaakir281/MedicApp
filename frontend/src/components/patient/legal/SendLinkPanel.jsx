@@ -5,6 +5,7 @@ import { sendConsentSignatureLinkByEmail } from '../../../services/patientDashbo
 
 export function SendLinkPanel({
   token,
+  documentType,
   primaryLabel,
   primaryEmail,
   secondaryLabel,
@@ -22,7 +23,7 @@ export function SendLinkPanel({
     setSuccessMessage?.(null);
     setSending(true);
     try {
-      await sendConsentSignatureLinkByEmail({ token, email });
+      await sendConsentSignatureLinkByEmail({ token, email, documentType });
       setSuccessMessage?.(`Lien envoyé à ${email}.`);
       await onReloadDashboard?.();
     } catch (err) {

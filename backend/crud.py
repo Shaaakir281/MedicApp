@@ -10,7 +10,6 @@ exercise they are collected here for simplicity.
 from __future__ import annotations
 
 import datetime
-import secrets
 from typing import Optional, Dict, Any
 
 import sqlalchemy as sa
@@ -20,10 +19,6 @@ import models
 import schemas
 from core.config import get_settings
 from services.ordonnances import build_ordonnance_context
-from services.pdf import (
-    generate_checklist_pdf,
-    generate_consent_pdf,
-)
 
 
 def _normalize_procedure_type(
@@ -169,14 +164,6 @@ def create_appointment(
     db.commit()
     db.refresh(appointment)
 
-    if procedure_case and appointment_type == models.AppointmentType.act:
-        refreshed_case = get_procedure_case_by_id(db, procedure_case.id)
-        if refreshed_case is not None:
-            _ensure_consent_pdf(refreshed_case)
-            db.add(refreshed_case)
-            db.commit()
-            db.refresh(refreshed_case)
-
     return appointment
 
 
@@ -212,7 +199,7 @@ def get_procedure_case_by_token(
 ) -> Optional[models.ProcedureCase]:
     return (
         db.query(models.ProcedureCase)
-        .filter(models.ProcedureCase.consent_download_token == token)
+        .filter(models.ProcedureCase.document_download_token == token)
         .first()
     )
 
@@ -251,62 +238,6 @@ def _recompute_case_flags(case: models.ProcedureCase) -> None:
     case.dossier_completed = all(required_fields) and bool(case.parental_authority_ack)
 
 
-def _build_checklist_context(case: models.ProcedureCase) -> Dict[str, Any]:
-    checklist_items = [
-        {
-            "label": (
-                "Je comprends que la circoncision rituelle n'est pas "
-                "motivee par une pathologie."
-            ),
-            "checked": case.parental_authority_ack,
-        },
-        {
-            "label": (
-                "Je suis titulaire de l'autorite parentale ou dispose de "
-                "l'accord ecrit du second parent."
-            ),
-            "checked": case.parental_authority_ack,
-        },
-        {
-            "label": (
-                "J'ai fourni les informations medicales de l'enfant "
-                "(age, poids, allergies, traitements)."
-            ),
-            "checked": bool(case.child_weight_kg is not None),
-        },
-        {
-            "label": (
-                "Je suis informe(e) des risques "
-                "(saignement, infection, douleur, cicatrisation)."
-            ),
-            "checked": case.parental_authority_ack,
-        },
-    ]
-    return {
-        "checklist_items": checklist_items,
-        "parent1_name": case.parent1_name,
-        "parent2_name": case.parent2_name,
-        "child_full_name": case.child_full_name,
-        "child_birthdate": case.child_birthdate.strftime('%d/%m/%Y'),
-        "child_weight": case.child_weight_kg or '',
-    }
-
-
-def _build_consent_context(case: models.ProcedureCase) -> Dict[str, Any]:
-    return {
-        "parent1_name": case.parent1_name,
-        "parent1_email": case.parent1_email,
-        "parent2_name": case.parent2_name,
-        "parent2_email": case.parent2_email,
-        "child_full_name": case.child_full_name,
-        "child_birthdate": case.child_birthdate.strftime('%d/%m/%Y'),
-        "child_weight": case.child_weight_kg or '',
-        "checklist_notes": case.notes or '',
-        "parent1_signed_at": None,
-        "parent2_signed_at": None,
-    }
-
-
 def _build_ordonnance_context(case: models.ProcedureCase) -> Dict[str, Any]:
     act_appointment = next(
         (
@@ -336,18 +267,6 @@ def _build_ordonnance_context(case: models.ProcedureCase) -> Dict[str, Any]:
     return context
 
 
-def _ensure_consent_pdf(case: models.ProcedureCase) -> None:
-    try:
-        case.checklist_pdf_path = generate_checklist_pdf(
-            _build_checklist_context(case)
-        )
-        case.consent_pdf_path = generate_consent_pdf(_build_consent_context(case))
-        if not case.consent_download_token:
-            case.consent_download_token = secrets.token_urlsafe(24)
-    except Exception:
-        pass
-
-
 def create_procedure_case(
     db: Session,
     patient_id: int,
@@ -374,17 +293,8 @@ def create_procedure_case(
         parent2_sms_optin=bool(case_data.parent2_sms_optin),
         parental_authority_ack=case_data.parental_authority_ack,
         notes=case_data.notes,
-        consent_download_token=secrets.token_urlsafe(24),
         preconsultation_date=case_data.preconsultation_date,
     )
-    if procedure.preconsultation_date:
-        procedure.signature_open_at = procedure.preconsultation_date + datetime.timedelta(days=15)
-    _recompute_case_flags(procedure)
-    db.add(procedure)
-    db.commit()
-    db.refresh(procedure)
-
-    _ensure_consent_pdf(procedure)
     _recompute_case_flags(procedure)
     db.add(procedure)
     db.commit()
@@ -417,14 +327,6 @@ def update_procedure_case(
     procedure.parental_authority_ack = case_data.parental_authority_ack
     procedure.notes = case_data.notes
     procedure.preconsultation_date = case_data.preconsultation_date
-    if procedure.preconsultation_date:
-        procedure.signature_open_at = procedure.preconsultation_date + datetime.timedelta(days=15)
-    _recompute_case_flags(procedure)
-    db.add(procedure)
-    db.commit()
-    db.refresh(procedure)
-
-    _ensure_consent_pdf(procedure)
     _recompute_case_flags(procedure)
     db.add(procedure)
     db.commit()

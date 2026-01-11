@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 
-import { downloadSignedConsentBlob } from '../../../services/patientDashboard.api.js';
 import { downloadDocumentSignatureFile, downloadLegalDocumentPreview } from '../../../services/documentSignature.api.js';
 import { LABELS_FR } from '../../../constants/labels.fr.js';
 
@@ -33,7 +32,7 @@ export function SignedDocumentActions({
         fileKind,
       });
     }
-    return downloadSignedConsentBlob({ token });
+    return null;
   };
 
   const handlePreview = async () => {

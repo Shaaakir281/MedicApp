@@ -1,14 +1,11 @@
 import {
-  API_BASE_URL,
   acknowledgeLegalBulk,
   acknowledgeLegalCase,
-  downloadSignedConsent,
   fetchLegalCatalog,
   fetchLegalStatus,
   fetchPatientDashboard,
   requestPhoneOtp,
-  sendConsentLinkCustom,
-  startSignature,
+  sendDocumentLinkCustom,
   verifyPhoneOtp,
 } from '../lib/api.js';
 import { startDocumentSignature as startDocumentSignatureGranular } from './documentSignature.api.js';
@@ -79,53 +76,29 @@ export async function startDocumentSignature({
   token,
   docType,
 }) {
-  // Architecture granulaire: utiliser l'endpoint granulaire si procedureCaseId fourni
-  if (procedureCaseId && docType) {
-    return startDocumentSignatureGranular({
-      token,
-      procedureCaseId,
-      appointmentId,
-      documentType: docType,
-      signerRole: parentRole,
-      mode,
-      sessionCode,
-    });
-  }
-
-  // Fallback vers ancien endpoint monolithique (deprecated)
-  if (docType && docType !== DOCUMENT_TYPES.INFORMED_CONSENT) {
-    const error = new Error('Signature de ce document non disponible pour le moment.');
+  if (!procedureCaseId || !docType) {
+    const error = new Error('Signature indisponible pour ce document.');
     error.code = 'NOT_IMPLEMENTED';
     throw error;
   }
-  return startSignature(token, { appointmentId, signerRole: parentRole, mode, sessionCode });
-}
-
-export async function sendConsentSignatureLinkByEmail({ token, email }) {
-  return sendConsentLinkCustom(token, { email });
-}
-
-export async function downloadSignedConsentBlob({ token }) {
-  return downloadSignedConsent(token);
-}
-
-export async function downloadConsentAuditTrailBlob({ token }) {
-  if (!token) {
-    throw new Error('Authentification requise.');
-  }
-  const resolvedToken = token;
-  const headers = resolvedToken ? { Authorization: `Bearer ${resolvedToken}` } : {};
-  const resp = await fetch(`${API_BASE_URL}/procedures/current/audit-trail`, {
-    method: 'GET',
-    headers,
+  return startDocumentSignatureGranular({
+    token,
+    procedureCaseId,
+    appointmentId,
+    documentType: docType,
+    signerRole: parentRole,
+    mode,
+    sessionCode,
   });
-  if (!resp.ok) {
-    const message = `Echec de telechargement (${resp.status})`;
-    const error = new Error(message);
-    error.status = resp.status;
+}
+
+export async function sendConsentSignatureLinkByEmail({ token, email, documentType }) {
+  if (!documentType) {
+    const error = new Error('Type de document manquant.');
+    error.code = 'MISSING_DOCUMENT_TYPE';
     throw error;
   }
-  return await resp.blob();
+  return sendDocumentLinkCustom(token, { email, document_type: documentType });
 }
 
 export async function requestGuardianPhoneOtp({ token, parentRole }) {

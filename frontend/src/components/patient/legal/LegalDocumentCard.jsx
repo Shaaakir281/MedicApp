@@ -12,7 +12,6 @@ export function LegalDocumentCard({
   cabinetStatus,
   appointmentId,
   procedureCaseId,
-  overallLegalComplete,
   parentVerifiedByRole,
   parentEmailByRole,
   onAcknowledgeCase,
@@ -109,7 +108,6 @@ export function LegalDocumentCard({
             otherParentEmail={
               role === 'parent1' ? parentEmailByRole?.parent2 : parentEmailByRole?.parent1
             }
-            overallLegalComplete={overallLegalComplete}
             onReloadCase={onReloadCase}
             onReloadDashboard={onReloadDashboard}
             setError={setError}

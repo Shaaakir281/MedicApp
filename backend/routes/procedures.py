@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from datetime import date as date_cls, datetime, timedelta
 import random
+import secrets
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Body
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Body, Query
 from sqlalchemy.orm import Session
 
 import crud
@@ -18,14 +18,14 @@ from database import get_db
 from dependencies.auth import get_current_user, get_optional_user
 from core.config import get_settings
 import logging
-from services import pdf as pdf_service
+from domain.legal_documents import LEGAL_CATALOG
 from services import email as email_service
 from services import download_links
 from services.storage import StorageError, get_storage_backend
 from services.sms import send_sms
-from services import consents as consents_service
 from services import legal as legal_service
-from services import consent_pdf
+from services import legal_documents_pdf
+from services import document_signature_service
 
 
 router = APIRouter(prefix="/procedures", tags=["procedures"])
@@ -73,13 +73,9 @@ class PhoneOtpVerify(BaseModel):
     code: str
 
 
-class ConsentSendCustom(BaseModel):
+class DocumentSendCustom(BaseModel):
     email: EmailStr
-    parent: str | None = Field(default=None, pattern="^(parent1|parent2)?$")
-
-
-class StartSignaturePayload(BaseModel):
-    in_person: bool = False
+    document_type: str
 
 
 def _serialize_case(case) -> schemas.ProcedureCase:
@@ -121,10 +117,6 @@ def _serialize_case(case) -> schemas.ProcedureCase:
                 prescription_signed=pres_signed,
             )
         )
-    download_url = None
-    if case.consent_download_token and case.consent_pdf_path:
-        download_url = f"{base_url}/procedures/{case.consent_download_token}/consent.pdf"
-
     appointments_entities = case.appointments or []
     latest_signed_prescription = None
     for appointment in appointments_entities:
@@ -179,35 +171,13 @@ def _serialize_case(case) -> schemas.ProcedureCase:
         notes=case.notes,
         created_at=case.created_at,
         updated_at=case.updated_at,
-        checklist_pdf_path=case.checklist_pdf_path,
-        consent_pdf_path=case.consent_pdf_path,
-        consent_download_url=download_url,
-        consent_signed_pdf_url=case.consent_signed_pdf_url,
-        consent_evidence_pdf_url=case.consent_evidence_pdf_url,
-        consent_last_status=case.consent_last_status,
-        consent_ready_at=case.consent_ready_at,
-        yousign_procedure_id=case.yousign_procedure_id,
-        parent1_yousign_signer_id=case.parent1_yousign_signer_id,
-        parent2_yousign_signer_id=case.parent2_yousign_signer_id,
-        parent1_consent_status=case.parent1_consent_status,
-        parent2_consent_status=case.parent2_consent_status,
-        parent1_consent_sent_at=case.parent1_consent_sent_at,
-        parent2_consent_sent_at=case.parent2_consent_sent_at,
-        parent1_consent_signed_at=case.parent1_consent_signed_at,
-        parent2_consent_signed_at=case.parent2_consent_signed_at,
-        parent1_consent_method=case.parent1_consent_method,
-        parent2_consent_method=case.parent2_consent_method,
-        parent1_signature_link=case.parent1_signature_link,
-        parent2_signature_link=case.parent2_signature_link,
         preconsultation_date=case.preconsultation_date,
-        signature_open_at=case.signature_open_at,
         ordonnance_pdf_path=case.ordonnance_pdf_path,
         ordonnance_download_url=ordonnance_download_url,
         ordonnance_prescription_id=ordonnance_prescription_id,
         ordonnance_signed_at=ordonnance_signed_at,
         child_age_years=round(child_age_years, 2),
         appointments=appointments_payload,
-        steps_acknowledged=case.steps_acknowledged,
         dossier_completed=case.dossier_completed,
         missing_fields=case.missing_fields or [],
         document_signatures=document_signatures_payload,
@@ -242,88 +212,7 @@ def get_current_procedure(
             detail="Aucune procedure en cours.",
         )
     serialized = _serialize_case(case)
-    logger.info(
-        "/procedures/current -> user=%s parent1_link=%s parent2_link=%s",
-        current_user.id,
-        serialized.parent1_signature_link,
-        serialized.parent2_signature_link,
-    )
     return serialized
-
-
-@router.get("/current/signed-consent")
-def download_signed_consent(
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-) -> Response:
-    """Télécharge le consentement signé/assemblé actuellement disponible pour l'utilisateur."""
-    case = crud.get_active_procedure_case(db, current_user.id)
-    if case is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consentement signe indisponible.")
-
-    # Si pas de PDF connu, tenter un polling Yousign pour récupérer/assembler
-    if not case.consent_signed_pdf_url:
-        try:
-            case = consents_service.poll_and_fetch_signed(db, case)
-        except Exception:
-            pass
-        if not case.consent_signed_pdf_url:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consentement signe indisponible.")
-
-    storage = get_storage_backend()
-    download_name = f"consentement-signe-{case.id}.pdf"
-    inline = True
-    identifier = case.consent_signed_pdf_url
-    exists_final = storage.exists(consent_pdf.FINAL_CONSENT_CATEGORY, identifier)
-    exists_signed = storage.exists(consent_pdf.SIGNED_CONSENT_CATEGORY, identifier)
-    logger.info(
-        "/procedures/current/signed-consent user=%s identifier=%s final_exists=%s signed_exists=%s",
-        current_user.id,
-        identifier,
-        exists_final,
-        exists_signed,
-    )
-    try:
-        category = consent_pdf.FINAL_CONSENT_CATEGORY if exists_final else consent_pdf.SIGNED_CONSENT_CATEGORY
-        return storage.build_file_response(category, identifier, download_name, inline=inline)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fichier signe introuvable.") from exc
-
-
-@router.get("/current/audit-trail")
-def download_audit_trail(
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-) -> Response:
-    """Télécharge l'audit trail Yousign (tous signataires si disponible)."""
-    case = crud.get_active_procedure_case(db, current_user.id)
-    if case is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit indisponible.")
-
-    storage = get_storage_backend()
-    identifier = case.consent_evidence_pdf_url
-    if not identifier:
-        # Essayer de reconstituer en déclenchant un polling + download audit complet
-        try:
-            case = consents_service.poll_and_fetch_signed(db, case)
-        except Exception:
-            pass
-        identifier = case.consent_evidence_pdf_url
-    if not identifier:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit indisponible.")
-
-    download_name = f"audit-consent-{case.id}.pdf"
-    exists_evidence = storage.exists(consent_pdf.EVIDENCE_CATEGORY, identifier)
-    logger.info(
-        "/procedures/current/audit-trail user=%s identifier=%s exists=%s",
-        current_user.id,
-        identifier,
-        exists_evidence,
-    )
-    try:
-        return storage.build_file_response(consent_pdf.EVIDENCE_CATEGORY, identifier, download_name, inline=True)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit introuvable.") from exc
 
 
 @router.post("", response_model=schemas.ProcedureCase, status_code=status.HTTP_201_CREATED)
@@ -342,115 +231,65 @@ def create_or_update_procedure(
     return _serialize_case(case)
 
 
-@router.post("/acknowledge-steps", response_model=schemas.ProcedureCase)
-def acknowledge_steps(
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-) -> schemas.ProcedureCase:
-    case = crud.get_active_procedure_case(db, current_user.id)
-    if case is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Aucune procedure en cours.",
-        )
-    if not case.steps_acknowledged:
-        case.steps_acknowledged = True
-        db.add(case)
-        db.commit()
-        db.refresh(case)
-    return _serialize_case(case)
-
-
-@router.post("/send-consent-link", status_code=status.HTTP_202_ACCEPTED)
-def send_consent_link(
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-) -> Dict[str, Any]:
-    """Send the consent download link by email to the recorded parents."""
-    case = crud.get_active_procedure_case(db, current_user.id)
-    if case is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Aucune procedure en cours.",
-        )
-
-    if not case.consent_download_token or not case.consent_pdf_path:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le consentement n'est pas encore disponible.",
-        )
-    if not case.consent_pdf_path:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Consentement introuvable.",
-        )
-    storage = get_storage_backend()
-    if not storage.exists(pdf_service.CONSENT_CATEGORY, case.consent_pdf_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Fichier de consentement introuvable.",
-        )
-
-    recipients = [
-        email for email in (case.parent1_email, case.parent2_email) if email
-    ]
-    if not recipients:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Aucune adresse e-mail valide n'est associee au dossier.",
-        )
-
-    base_url = get_settings().app_base_url.rstrip("/")
-    download_url = f"{base_url}/procedures/{case.consent_download_token}/consent.pdf"
-
-    for recipient in recipients:
-        email_service.send_consent_download_email(
-            recipient,
-            case.child_full_name,
-            download_url,
-        )
-
-    return {"detail": "Lien de consentement envoye.", "recipients": recipients}
-
-
-@router.get("/{token}/consent.pdf")
-def download_consent_pdf(
+@router.get("/{token}/documents/{document_type}.pdf")
+def download_legal_document(
     token: str,
+    document_type: str,
     request: Request,
+    kind: str = Query(default="base", pattern="^(base|final|signed|evidence)$"),
     db: Session = Depends(get_db),
     current_user=Depends(get_optional_user),
 ) -> Response:
     case = crud.get_procedure_case_by_token(db, token)
-    if case is None or not case.consent_pdf_path:
+    if case is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Consentement introuvable.",
+            detail="Document introuvable.",
         )
     if current_user and current_user.role == models.UserRole.patient and case.patient_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acces refuse.")
 
+    doc_type = legal_documents_pdf.normalize_document_type(document_type)
+    inline = request.query_params.get("inline") == "true"
     storage = get_storage_backend()
-    filename = f"consentement-{case.child_full_name.replace(' ', '_')}.pdf"
-    inline = request.query_params.get("mode") == "inline"
-    if storage.supports_presigned_urls:
-        try:
-            url = storage.generate_presigned_url(
-                pdf_service.CONSENT_CATEGORY,
-                case.consent_pdf_path,
-                download_name=filename,
-                expires_in_seconds=600,
-                inline=inline,
+    download_name = f"case-{case.id}-{doc_type.value}-{kind}.pdf"
+
+    if kind == "base":
+        identifier = legal_documents_pdf.ensure_legal_document_pdf(case, doc_type)
+        category = legal_documents_pdf.base_category_for(doc_type)
+    else:
+        signature_doc_type = document_signature_service.normalize_document_type(document_type)
+        doc_sig = db.query(models.DocumentSignature).filter(
+            models.DocumentSignature.procedure_case_id == case.id,
+            models.DocumentSignature.document_type == signature_doc_type,
+        ).first()
+        if not doc_sig:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document signe introuvable.",
             )
-            return RedirectResponse(url, status_code=307)
-        except StorageError:
-            # fallback to streaming below
-            pass
+        if kind == "final":
+            doc_sig = document_signature_service.ensure_final_document(db, doc_sig)
+            identifier = doc_sig.final_pdf_identifier
+            category = legal_documents_pdf.final_category_for(doc_type)
+        elif kind == "signed":
+            identifier = doc_sig.signed_pdf_identifier
+            category = legal_documents_pdf.signed_category_for(doc_type)
+        else:
+            identifier = doc_sig.evidence_pdf_identifier
+            category = legal_documents_pdf.evidence_category_for(doc_type)
+
+        if not identifier:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document signe indisponible.",
+            )
 
     try:
         return storage.build_file_response(
-            pdf_service.CONSENT_CATEGORY,
-            case.consent_pdf_path,
-            filename,
+            category,
+            identifier,
+            download_name,
             inline=inline,
         )
     except StorageError as exc:
@@ -460,33 +299,45 @@ def download_consent_pdf(
         ) from exc
 
 
-@router.post("/send-consent-link-custom", response_model=schemas.Message)
-def send_consent_link_custom(
-    payload: ConsentSendCustom,
+@router.post("/send-document-link", response_model=schemas.Message)
+def send_document_link(
+    payload: DocumentSendCustom,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> schemas.Message:
-    """Envoyer le lien de consentement à un email cible (parent ou autre)."""
     case = _get_case_for_user(db, current_user.id)
-    if not case.consent_download_token or not case.consent_pdf_path:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Consentement indisponible pour ce dossier.",
-        )
+    if not case.document_download_token:
+        case.document_download_token = secrets.token_urlsafe(24)
+        db.add(case)
+        db.commit()
+        db.refresh(case)
+
+    doc_type = legal_documents_pdf.normalize_document_type(payload.document_type)
+    signature_doc_type = document_signature_service.normalize_document_type(payload.document_type)
+    doc_sig = db.query(models.DocumentSignature).filter(
+        models.DocumentSignature.procedure_case_id == case.id,
+        models.DocumentSignature.document_type == signature_doc_type,
+    ).first()
+
+    kind = "base"
+    if doc_sig:
+        doc_sig = document_signature_service.ensure_final_document(db, doc_sig)
+        if doc_sig.final_pdf_identifier:
+            kind = "final"
+
     base_url = get_settings().app_base_url.rstrip("/")
-    download_url = f"{base_url}/procedures/{case.consent_download_token}/consent.pdf"
-    try:
-        email_service.send_consent_download_email(
-          payload.email,
-          case.child_full_name,
-          download_url,
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Echec d'envoi du lien de consentement.",
-        ) from exc
-    return schemas.Message(detail="Lien de consentement envoye.")
+    download_url = (
+        f"{base_url}/procedures/{case.document_download_token}/documents/{doc_type.value}.pdf?kind={kind}"
+    )
+    document_title = LEGAL_CATALOG[doc_type].title
+    email_service.send_legal_document_download_email(
+        payload.email,
+        child_name=case.child_full_name,
+        document_title=document_title,
+        download_url=download_url,
+        is_final=kind == "final",
+    )
+    return schemas.Message(detail="Lien du document envoye.")
 
 
 @router.post("/phone-otp/request", response_model=schemas.ProcedureCase)
@@ -550,30 +401,3 @@ def verify_phone_otp(
     return _serialize_case(case)
 
 
-@router.post("/start-signature", response_model=schemas.ProcedureCase)
-def start_signature(
-    payload: StartSignaturePayload = Body(default=StartSignaturePayload()),
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-) -> schemas.ProcedureCase:
-    """Initie la procedure Yousign pour le dossier patient courant (parents) avec option face-à-face."""
-    settings = get_settings()
-    case = _get_case_for_user(db, current_user.id)
-    target_appt = next(
-        (appt for appt in case.appointments if appt.appointment_type == models.AppointmentType.act),
-        None,
-    ) or (case.appointments[0] if case.appointments else None)
-    if not target_appt:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Aucun rendez-vous associé pour la signature.")
-    if settings.feature_enforce_legal_checklist:
-        legal_status = legal_service.compute_status(db, target_appt.id)
-        if not legal_status.complete:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "message": "Checklist incomplète, signature indisponible.",
-                    "legal_status": legal_status.model_dump(mode="json"),
-                },
-            )
-    case = consents_service.initiate_consent(db, case, in_person=payload.in_person)
-    return _serialize_case(case)

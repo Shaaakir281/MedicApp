@@ -161,7 +161,6 @@ export function PatientDetailsDrawer({
   onPreview,
   onEdit,
   onSend,
-  onDownloadConsent,
   onNavigateDate,
   sendingId,
   updatingCase = false,
@@ -451,12 +450,7 @@ export function PatientDetailsDrawer({
           />
         </div>
 
-        {!isEditingCase && (
-          <CaseSummary
-            appointment={appointment}
-            onDownloadConsent={() => onDownloadConsent?.(appointment)}
-          />
-        )}
+        {!isEditingCase && <CaseSummary appointment={appointment} />}
 
         {isEditingCase && (
           <form className="space-y-3 border rounded-2xl p-4 bg-slate-50" onSubmit={handleSubmitCase}>
@@ -493,7 +487,7 @@ export function PatientDetailsDrawer({
 
         <CaseStatus
           appointment={appointment}
-          procedure={procedure}
+          procedure={procedureWithSignatures || procedure}
           onNavigateDate={onNavigateDate}
         />
 

@@ -48,7 +48,7 @@ class YousignClient:
         fake_signers = []
         for idx, signer in enumerate(signers, start=1):
             signer_id = signer.get("external_id") or f"mock-signer-{idx}"
-            link = f"{base}/consents/mock/{proc_id}/{signer_id}"
+            link = f"{base}/signature/mock/{proc_id}/{signer_id}"
             fake_signers.append(
                 YousignSigner(
                     signer_id=signer_id,
@@ -109,7 +109,7 @@ class YousignClient:
             return [
                 YousignSigner(
                     signer_id=s.get("external_id") or f"mock-{i}",
-                    signature_link=f"{base}/consents/mock/{signature_request_id}/{s.get('external_id', f'mock-{i}')}",
+                    signature_link=f"{base}/signature/mock/{signature_request_id}/{s.get('external_id', f'mock-{i}')}",
                     email=s.get("email"),
                     phone=s.get("phone"),
                 )

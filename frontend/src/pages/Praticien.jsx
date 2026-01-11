@@ -7,8 +7,6 @@ import {
   updatePatientCase,
   rescheduleAppointment,
   createPractitionerAppointment,
-  initiateConsentProcedure,
-  remindConsent,
 } from '../lib/api.js';
 import {
   PractitionerLogin,
@@ -156,14 +154,6 @@ const Praticien = () => {
     mutationFn: (payload) => createPractitionerAppointment(token, payload),
   });
 
-  const initiateConsentMutation = useMutation({
-    mutationFn: (caseId) => initiateConsentProcedure(token, caseId),
-  });
-
-  const remindConsentMutation = useMutation({
-    mutationFn: (caseId) => remindConsent(token, caseId),
-  });
-
   const handleLogin = async (credentials) => {
     setLoginError(null);
     try {
@@ -171,15 +161,6 @@ const Praticien = () => {
     } catch (err) {
       setLoginError(err.message || 'Echec de la connexion');
     }
-  };
-
-  const handleDownloadConsent = (appointment) => {
-    const url = appointment?.procedure?.consent_download_url;
-    if (!url) {
-      setError("Aucun consentement disponible pour ce dossier.");
-      return;
-    }
-    window.open(url, '_blank', 'noopener');
   };
 
   const handleOpenEditor = (appointment) => {
@@ -336,33 +317,6 @@ const Praticien = () => {
     }
   };
 
-  const handleInitiateConsent = async (caseId) => {
-    if (!caseId) return;
-    setError(null);
-    setSuccessMessage(null);
-    try {
-      const updatedCase = await initiateConsentMutation.mutateAsync(caseId);
-      updateDrawerProcedure(updatedCase);
-      setSuccessMessage('Consentement envoye (Yousign + SMS).');
-      handleRefresh();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleRemindConsent = async (caseId) => {
-    if (!caseId) return;
-    setError(null);
-    setSuccessMessage(null);
-    try {
-      const updatedCase = await remindConsentMutation.mutateAsync(caseId);
-      updateDrawerProcedure(updatedCase);
-      setSuccessMessage('Rappel de consentement renvoye.');
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
   const handleNavigateToDate = (dateValue) => {
     const isoDate = normalizeISODate(dateValue);
     if (!isoDate) return;
@@ -381,7 +335,6 @@ const Praticien = () => {
   }
 
   const stats = statsQuery.data;
-  const consentActionLoading = initiateConsentMutation.isLoading || remindConsentMutation.isLoading;
   return (
     <div className="min-h-screen bg-slate-50/50">
       <PractitionerHeader userEmail={user?.email} onLogout={logout} />
@@ -407,7 +360,7 @@ const Praticien = () => {
           <StatCard title="Créations aujourd&apos;hui" value={stats?.bookings_created} tone="neutral" />
           <StatCard title="Nouveaux patients (7j)" value={stats?.new_patients_week} tone="success" />
           <StatCard title="Relances nécessaires" value={stats?.follow_ups_required} tone="warning" />
-          <StatCard title="Consents manquants" value={stats?.pending_consents} tone="danger" />
+          <StatCard title="Documents a signer" value={stats?.pending_documents} tone="danger" />
         </section>
 
       {viewMode === 'agenda' ? (
@@ -425,7 +378,6 @@ const Praticien = () => {
           onSendPrescription={handleSendPrescription}
           onSelectPatient={handleSelectPatient}
           onEditPrescription={handleOpenEditor}
-          onDownloadConsent={handleDownloadConsent}
           previewingId={previewingId}
           signingId={signingId}
           sendingId={activeSendId}
@@ -471,15 +423,12 @@ const Praticien = () => {
         onEdit={handleOpenEditor}
         onSend={handleSendPrescription}
         onNavigateDate={handleNavigateToDate}
-        onInitiateConsent={handleInitiateConsent}
-        onRemindConsent={handleRemindConsent}
         previewingId={previewingId}
         signingId={signingId}
         sendingId={activeSendId}
         updatingCase={updateCaseMutation.isLoading}
         updatingAppointment={rescheduleMutation.isLoading}
         creatingAppointment={createAppointmentMutation.isLoading}
-        consentActionLoading={consentActionLoading}
         prescriptionHistory={prescriptionHistory}
         historyLoading={historyLoading}
         historyError={historyError}

@@ -8,13 +8,24 @@ export const CaseStatus = ({
   procedure,
   onNavigateDate,
 }) => {
+  const docSignatures = procedure?.documentSignatures || procedure?.document_signatures || [];
+  const totalDocs = docSignatures.length;
+  const signedDocs = docSignatures.filter((doc) => {
+    const status = doc?.overallStatus || doc?.overall_status || doc?.status || '';
+    return String(status).toLowerCase() === 'completed';
+  }).length;
+
+  const documentsLabel = totalDocs
+    ? `${signedDocs}/${totalDocs} signes`
+    : 'Aucun document';
+
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <div className="space-y-2">
         <h4 className="font-semibold text-slate-700">Statut dossier</h4>
         <ul className="list-disc list-inside text-sm text-slate-600 space-y-1">
           <li>Autorite parentale : {procedure?.parental_authority_ack ? 'OK' : 'Manquante'}</li>
-          <li>Consentement : {procedure?.has_consent ? 'OK' : 'A recuperer'}</li>
+          <li>Documents : {documentsLabel}</li>
           <li>Ordonnance : {procedure?.has_ordonnance ? 'OK' : 'Non generee'}</li>
           <li>
             Pre-consultation :{' '}

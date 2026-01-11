@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 
 import { LABELS_FR } from '../../../constants/labels.fr.js';
-import { downloadConsentAuditTrailBlob, startDocumentSignature } from '../../../services/patientDashboard.api.js';
+import { startDocumentSignature } from '../../../services/patientDashboard.api.js';
 import { downloadDocumentSignatureFile } from '../../../services/documentSignature.api.js';
 import { SendLinkPanel } from './SendLinkPanel.jsx';
 import { SignedDocumentActions } from './SignedDocumentActions.jsx';
@@ -17,7 +17,6 @@ export function SignatureActions({
   parentVerified,
   parentEmail,
   otherParentEmail,
-  overallLegalComplete,
   onReloadCase,
   onReloadDashboard,
   setError,
@@ -37,10 +36,8 @@ export function SignatureActions({
     signedAt: null,
   };
 
-  const hasDocFile = Boolean(
-    doc?.finalPdfAvailable || doc?.signedPdfAvailable || doc?.legacySignedAvailable,
-  );
-  const hasEvidence = Boolean(doc?.evidencePdfAvailable || doc?.legacyEvidenceAvailable);
+  const hasDocFile = Boolean(doc?.finalPdfAvailable || doc?.signedPdfAvailable);
+  const hasEvidence = Boolean(doc?.evidencePdfAvailable);
 
   const checklistComplete = parentState.total > 0 && parentState.completedCount === parentState.total;
   const signatureSupported = Boolean(doc?.signatureSupported);
@@ -58,8 +55,6 @@ export function SignatureActions({
   const parent2Signed = String(doc?.byParent?.parent2?.signatureStatus || '').toLowerCase() === 'signed';
   const fullySigned = (!parent1Required || parent1Signed) && (!parent2Required || parent2Signed);
 
-  // INDEPENDENT DOCUMENTS: Each document can be signed independently
-  // Act-only: no preconsultation delay enforced
   const canSignCabinet = Boolean(
     signatureSupported &&
       appointmentId &&
@@ -67,8 +62,6 @@ export function SignatureActions({
       hasAccess &&
       cabinetEnabled &&
       !alreadySigned
-      // overallLegalComplete removed - documents are independent
-      // canSignAfterDelay removed for demo
   );
   const canSignRemote = Boolean(
     signatureSupported && appointmentId && checklistComplete && parentVerified && token && !alreadySigned,
@@ -80,7 +73,6 @@ export function SignatureActions({
     if (!checklistComplete) return LABELS_FR.patientSpace.documents.reasons.checklistIncomplete;
     if (alreadySigned) return 'Document deja signe pour ce parent.';
     if (!hasAccess) return 'Session invalide.';
-    // Removed: if (!overallLegalComplete) return 'Les 3 documents doivent etre valides avant la signature.';
     return null;
   }, [alreadySigned, appointmentId, checklistComplete, hasAccess, signatureSupported]);
 
@@ -138,8 +130,6 @@ export function SignatureActions({
           documentSignatureId: doc.documentSignatureId,
           fileKind: 'evidence',
         });
-      } else if (doc?.legacyEvidenceAvailable) {
-        blob = await downloadConsentAuditTrailBlob({ token });
       }
       if (!blob) {
         setError?.('Document indisponible.');
@@ -216,7 +206,7 @@ export function SignatureActions({
           documentSignatureId={doc?.documentSignatureId}
           procedureCaseId={procedureCaseId}
           documentType={doc?.docType}
-          hasFinalPdf={Boolean(doc?.finalPdfAvailable || doc?.legacySignedAvailable)}
+          hasFinalPdf={Boolean(doc?.finalPdfAvailable)}
           hasSignedPdf={Boolean(doc?.signedPdfAvailable)}
           previewType="document"
         />
@@ -225,6 +215,7 @@ export function SignatureActions({
       {signatureSupported && token && (
         <SendLinkPanel
           token={token}
+          documentType={doc?.docType}
           primaryLabel={LABELS_FR.patientSpace.guardians[role]}
           primaryEmail={parentEmail}
           secondaryLabel={

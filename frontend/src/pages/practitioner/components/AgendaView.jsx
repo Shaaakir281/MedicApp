@@ -16,7 +16,6 @@ export const AgendaView = ({
   onSendPrescription,
   onSelectPatient,
   onEditPrescription,
-  onDownloadConsent,
   previewingId,
   signingId,
   sendingId,
@@ -52,7 +51,6 @@ export const AgendaView = ({
               onSendPrescription={onSendPrescription}
               onSelectPatient={onSelectPatient}
               onEditPrescription={onEditPrescription}
-              onDownloadConsent={onDownloadConsent}
               previewingId={previewingId}
               signingId={signingId}
               sendingId={sendingId}

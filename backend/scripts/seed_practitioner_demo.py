@@ -121,7 +121,7 @@ class CaseProfile:
     label: str
     preconsult_mode: models.AppointmentMode
     act_offset_days: int | None
-    mark_missing_consent: bool = False
+    mark_missing_documents: bool = False
     add_followup_note: str | None = None
     mark_requires_call: bool = False
 
@@ -133,11 +133,11 @@ PROFILES: list[CaseProfile] = [
         act_offset_days=15,
     ),
     CaseProfile(
-        label="consentement_manquant",
+        label="documents_manquants",
         preconsult_mode=models.AppointmentMode.presentiel,
         act_offset_days=16,
-        mark_missing_consent=True,
-        add_followup_note="Consentement à relancer - en attente de signature.",
+        mark_missing_documents=True,
+        add_followup_note="Documents à relancer - en attente de signature.",
     ),
     CaseProfile(
         label="preconsult_seule",
@@ -231,10 +231,8 @@ def case_payload(index: int, profile: CaseProfile, preconsult_date: dt.date) -> 
 
 def mark_case_flags(db: Session, case: models.ProcedureCase, profile: CaseProfile) -> None:
     updated = False
-    if profile.mark_missing_consent:
-        case.consent_pdf_path = None
-        case.consent_download_token = None
-        case.checklist_pdf_path = None
+    if profile.mark_missing_documents:
+        case.document_download_token = None
         updated = True
     if profile.add_followup_note:
         case.notes = f"{case.notes} | {profile.add_followup_note}".strip()

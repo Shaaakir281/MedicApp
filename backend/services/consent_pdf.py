@@ -30,14 +30,6 @@ def compute_pdf_sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def compute_file_sha256(path: Path) -> Optional[str]:
-    """Compute SHA-256 for a file path; return None if file missing."""
-    try:
-        data = path.read_bytes()
-    except FileNotFoundError:
-        return None
-    return compute_pdf_sha256(data)
-
 
 def load_pdf_bytes(category: str, identifier: str) -> Optional[bytes]:
     """Attempt to load a stored PDF into memory (local storage only)."""
@@ -51,26 +43,6 @@ def load_pdf_bytes(category: str, identifier: str) -> Optional[bytes]:
     except FileNotFoundError:
         return None
 
-
-def render_neutral_consent_pdf(consent_id: str, consent_hash: Optional[str] = None) -> Path:
-    """
-    Render a neutral consent PDF to a temporary file and return its path.
-
-    DEPRECATED: Utiliser render_neutral_document_pdf() pour l'architecture granulaire.
-    """
-    if base_pdf.HTML is None:
-        raise RuntimeError("WeasyPrint is not installed in this environment")
-
-    env = _env()
-    template = env.get_template("consent_neutral.html")
-    html = template.render(consent_id=consent_id, consent_hash=consent_hash)
-    pdf_bytes = base_pdf.HTML(string=html).write_pdf()
-
-    temp_dir = Path(tempfile.mkdtemp(prefix="consent-neutral-"))
-    filename = f"yousign-neutral-consent-{uuid.uuid4().hex}.pdf"
-    path = temp_dir / filename
-    path.write_bytes(pdf_bytes)
-    return path
 
 
 def render_neutral_document_pdf(
@@ -187,56 +159,6 @@ def prune_case_files(category: str, case_id: int, keep_latest: int = 2) -> None:
     except Exception:
         return
 
-
-def compose_final_consent(
-    *,
-    full_consent_id: str,
-    case_id: int,
-    signed_ids: list[str] | None = None,
-    evidence_ids: list[str] | None = None,
-) -> Optional[str]:
-    """
-    Merge consent + audits + signed neutral PDFs into a single PDF (local storage only).
-
-    DEPRECATED: Utiliser compose_final_document_consent() pour l'architecture granulaire.
-    """
-    try:
-        from PyPDF2 import PdfMerger
-    except Exception as exc:  # pragma: no cover - optional dependency
-        raise RuntimeError("PyPDF2 est requis pour assembler le PDF final") from exc
-
-    storage = get_storage_backend()
-    try:
-        full_path = storage.get_local_path(full_consent_category, full_consent_id)
-    except StorageError:
-        return None
-
-    merger = PdfMerger()
-    merger.append(str(full_path))
-
-    for evid in evidence_ids or []:
-        try:
-            evidence_path = storage.get_local_path(evidence_category, evid)
-            merger.append(str(evidence_path))
-        except StorageError:
-            continue
-
-    for signed in signed_ids or []:
-        try:
-            signed_path = storage.get_local_path(signed_category, signed)
-            merger.append(str(signed_path))
-        except StorageError:
-            continue
-
-    temp_dir = Path(tempfile.mkdtemp(prefix="consent-final-"))
-    filename = f"consent-final-{uuid.uuid4().hex}.pdf"
-    output_path = temp_dir / filename
-    with output_path.open("wb") as f:
-        merger.write(f)
-    merger.close()
-    stored_id = store_pdf_bytes(FINAL_CONSENT_CATEGORY, f"{case_id}-final-consent", output_path.read_bytes())
-    prune_case_files(FINAL_CONSENT_CATEGORY, case_id, keep_latest=1)
-    return stored_id
 
 
 def compose_final_document_consent(
