@@ -7,8 +7,10 @@ and e-mail verification.
 from __future__ import annotations
 
 from urllib.parse import urlencode
+import json
+import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, EmailStr, Field, model_validator
 from sqlalchemy.orm import Session
 
@@ -22,6 +24,7 @@ from services.email import send_verification_email, send_password_reset_email
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger("audit")
 
 
 class LoginRequest(BaseModel):
@@ -89,21 +92,61 @@ def _build_password_reset_link(token: str) -> str:
 
 
 @router.post("/login", response_model=schemas.Token)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> schemas.Token:
+def login(
+    payload: LoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> schemas.Token:
     """Authenticate a user and return access and refresh tokens."""
     try:
         user = auth_service.authenticate_user(db, payload.email, payload.password)
     except auth_service.InvalidCredentialsError:
+        logger.info(
+            json.dumps(
+                {
+                    "event": "auth_login_failed",
+                    "email": payload.email,
+                    "reason": "invalid_credentials",
+                    "ip": request.client.host if request.client else None,
+                    "user_agent": request.headers.get("user-agent"),
+                }
+            )
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
     if user.role == models.UserRole.patient and not user.email_verified:
+        logger.info(
+            json.dumps(
+                {
+                    "event": "auth_login_blocked",
+                    "user_id": user.id,
+                    "email": user.email,
+                    "role": user.role,
+                    "reason": "email_not_verified",
+                    "ip": request.client.host if request.client else None,
+                    "user_agent": request.headers.get("user-agent"),
+                }
+            )
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email address not verified",
         )
     tokens = auth_service.issue_tokens(user.id)
+    logger.info(
+        json.dumps(
+            {
+                "event": "auth_login_success",
+                "user_id": user.id,
+                "email": user.email,
+                "role": user.role,
+                "ip": request.client.host if request.client else None,
+                "user_agent": request.headers.get("user-agent"),
+            }
+        )
+    )
     return schemas.Token(access_token=tokens.access_token, refresh_token=tokens.refresh_token)
 
 

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from uuid import UUID
+import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+import models
 from database import get_db
 from dependencies.auth import get_current_user
 from dossier import schemas
@@ -12,6 +15,7 @@ from dossier import service as dossier_service
 from dossier import email_verification_service
 
 router = APIRouter(prefix="/dossier", tags=["dossier"])
+logger = logging.getLogger("audit")
 
 
 @router.get("/current", response_model=schemas.DossierResponse)
@@ -19,7 +23,18 @@ def read_current_dossier(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> schemas.DossierResponse:
-    return dossier_service.get_dossier_current(db, current_user)
+    response = dossier_service.get_dossier_current(db, current_user)
+    logger.info(
+        json.dumps(
+            {
+                "event": "patient_dossier_access",
+                "user_id": getattr(current_user, "id", None),
+                "role": getattr(current_user, "role", None),
+                "child_id": response.child.id,
+            }
+        )
+    )
+    return response
 
 
 @router.put("/current", response_model=schemas.DossierResponse)
@@ -40,7 +55,19 @@ def read_dossier(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> schemas.DossierResponse:
-    return dossier_service.get_dossier(db, str(child_id), current_user)
+    response = dossier_service.get_dossier(db, str(child_id), current_user)
+    if getattr(current_user, "role", None) == models.UserRole.praticien:
+        logger.info(
+            json.dumps(
+                {
+                    "event": "practitioner_dossier_access",
+                    "user_id": getattr(current_user, "id", None),
+                    "role": getattr(current_user, "role", None),
+                    "child_id": response.child.id,
+                }
+            )
+        )
+    return response
 
 
 @router.put("/{child_id}", response_model=schemas.DossierResponse)
