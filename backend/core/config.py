@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     storage_local_path: Optional[str] = Field(default=None, alias="STORAGE_LOCAL_PATH")
     azure_blob_connection_string: Optional[str] = Field(default=None, alias="AZURE_BLOB_CONNECTION_STRING")
     azure_blob_container: Optional[str] = Field(default=None, alias="AZURE_BLOB_CONTAINER")
+    azure_key_vault_uri: Optional[str] = Field(default=None, alias="AZURE_KEY_VAULT_URI")
     yousign_api_key: Optional[str] = Field(default=None, alias="YOUSIGN_API_KEY")
     yousign_api_base_url: str = Field(default="https://api.yousign.app/v3", alias="YOUSIGN_API_BASE_URL")
     yousign_webhook_secret: Optional[str] = Field(default=None, alias="YOUSIGN_WEBHOOK_SECRET")
