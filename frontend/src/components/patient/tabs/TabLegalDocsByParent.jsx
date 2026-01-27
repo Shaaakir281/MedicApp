@@ -9,7 +9,6 @@ export function TabLegalDocsByParent({
   cabinetStatus,
   appointmentId,
   procedureCaseId,
-  overallLegalComplete,
   parentVerifiedByRole,
   parentEmailByRole,
   onAcknowledgeCase,
@@ -70,7 +69,6 @@ export function TabLegalDocsByParent({
             cabinetStatus={cabinetStatus}
             appointmentId={appointmentId}
             procedureCaseId={procedureCaseId}
-            overallLegalComplete={overallLegalComplete}
             parentVerifiedByRole={parentVerifiedByRole}
             parentEmailByRole={parentEmailByRole}
             onAcknowledgeCase={onAcknowledgeCase}

@@ -15,7 +15,6 @@ from core.config import get_settings
 from dossier import schemas
 from dossier.models import Child, Guardian, GuardianPhoneVerification, GuardianEmailVerification, GuardianRole, VerificationStatus
 from services import sms
-from services import consents as consents_service
 
 try:
     import phonenumbers

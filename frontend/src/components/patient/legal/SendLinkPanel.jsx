@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 
 import { LABELS_FR } from '../../../constants/labels.fr.js';
-import { sendDocumentLinkByEmail } from '../../../services/patientDashboard.api.js';
+import { sendConsentSignatureLinkByEmail } from '../../../services/patientDashboard.api.js';
 
 export function SendLinkPanel({
   token,
@@ -18,12 +18,12 @@ export function SendLinkPanel({
   const [sending, setSending] = useState(false);
 
   const handleSend = async (email) => {
-    if (!token || !email || !documentType) return;
+    if (!token || !email) return;
     setError?.(null);
     setSuccessMessage?.(null);
     setSending(true);
     try {
-      await sendDocumentLinkByEmail({ token, email, documentType });
+      await sendConsentSignatureLinkByEmail({ token, email, documentType });
       setSuccessMessage?.(`Lien envoyé à ${email}.`);
       await onReloadDashboard?.();
     } catch (err) {
@@ -41,7 +41,7 @@ export function SendLinkPanel({
           type="button"
           className="btn btn-xs btn-outline"
           onClick={() => handleSend(primaryEmail)}
-          disabled={!primaryEmail || !documentType || sending}
+          disabled={!primaryEmail || sending}
         >
           {primaryLabel} ({primaryEmail || 'email absent'})
         </button>
@@ -49,7 +49,7 @@ export function SendLinkPanel({
           type="button"
           className="btn btn-xs btn-outline"
           onClick={() => handleSend(secondaryEmail)}
-          disabled={!secondaryEmail || !documentType || sending}
+          disabled={!secondaryEmail || sending}
         >
           {secondaryLabel} ({secondaryEmail || 'email absent'})
         </button>
@@ -64,7 +64,7 @@ export function SendLinkPanel({
           type="button"
           className="btn btn-xs btn-primary"
           onClick={() => handleSend(customEmail)}
-          disabled={!customEmail || !documentType || sending}
+          disabled={!customEmail || sending}
         >
           {sending ? 'Envoi…' : 'Envoyer'}
         </button>

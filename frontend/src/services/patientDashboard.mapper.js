@@ -23,11 +23,6 @@ function findGuardian(guardians, label) {
   return (guardians || []).find((g) => g?.label === label) || null;
 }
 
-function signatureEntryByRole(dashboard, role) {
-  const entries = dashboard?.signature?.entries || [];
-  return entries.find((entry) => entry?.signer_role === role) || null;
-}
-
 function isDateString(value) {
   return Boolean(value && typeof value === 'string');
 }
@@ -87,7 +82,6 @@ function mapAppointments(dashboard, procedureCase) {
 function buildDocumentVM({
   catalogDoc,
   statusDoc,
-  dashboard,
   procedureCase,
   documentSignatures = [],
 }) {
@@ -95,25 +89,15 @@ function buildDocumentVM({
   const ack = statusDoc?.acknowledged || {};
 
   const docType = catalogDoc.document_type;
-  const isConsent = docType === DOCUMENT_TYPES.INFORMED_CONSENT;
 
-  // Architecture granulaire: chercher DocumentSignature pour CE document
   const docSignature = (documentSignatures || []).find(
     (sig) => mapSignatureTypeToCatalog(sig?.document_type) === docType
   );
 
-  // Fallback vers ancien système si pas de DocumentSignature
   const documentSignatureId = docSignature?.id || null;
   const finalPdfAvailable = Boolean(docSignature?.final_pdf_identifier);
   const signedPdfAvailable = Boolean(docSignature?.signed_pdf_identifier);
   const evidencePdfAvailable = Boolean(docSignature?.evidence_pdf_identifier);
-  const legacySignedAvailable = Boolean(
-    isConsent && (dashboard?.signature?.signed_pdf_url || procedureCase?.consent_signed_pdf_url),
-  );
-  const legacyEvidenceAvailable = Boolean(
-    isConsent && (dashboard?.signature?.evidence_pdf_url || procedureCase?.consent_evidence_pdf_url),
-  );
-  const previewPdfUrl = isConsent ? procedureCase?.consent_download_url || null : null;
 
   const byParent = roles.reduce((acc, role) => {
     const requiredCases = (catalogDoc.cases || []).filter(
@@ -123,14 +107,12 @@ function buildDocumentVM({
     const checkedKeys = ack[role] || [];
     const completedCount = requiredCases.filter((item) => checkedKeys.includes(item.key)).length;
 
-    // Architecture granulaire: données de signature depuis DocumentSignature
-    let signatureStatus = null;
+    let signatureStatus = 'pending';
     let signatureLink = null;
     let sentAt = null;
     let signedAt = null;
 
     if (docSignature) {
-      // Données granulaires par document
       if (role === SIGNER_ROLES.PARENT_1) {
         signatureStatus = docSignature.parent1_status || 'pending';
         signatureLink = docSignature.parent1_signature_link || null;
@@ -142,16 +124,6 @@ function buildDocumentVM({
         sentAt = docSignature.parent2_sent_at || null;
         signedAt = docSignature.parent2_signed_at || null;
       }
-    } else {
-      // Fallback vers ancien système (monolithique)
-      const signatureEntry = isConsent ? signatureEntryByRole(dashboard, role) : null;
-      signatureStatus = signatureEntry?.status || null;
-      signatureLink =
-        (signatureEntry?.signature_link || null) ||
-        (role === SIGNER_ROLES.PARENT_1 ? procedureCase?.parent1_signature_link : procedureCase?.parent2_signature_link) ||
-        null;
-      sentAt = signatureEntry?.sent_at || null;
-      signedAt = signatureEntry?.signed_at || null;
     }
 
     acc[role] = {
@@ -177,13 +149,10 @@ function buildDocumentVM({
       requiredRoles: item.required_roles || [],
     })),
     byParent,
-    previewPdfUrl,
     documentSignatureId,
     finalPdfAvailable,
     signedPdfAvailable,
     evidencePdfAvailable,
-    legacySignedAvailable,
-    legacyEvidenceAvailable,
     signatureSupported: true,
   };
 }
@@ -211,14 +180,12 @@ export function buildPatientDashboardVM({
   const statusByType = new Map(statusDocs.map((doc) => [String(doc.document_type), doc]));
   const catalogDocs = legalCatalog?.documents || [];
 
-  // Architecture granulaire: extraire document_signatures depuis procedureCase
   const documentSignatures = procedureCase?.document_signatures || [];
 
   const legalDocuments = catalogDocs.map((doc) =>
     buildDocumentVM({
       catalogDoc: doc,
       statusDoc: statusByType.get(String(doc.document_type)) || null,
-      dashboard,
       procedureCase,
       documentSignatures,
     }),
@@ -233,13 +200,6 @@ export function buildPatientDashboardVM({
         return (!parent1Required || parent1Signed) && (!parent2Required || parent2Signed);
       })
     : false;
-  const legacySignatureComplete = Boolean(
-    dashboard?.signature?.signed_pdf_url ||
-      (dashboard?.signature?.entries || []).some(
-        (entry) => (entry?.status || '').toLowerCase() === 'signed',
-      ) ||
-      procedureCase?.consent_signed_pdf_url,
-  );
 
   return {
     child: {
@@ -268,14 +228,10 @@ export function buildPatientDashboardVM({
     appointments,
     legalDocuments,
     legalComplete: Boolean(legalStatus?.complete ?? dashboard?.legal_status?.complete),
-    signatureComplete: signatureCompleteFromDocs || legacySignatureComplete,
+    signatureComplete: signatureCompleteFromDocs,
   };
 }
 
-/**
- * Mapper pour les données praticien
- * Transforme document_signatures (snake_case) en documentSignatures (camelCase avec VM)
- */
 export function mapPractitionerProcedureCase(procedureData) {
   if (!procedureData) return procedureData;
 

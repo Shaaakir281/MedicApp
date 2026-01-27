@@ -1,11 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { FormProvider } from 'react-hook-form';
-
 import PdfPreviewModal from '../../components/PdfPreviewModal.jsx';
 import Toast from '../../components/Toast.jsx';
 import { HeaderSummary } from '../../components/patient/HeaderSummary.jsx';
 import { TabAppointments } from '../../components/patient/tabs/TabAppointments.jsx';
-import { TabDossier } from '../../components/patient/tabs/TabDossier.jsx';
 import { TabPrescriptions } from '../../components/patient/tabs/TabPrescriptions.jsx';
 import { TabLegalDocs } from '../../components/patient/tabs/TabLegalDocs.jsx';
 import { FourteenDayRuleModal } from '../../components/patient/FourteenDayRuleModal.jsx';
@@ -28,8 +25,7 @@ export function PatientSpacePage({
   procedureSelection,
   onChangeProcedure,
 }) {
-  const enableNewDossier = String(import.meta.env.VITE_FEATURE_NEW_DOSSIER || '').toLowerCase() === 'true';
-  const dossier = useDossier({ token: enableNewDossier ? token : null });
+  const dossier = useDossier({ token });
   const [fourteenDayModal, setFourteenDayModal] = useState({
     open: false,
     title: 'Regle des 14 jours',
@@ -38,8 +34,8 @@ export function PatientSpacePage({
   const controller = usePatientSpaceController({
     token,
     procedureSelection,
-    dossierForm: enableNewDossier ? dossier.formState : null,
-    dossierVm: enableNewDossier ? dossier.vm : null,
+    dossierForm: dossier.formState,
+    dossierVm: dossier.vm,
     onShow14DayModal: (payload) => {
       if (!payload) return;
       setFourteenDayModal({
@@ -58,9 +54,7 @@ export function PatientSpacePage({
       setPendingPrescriptionId(null);
     }
     if (nextTab === TABS.appointments) {
-      if (enableNewDossier) {
-        dossier.load?.();
-      }
+      dossier.load?.();
       controller.procedure.loadProcedureCase?.();
       controller.reloadDashboard?.();
     }
@@ -103,8 +97,8 @@ export function PatientSpacePage({
     <div className="max-w-6xl mx-auto space-y-6 pb-16">
       <HeaderSummary
         vm={controller.vm}
-        dossierForm={enableNewDossier ? dossier.formState : null}
-        dossierVm={enableNewDossier ? dossier.vm : null}
+        dossierForm={dossier.formState}
+        dossierVm={dossier.vm}
         userEmail={user?.email}
         onLogout={onLogout}
         dossierComplete={controller.dossierComplete}
@@ -152,24 +146,7 @@ export function PatientSpacePage({
       {controller.error && <div className="alert alert-error">{controller.error}</div>}
 
       {activeTab === TABS.file && (
-        <>
-          {enableNewDossier ? (
-            <PatientTabDossierView dossier={dossier} currentUser={user} />
-          ) : (
-            <FormProvider {...controller.formMethods}>
-              <TabDossier
-                procedure={controller.procedure}
-                childAgeDisplay={controller.childAgeDisplay}
-                token={token}
-                dashboard={controller.dashboard}
-                onReloadCase={controller.procedure.loadProcedureCase}
-                onReloadDashboard={controller.reloadDashboard}
-                setError={controller.setError}
-                setSuccessMessage={controller.setSuccessMessage}
-              />
-            </FormProvider>
-          )}
-        </>
+        <PatientTabDossierView dossier={dossier} currentUser={user} />
       )}
 
       {activeTab === TABS.appointments && (

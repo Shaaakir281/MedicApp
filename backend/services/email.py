@@ -111,26 +111,30 @@ def send_appointment_confirmation_email(
     send_email(subject, recipient, text_body, html_body=html_body)
 
 
-def send_consent_download_email(
+def send_legal_document_download_email(
     recipient: str,
+    *,
     child_name: str,
+    document_title: str,
     download_url: str,
+    is_final: bool = False,
 ) -> None:
-    """Send the consent download link for a procedure case."""
+    """Send a legal document download link (base or final)."""
     app_name = _app_name()
-    subject = f"[{app_name}] Lien de consentement pour {child_name}"
+    status_label = "document signe" if is_final else "document"
+    subject = f"[{app_name}] Lien de telechargement - {document_title}"
     text_body = (
         f"Bonjour,\n\n"
-        f"Le consentement pre-rempli pour {child_name} est disponible au lien suivant :\n"
+        f"Le {status_label} pour {child_name} est disponible :\n"
+        f"{document_title}\n"
         f"{download_url}\n\n"
-        f"Pensez a le signer avant la procedure.\n"
         f"L'equipe {app_name}\n"
     )
     html_body = f"""
     <p>Bonjour,</p>
-    <p>Le consentement pre-rempli pour <strong>{child_name}</strong> est disponible au lien suivant :</p>
+    <p>Le {status_label} pour <strong>{child_name}</strong> est disponible :</p>
+    <p><strong>{document_title}</strong></p>
     <p><a href="{download_url}">{download_url}</a></p>
-    <p>Pensez a le signer avant la procedure.</p>
     <p>L'equipe {app_name}</p>
     """
     send_email(subject, recipient, text_body, html_body=html_body)
@@ -200,7 +204,7 @@ def send_prescription_email(recipient: str, download_url: str, appointment_type:
     is_act = appointment_type == "act"
     subject = f"[{app_name}] Ordonnance pour votre {'acte' if is_act else 'consultation'}"
     reminder = (
-        "Merci de vérifier que le consentement signé des deux parents est prêt pour le jour de l'acte."
+        "Merci de verifier que les documents signes des deux parents sont prets pour le jour de l'acte."
         if is_act
         else "Merci d'apporter l'ordonnance lors de votre rendez-vous."
     )
@@ -262,21 +266,21 @@ def send_appointment_reminder_email(
     app_name = _app_name()
     is_act = appointment_type == "act"
     subject = f"[{app_name}] Rappel rendez-vous du {appointment_date}"
-    consent_line = (
-        "Merci de vérifier que le consentement signé des deux parents est prêt pour le jour de l'acte."
+    documents_line = (
+        "Merci de verifier que les documents signes des deux parents sont prets pour le jour de l'acte."
         if is_act
         else "Pensez à préparer vos documents et venir quelques minutes en avance."
     )
     text_body = (
         f"Bonjour,\n\n"
-        f"Votre rendez-vous est prévu le {appointment_date}. {consent_line}\n"
+        f"Votre rendez-vous est prévu le {appointment_date}. {documents_line}\n"
         f"Vous pouvez finaliser les informations manquantes ou consulter les consignes ici :\n{reminder_link}\n\n"
         f"L'équipe {app_name}\n"
     )
     html_body = f"""
     <p>Bonjour,</p>
     <p>Votre rendez-vous est prévu le <strong>{appointment_date}</strong>.</p>
-    <p>{consent_line}</p>
+    <p>{documents_line}</p>
     <p>Complétez vos informations ou relisez les consignes en cliquant sur le lien ci-dessous :</p>
     <p><a href="{reminder_link}">{reminder_link}</a></p>
     <p>L'équipe {app_name}</p>

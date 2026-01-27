@@ -83,7 +83,7 @@ def test_reschedule_appointment_detects_conflict(db_session, patient_case):
     assert exc.value.status_code == status.HTTP_409_CONFLICT
 
 
-def test_get_stats_counts_followups_and_consents(db_session, patient_case):
+def test_get_stats_counts_followups_and_documents(db_session, patient_case):
     patient, case = patient_case
     case.parental_authority_ack = False
     db_session.add(case)
@@ -106,7 +106,7 @@ def test_get_stats_counts_followups_and_consents(db_session, patient_case):
     assert stats.new_patients == 1
     assert stats.new_patients_week == 1
     assert stats.follow_ups_required == 1
-    assert stats.pending_consents == 1
+    assert stats.pending_documents == 1
 
 
 def test_get_agenda_validates_date_range(db_session):

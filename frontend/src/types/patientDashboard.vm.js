@@ -23,13 +23,10 @@
  * @property {string} version
  * @property {LegalCaseVM[]} cases
  * @property {{ parent1: DocumentParentStateVM, parent2: DocumentParentStateVM }} byParent
- * @property {string|null} previewPdfUrl
  * @property {number|null} documentSignatureId
  * @property {boolean} finalPdfAvailable
  * @property {boolean} signedPdfAvailable
  * @property {boolean} evidencePdfAvailable
- * @property {boolean} legacySignedAvailable
- * @property {boolean} legacyEvidenceAvailable
  * @property {boolean} signatureSupported
  *
  * @typedef {Object} PatientDashboardVM
@@ -41,13 +38,10 @@
  * @property {boolean} signatureComplete
  */
 
-/**
- * View Model pour une signature de document (praticien)
- */
 export class DocumentSignatureVM {
   constructor(data) {
     this.id = data.id;
-    this.documentType = data.document_type; // "authorization" | "consent" | "fees"
+    this.documentType = data.document_type;
     this.parent1SignedAt = data.parent1_signed_at;
     this.parent1SignatureUrl = data.parent1_signature_url;
     this.parent2SignedAt = data.parent2_signed_at;
@@ -76,18 +70,15 @@ export class DocumentSignatureVM {
   get displayLabel() {
     const labels = {
       authorization: 'Autorisation parentale',
-      consent: 'Consentement éclairé',
+      consent: 'Consentement eclaire',
       fees: 'Frais et honoraires',
-      surgical_authorization_minor: 'Autorisation parentale',
-      informed_consent: 'Consentement éclairé',
-      fees_consent_quote: 'Frais et honoraires',
     };
     return labels[this.documentType] || this.documentType;
   }
 
   get signaturesText() {
-    const p1 = this.parent1SignedAt ? 'Parent 1 ✓' : 'Parent 1 ✗';
-    const p2 = this.parent2SignedAt ? 'Parent 2 ✓' : 'Parent 2 ✗';
+    const p1 = this.parent1SignedAt ? 'Parent 1 OK' : 'Parent 1 -';
+    const p2 = this.parent2SignedAt ? 'Parent 2 OK' : 'Parent 2 -';
     return `${p1}, ${p2}`;
   }
 }

@@ -64,7 +64,6 @@ def build_dashboard(db: Session, appointment: models.Appointment) -> dashboard_s
     )
 
     guardians: list[dashboard_schemas.GuardianContact] = []
-    signature_entries: list[dashboard_schemas.SignatureEntry] = []
     contact_verification = None
 
     if case:
@@ -77,17 +76,6 @@ def build_dashboard(db: Session, appointment: models.Appointment) -> dashboard_s
                 sms_optin=case.parent1_sms_optin,
                 receives_codes=case.parent1_sms_optin,
                 phone_verified_at=case.parent1_phone_verified_at,
-                signature_link=case.parent1_signature_link,
-            )
-        )
-        signature_entries.append(
-            dashboard_schemas.SignatureEntry(
-                signer_role="parent1",
-                status=case.parent1_consent_status,
-                sent_at=case.parent1_consent_sent_at,
-                signed_at=case.parent1_consent_signed_at,
-                method=case.parent1_consent_method,
-                signature_link=case.parent1_signature_link,
             )
         )
 
@@ -101,17 +89,6 @@ def build_dashboard(db: Session, appointment: models.Appointment) -> dashboard_s
                     sms_optin=case.parent2_sms_optin,
                     receives_codes=case.parent2_sms_optin,
                     phone_verified_at=case.parent2_phone_verified_at,
-                    signature_link=case.parent2_signature_link,
-                )
-            )
-            signature_entries.append(
-                dashboard_schemas.SignatureEntry(
-                    signer_role="parent2",
-                    status=case.parent2_consent_status,
-                    sent_at=case.parent2_consent_sent_at,
-                    signed_at=case.parent2_consent_signed_at,
-                    method=case.parent2_consent_method,
-                    signature_link=case.parent2_signature_link,
                 )
             )
 
@@ -131,7 +108,6 @@ def build_dashboard(db: Session, appointment: models.Appointment) -> dashboard_s
                 sms_optin=False,
                 receives_codes=False,
                 phone_verified_at=None,
-                signature_link=None,
             )
         )
 
@@ -154,13 +130,6 @@ def build_dashboard(db: Session, appointment: models.Appointment) -> dashboard_s
         # Preserve existing behaviour: dashboard should still render if legal status fails
         legal_status = None
 
-    signature = dashboard_schemas.SignatureBlock(
-        yousign_procedure_id=getattr(case, "yousign_procedure_id", None) if case else None,
-        signed_pdf_url=getattr(case, "consent_signed_pdf_url", None) if case else None,
-        evidence_pdf_url=getattr(case, "consent_evidence_pdf_url", None) if case else None,
-        entries=signature_entries,
-    )
-
     appointments_block = dashboard_schemas.AppointmentsBlock(upcoming=upcoming, history=history)
 
     return dashboard_schemas.PatientDashboard(
@@ -172,5 +141,4 @@ def build_dashboard(db: Session, appointment: models.Appointment) -> dashboard_s
         contact_verification=contact_verification,
         appointments=appointments_block,
         legal_status=legal_status,
-        signature=signature,
     )

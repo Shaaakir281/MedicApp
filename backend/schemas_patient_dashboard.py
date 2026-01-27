@@ -25,7 +25,6 @@ class GuardianContact(BaseModel):
     sms_optin: bool = False
     receives_codes: bool = False
     phone_verified_at: Optional[datetime] = None
-    signature_link: Optional[str] = None
 
 
 class ContactVerificationStatus(BaseModel):
@@ -55,22 +54,6 @@ class AppointmentsBlock(BaseModel):
     history: List[DashboardAppointment] = Field(default_factory=list)
 
 
-class SignatureEntry(BaseModel):
-    signer_role: str
-    status: Optional[str] = None
-    sent_at: Optional[datetime] = None
-    signed_at: Optional[datetime] = None
-    method: Optional[str] = None
-    signature_link: Optional[str] = None
-
-
-class SignatureBlock(BaseModel):
-    yousign_procedure_id: Optional[str] = None
-    signed_pdf_url: Optional[str] = None
-    evidence_pdf_url: Optional[str] = None
-    entries: List[SignatureEntry] = Field(default_factory=list)
-
-
 class PatientDashboard(BaseModel):
     appointment_id: int
     patient_id: Optional[int] = None
@@ -80,4 +63,3 @@ class PatientDashboard(BaseModel):
     contact_verification: Optional[ContactVerificationStatus] = None
     appointments: AppointmentsBlock
     legal_status: Optional[schemas.LegalStatusResponse] = None
-    signature: SignatureBlock

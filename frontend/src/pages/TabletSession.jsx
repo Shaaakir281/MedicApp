@@ -146,7 +146,6 @@ export default function TabletSession() {
               sessionCode={sessionCode}
               appointmentId={sessionInfo.appointment_id}
               procedureCaseId={sessionInfo.case_id}
-              overallLegalComplete={Boolean(legalStatus?.complete)}
               parentVerifiedByRole={{}}
               parentEmailByRole={{}}
               onAcknowledgeCase={handleAcknowledgeCase}

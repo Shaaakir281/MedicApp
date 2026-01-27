@@ -99,10 +99,6 @@ export async function createAppointment(token, payload) {
   return apiRequest('/appointments', { method: 'POST', body: payload, token });
 }
 
-export async function fetchProcedureInfo() {
-  return apiRequest('/procedures/info');
-}
-
 export async function fetchCurrentProcedure(token) {
   try {
     return await apiRequest('/procedures/current', { token });
@@ -112,39 +108,6 @@ export async function fetchCurrentProcedure(token) {
     }
     throw error;
   }
-}
-
-export async function saveProcedure(token, payload) {
-  return apiRequest('/procedures', { method: 'POST', body: payload, token });
-}
-
-export async function sendConsentLink(token) {
-  return apiRequest('/procedures/send-consent-link', { method: 'POST', token });
-}
-
-export async function startSignature(token, { appointmentId, signerRole, mode = 'remote', sessionCode } = {}) {
-  const params = new URLSearchParams();
-  if (sessionCode) {
-    params.set('session_code', sessionCode);
-  }
-  const query = params.toString() ? `?${params.toString()}` : '';
-  return apiRequest(`/signature/start${query}`, {
-    method: 'POST',
-    token,
-    skipAuth: !token && Boolean(sessionCode),
-    body: {
-      appointment_id: appointmentId,
-      signer_role: signerRole,
-      mode,
-    },
-  });
-}
-
-export async function acknowledgeProcedureSteps(token) {
-  return apiRequest('/procedures/acknowledge-steps', {
-    method: 'POST',
-    token,
-  });
 }
 
 export async function fetchLegalCatalog({ appointmentId, sessionCode, token } = {}) {
@@ -336,18 +299,6 @@ export async function deleteAppointment(token, appointmentId, options = {}) {
   });
 }
 
-export async function initiateConsentProcedure(token, caseId) {
-  return apiRequest(`/consents/procedures/${caseId}/initiate`, { method: 'POST', token });
-}
-
-export async function remindConsent(token, caseId) {
-  return apiRequest(`/consents/procedures/${caseId}/remind`, { method: 'POST', token });
-}
-
-export async function fetchConsentStatus(token, caseId) {
-  return apiRequest(`/consents/procedures/${caseId}/status`, { method: 'GET', token });
-}
-
 export async function requestPhoneOtp(token, payload) {
   return apiRequest('/procedures/phone-otp/request', { method: 'POST', body: payload, token });
 }
@@ -356,8 +307,8 @@ export async function verifyPhoneOtp(token, payload) {
   return apiRequest('/procedures/phone-otp/verify', { method: 'POST', body: payload, token });
 }
 
-export async function sendConsentLinkCustom(token, payload) {
-  return apiRequest('/procedures/send-consent-link-custom', { method: 'POST', body: payload, token });
+export async function sendDocumentLinkCustom(token, payload) {
+  return apiRequest('/procedures/send-document-link', { method: 'POST', body: payload, token });
 }
 
 export async function sendDocumentLinkCustom(token, payload) {
@@ -402,22 +353,6 @@ export async function resendDocumentsDashboard(token, caseId, parentRole) {
     method: 'POST',
     token,
   });
-}
-
-export async function downloadSignedConsent(token) {
-  const resolvedToken = token || authSessionManager?.getAccessToken?.();
-  const headers = resolvedToken ? { Authorization: `Bearer ${resolvedToken}` } : {};
-  const resp = await fetch(`${API_BASE_URL}/procedures/current/signed-consent`, {
-    method: 'GET',
-    headers,
-  });
-  if (!resp.ok) {
-    const message = `Echec de telechargement (${resp.status})`;
-    const error = new Error(message);
-    error.status = resp.status;
-    throw error;
-  }
-  return await resp.blob();
 }
 
 export { API_BASE_URL };

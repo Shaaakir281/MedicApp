@@ -83,10 +83,6 @@ export function TabLegalDocs({
     };
   }, [signatureAppointmentId, token]);
 
-  const overallLegalComplete = Boolean(legalStatus?.complete);
-
-
-
   const documentAppointmentOptions = useMemo(() => {
     return (appointmentOptions || []).filter((appt) => appt?.appointment_type === 'act');
   }, [appointmentOptions]);
@@ -202,7 +198,6 @@ export function TabLegalDocs({
         cabinetStatus={activeCabinetStatus || cabinetStatus}
         appointmentId={signatureAppointmentId}
         procedureCaseId={procedureCase?.id}
-        overallLegalComplete={overallLegalComplete}
         parentVerifiedByRole={parentVerifiedByRole}
         parentEmailByRole={parentEmailByRole}
         onAcknowledgeCase={handleAcknowledgeCase}

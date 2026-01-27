@@ -47,7 +47,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
 PRESCRIPTIONS_CATEGORY = "prescriptions"
-CHECKLIST_CATEGORY = "checklists"
 CONSENT_CATEGORY = "consents"
 ORDONNANCE_CATEGORY = "ordonnances"
 
@@ -76,16 +75,6 @@ def _render_to_pdf(template_name: str, category: str, context: Dict[str, Any]) -
 def generate_prescription_pdf(template_name: str, context: Dict[str, Any]) -> str:
     """Render `template_name` with `context` and store the PDF."""
     return _render_to_pdf(template_name, PRESCRIPTIONS_CATEGORY, context)
-
-
-def generate_checklist_pdf(context: Dict[str, Any]) -> str:
-    """Generate the checklist PDF and return stored identifier."""
-    return _render_to_pdf("checklist.html", CHECKLIST_CATEGORY, context)
-
-
-def generate_consent_pdf(context: Dict[str, Any]) -> str:
-    """Generate the parental consent PDF."""
-    return _render_to_pdf("consent.html", CONSENT_CATEGORY, context)
 
 
 def generate_ordonnance_pdf(context: Dict[str, Any]) -> str:

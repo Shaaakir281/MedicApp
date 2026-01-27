@@ -10,7 +10,7 @@ Architecture:
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 import models
@@ -22,6 +22,24 @@ from services import legal as legal_service
 from services.storage import StorageError, get_storage_backend
 
 router = APIRouter(prefix="/signature", tags=["document_signature"])
+
+
+@router.get("/mock/{procedure_id}/{signer_id}", response_class=HTMLResponse)
+def mock_signature_link(procedure_id: str, signer_id: str) -> HTMLResponse:
+    """Fallback page for mock signature links when Yousign is not configured."""
+    html = (
+        "<html><body>"
+        "<h2>Signature mock</h2>"
+        "<p>Yousign n'est pas configure. Ce lien est un placeholder.</p>"
+        "<p>Procedure: "
+        f"{procedure_id}"
+        "</p>"
+        "<p>Signer: "
+        f"{signer_id}"
+        "</p>"
+        "</body></html>"
+    )
+    return HTMLResponse(content=html)
 
 
 @router.post("/start-document", response_model=schemas.DocumentSignatureStartResponse)

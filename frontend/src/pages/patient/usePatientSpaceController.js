@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 
 import { usePatientAppointments } from '../../hooks/usePatientAppointments.js';
 import { usePatientDashboard } from '../../hooks/usePatientDashboard.js';
 import { usePatientProcedure } from '../../hooks/usePatientProcedure.js';
-import { defaultProcedureValues, patientProcedureSchema } from '../../lib/forms';
 import { buildPatientDashboardVM } from '../../services/patientDashboard.mapper.js';
 import { formatChildAge } from '../../utils/child.js';
 import { parseISODateLocal, sortAppointments } from '../../utils/date.js';
@@ -21,12 +18,6 @@ export function usePatientSpaceController({
   dossierVm = null,
   onShow14DayModal = null,
 }) {
-  const formMethods = useForm({
-    resolver: zodResolver(patientProcedureSchema),
-    defaultValues: defaultProcedureValues,
-  });
-  const { reset, watch } = formMethods;
-
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [previewState, setPreviewState] = useState(previewInitialState);
@@ -37,9 +28,7 @@ export function usePatientSpaceController({
     token,
     isAuthenticated: true,
     procedureSelection,
-    resetForm: reset,
     setError,
-    setSuccessMessage,
   });
 
   const dashboardQuery = usePatientDashboard({
@@ -161,7 +150,11 @@ export function usePatientSpaceController({
   const appointmentNeedsSave = Boolean(!procedureCase && appointmentSnapshot && appointmentMissingFields.length === 0);
   const showScheduling = canSchedule && (!appointments.bothAppointmentsBooked || appointments.editingAppointmentId);
 
-  const childBirthdateString = watch('child_birthdate') || procedure.procedureCase?.child_birthdate || null;
+  const childBirthdateString =
+    dossierForm?.birthDate ||
+    dossierVm?.child?.birthDate ||
+    procedure.procedureCase?.child_birthdate ||
+    null;
   const childAgeDisplay = useMemo(
     () => formatChildAge(childBirthdateString),
     [childBirthdateString],
@@ -196,7 +189,6 @@ export function usePatientSpaceController({
     previewState.type === 'consent' ? 'Télécharger le consentement' : 'Télécharger le PDF';
 
   return {
-    formMethods,
     error,
     setError,
     successMessage,

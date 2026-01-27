@@ -2,7 +2,7 @@ import React from 'react';
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString('fr-FR') : '--');
 
-export const CaseSummary = ({ appointment, onDownloadConsent }) => {
+export const CaseSummary = ({ appointment }) => {
   const { procedure, patient } = appointment || {};
 
   // Helper function to format parent name

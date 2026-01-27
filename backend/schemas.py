@@ -116,37 +116,14 @@ class ProcedureCase(ProcedureCaseBase):
     id: int
     created_at: datetime
     updated_at: datetime
-    checklist_pdf_path: Optional[str] = None
-    consent_pdf_path: Optional[str] = None
-    consent_download_url: Optional[str] = None
     ordonnance_pdf_path: Optional[str] = None
     ordonnance_download_url: Optional[str] = None
     ordonnance_prescription_id: Optional[int] = None
     ordonnance_signed_at: Optional[datetime] = None
     child_age_years: float
     appointments: List[Appointment] = Field(default_factory=list)
-    steps_acknowledged: bool
     dossier_completed: bool
     missing_fields: List[str] = Field(default_factory=list)
-    consent_signed_pdf_url: Optional[str] = None
-    consent_evidence_pdf_url: Optional[str] = None
-    consent_last_status: Optional[str] = None
-    consent_ready_at: Optional[datetime] = None
-    yousign_procedure_id: Optional[str] = None
-    parent1_yousign_signer_id: Optional[str] = None
-    parent2_yousign_signer_id: Optional[str] = None
-    parent1_consent_status: str
-    parent2_consent_status: str
-    parent1_consent_sent_at: Optional[datetime] = None
-    parent2_consent_sent_at: Optional[datetime] = None
-    parent1_consent_signed_at: Optional[datetime] = None
-    parent2_consent_signed_at: Optional[datetime] = None
-    parent1_consent_method: Optional[str] = None
-    parent2_consent_method: Optional[str] = None
-    parent1_signature_link: Optional[str] = None
-    parent2_signature_link: Optional[str] = None
-    preconsultation_date: Optional[date] = None
-    signature_open_at: Optional[date] = None
     parent1_phone_verified_at: Optional[datetime] = None
     parent2_phone_verified_at: Optional[datetime] = None
     document_signatures: List["DocumentSignatureDetail"] = Field(default_factory=list)
@@ -178,8 +155,7 @@ class PractitionerCaseStatus(BaseModel):
     parent1_sms_optin: Optional[bool] = None
     parent2_sms_optin: Optional[bool] = None
     parental_authority_ack: bool
-    has_checklist: bool
-    has_consent: bool
+    documents_complete: bool
     has_ordonnance: bool
     has_preconsultation: bool
     has_act_planned: bool
@@ -191,24 +167,7 @@ class PractitionerCaseStatus(BaseModel):
     missing_items: List[str] = Field(default_factory=list)
     needs_follow_up: bool
     appointments_overview: List["PractitionerAppointmentSummary"] = Field(default_factory=list)
-    consent_download_url: Optional[str] = None
-    consent_signed_pdf_url: Optional[str] = None
-    consent_evidence_pdf_url: Optional[str] = None
-    consent_last_status: Optional[str] = None
-    consent_ready_at: Optional[datetime] = None
-    yousign_procedure_id: Optional[str] = None
-    parent1_consent_status: Optional[str] = None
-    parent2_consent_status: Optional[str] = None
-    parent1_consent_sent_at: Optional[datetime] = None
-    parent2_consent_sent_at: Optional[datetime] = None
-    parent1_consent_signed_at: Optional[datetime] = None
-    parent2_consent_signed_at: Optional[datetime] = None
-    parent1_consent_method: Optional[str] = None
-    parent2_consent_method: Optional[str] = None
-    parent1_signature_link: Optional[str] = None
-    parent2_signature_link: Optional[str] = None
     preconsultation_date: Optional[date] = None
-    signature_open_at: Optional[date] = None
     parent1_phone_verified_at: Optional[datetime] = None
     parent2_phone_verified_at: Optional[datetime] = None
     document_signatures: List["DocumentSignatureDetail"] = Field(default_factory=list)
@@ -325,23 +284,6 @@ class CabinetPatientEntry(BaseModel):
     fees_signed: bool = False
 
 
-class SignatureStartPayload(BaseModel):
-    appointment_id: int
-    signer_role: SignerRole
-    mode: str = Field(default="remote", pattern="^(remote|cabinet)$")
-    session_code: Optional[str] = None
-
-
-class SignatureStartResponse(BaseModel):
-    appointment_id: int
-    signer_role: SignerRole
-    signature_link: Optional[str] = None
-    yousign_procedure_id: Optional[str] = None
-    status: str
-
-    model_config = ConfigDict(use_enum_values=True)
-
-
 class PractitionerAppointmentEntry(BaseModel):
     appointment_id: int
     date: date
@@ -381,7 +323,7 @@ class PractitionerStats(BaseModel):
     new_patients: int
     new_patients_week: int
     follow_ups_required: int
-    pending_consents: int
+    pending_documents: int
 
 
 class PractitionerNewPatient(BaseModel):

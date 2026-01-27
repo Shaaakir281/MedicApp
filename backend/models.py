@@ -348,28 +348,8 @@ class ProcedureCase(Base):
     parent2_phone_otp_expires_at: datetime.datetime | None = Column(DateTime, nullable=True)
     parental_authority_ack: bool = Column(Boolean, nullable=False, default=False)
     notes: str | None = Column(String, nullable=True)
-    checklist_pdf_path: str | None = Column(String, nullable=True)
-    consent_pdf_path: str | None = Column(String, nullable=True)
-    consent_download_token: str | None = Column(String, nullable=True, unique=True)
-    consent_signed_pdf_url: str | None = Column(String, nullable=True)
-    consent_evidence_pdf_url: str | None = Column(String, nullable=True)
-    consent_last_status: str | None = Column(String(64), nullable=True)
-    consent_ready_at: datetime.datetime | None = Column(DateTime, nullable=True)
-    yousign_procedure_id: str | None = Column(String(128), nullable=True, index=True)
-    parent1_yousign_signer_id: str | None = Column(String(128), nullable=True)
-    parent2_yousign_signer_id: str | None = Column(String(128), nullable=True)
-    parent1_consent_status: str = Column(String(32), nullable=False, default="pending")
-    parent2_consent_status: str = Column(String(32), nullable=False, default="pending")
-    parent1_consent_sent_at: datetime.datetime | None = Column(DateTime, nullable=True)
-    parent2_consent_sent_at: datetime.datetime | None = Column(DateTime, nullable=True)
-    parent1_consent_signed_at: datetime.datetime | None = Column(DateTime, nullable=True)
-    parent2_consent_signed_at: datetime.datetime | None = Column(DateTime, nullable=True)
-    parent1_consent_method: str | None = Column(String(32), nullable=True)
-    parent2_consent_method: str | None = Column(String(32), nullable=True)
-    parent1_signature_link: str | None = Column(String, nullable=True)
-    parent2_signature_link: str | None = Column(String, nullable=True)
+    document_download_token: str | None = Column(String, nullable=True, unique=True)
     preconsultation_date: datetime.date | None = Column(Date, nullable=True)
-    signature_open_at: datetime.date | None = Column(Date, nullable=True)
     ordonnance_pdf_path: str | None = Column(String, nullable=True)
     created_at: datetime.datetime = Column(
         DateTime, default=datetime.datetime.utcnow, nullable=False
@@ -380,7 +360,6 @@ class ProcedureCase(Base):
         onupdate=datetime.datetime.utcnow,
         nullable=False,
     )
-    steps_acknowledged: bool = Column(Boolean, nullable=False, default=False)
     dossier_completed: bool = Column(Boolean, nullable=False, default=False)
     missing_fields: list[str] = Column(JSON, nullable=False, default=list)
 
