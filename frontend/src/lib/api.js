@@ -311,10 +311,6 @@ export async function sendDocumentLinkCustom(token, payload) {
   return apiRequest('/procedures/send-document-link', { method: 'POST', body: payload, token });
 }
 
-export async function sendDocumentLinkCustom(token, payload) {
-  return apiRequest('/procedures/send-document-link', { method: 'POST', body: payload, token });
-}
-
 export async function createCabinetSession(token, payload) {
   return apiRequest('/cabinet-sessions', { method: 'POST', token, body: payload });
 }
