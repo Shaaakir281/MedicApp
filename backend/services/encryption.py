@@ -7,17 +7,11 @@ import logging
 from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
-from azure.identity import DefaultAzureCredential
-from azure.keyvault.secrets import SecretClient
 from azure.core.exceptions import AzureError
 
-from core.config import get_settings
+from core.key_vault import get_key_vault_client, KeyVaultError
 
 logger = logging.getLogger(__name__)
-
-
-class KeyVaultError(RuntimeError):
-    """Raised when Key Vault access fails."""
 
 
 @dataclass
@@ -53,19 +47,12 @@ class EncryptionService:
 
     def _load_key(self) -> bytes:
         """Load the encryption key from Azure Key Vault."""
-        settings = get_settings()
-        vault_uri = settings.azure_key_vault_uri
-        if not vault_uri:
-            raise KeyVaultError("AZURE_KEY_VAULT_URI is not configured.")
-
         secret_name = "pdf-encryption-key"
         try:
-            credential = DefaultAzureCredential()
-            client = SecretClient(vault_url=vault_uri, credential=credential)
-            secret = client.get_secret(secret_name)
-            if not secret or not secret.value:
-                raise KeyVaultError("Secret pdf-encryption-key is missing or empty.")
-            return secret.value.encode("utf-8")
+            value = get_key_vault_client().get_secret(secret_name)
+            return value.encode("utf-8")
+        except KeyVaultError:
+            raise
         except AzureError as exc:
             logger.exception("Failed to read Key Vault secret %s", secret_name)
             raise KeyVaultError("Unable to read Key Vault secret.") from exc
