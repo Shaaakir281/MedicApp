@@ -26,3 +26,6 @@ backend/migrations/__pycache__/
 # Generated PDFs
 backend/storage/
 *.pdf
+
+MedicApp_Sprints_HDS.docx
+
