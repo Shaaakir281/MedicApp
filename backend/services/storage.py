@@ -9,10 +9,24 @@ from typing import Protocol
 
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from core.config import get_settings
+from services.encryption import EncryptionService, KeyVaultError
 
 
 class StorageError(RuntimeError):
     """Raised when a stored document cannot be accessed."""
+
+
+_encryption_service: EncryptionService | None = None
+
+
+def _get_encryption_service() -> EncryptionService:
+    global _encryption_service
+    if _encryption_service is None:
+        try:
+            _encryption_service = EncryptionService()
+        except KeyVaultError as exc:
+            raise StorageError("Encryption service unavailable.") from exc
+    return _encryption_service
 
 
 class StorageBackend(Protocol):
@@ -139,14 +153,17 @@ class AzureBlobStorageBackend:
     def save_pdf(self, category: str, filename: str, data: bytes) -> str:
         from azure.storage.blob import ContentSettings
 
-        blob_name = self._blob_name(category, filename)
+        enc_service = _get_encryption_service()
+        encrypted = enc_service.encrypt_pdf(data)
+        encrypted_name = f"{filename}.enc" if not filename.endswith(".enc") else filename
         self._container.upload_blob(
-            name=blob_name,
-            data=data,
+            name=self._blob_name(category, encrypted_name),
+            data=encrypted,
             overwrite=True,
             content_settings=ContentSettings(content_type="application/pdf"),
+            metadata={"encrypted": "true"},
         )
-        return filename
+        return encrypted_name
 
     def exists(self, category: str, identifier: str) -> bool:
         if not identifier:
@@ -159,19 +176,26 @@ class AzureBlobStorageBackend:
         category: str,
         identifier: str,
         download_name: str,
-        *,
-        inline: bool = False,
+    *,
+    inline: bool = False,
     ) -> Response:
         from azure.core.exceptions import ResourceNotFoundError
 
         blob_name = self._blob_name(category, identifier)
         blob = self._container.get_blob_client(blob_name)
         try:
+            props = blob.get_blob_properties()
+            encrypted = (props.metadata or {}).get("encrypted") == "true"
             downloader = blob.download_blob()
         except ResourceNotFoundError as exc:  # pragma: no cover - network error
             raise StorageError(f"Blob {blob_name} is missing") from exc
-
-        response = StreamingResponse(downloader.chunks(), media_type="application/pdf")
+        if encrypted:
+            enc_service = _get_encryption_service()
+            data = downloader.readall()
+            data = enc_service.decrypt_pdf(data)
+            response = Response(content=data, media_type="application/pdf")
+        else:
+            response = StreamingResponse(downloader.chunks(), media_type="application/pdf")
         disposition = "inline" if inline else "attachment"
         response.headers["Content-Disposition"] = f'{disposition}; filename="{download_name}"'
         return response
@@ -191,6 +215,10 @@ class AzureBlobStorageBackend:
             raise StorageError("Azure Blob presigned URLs require an account key.")
 
         blob_name = self._blob_name(category, identifier)
+        blob = self._container.get_blob_client(blob_name)
+        props = blob.get_blob_properties()
+        if (props.metadata or {}).get("encrypted") == "true":
+            raise StorageError("Encrypted blobs require server-side streaming.")
         expiry = datetime.utcnow() + timedelta(seconds=expires_in_seconds)
         disposition = "inline" if inline else "attachment"
         sas = generate_blob_sas(
@@ -215,10 +243,15 @@ class AzureBlobStorageBackend:
         blob_name = self._blob_name(category, identifier)
         blob = self._container.get_blob_client(blob_name)
         try:
+            props = blob.get_blob_properties()
+            encrypted = (props.metadata or {}).get("encrypted") == "true"
             downloader = blob.download_blob()
             data = downloader.readall()
         except ResourceNotFoundError as exc:
             raise StorageError(f"Blob {blob_name} is missing") from exc
+        if encrypted:
+            enc_service = _get_encryption_service()
+            data = enc_service.decrypt_pdf(data)
 
         temp_dir = Path(tempfile.mkdtemp(prefix="medicapp-blob-"))
         filename = f"{uuid.uuid4().hex}.pdf"
