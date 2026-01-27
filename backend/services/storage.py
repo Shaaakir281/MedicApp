@@ -185,7 +185,7 @@ class AzureBlobStorageBackend:
         blob = self._container.get_blob_client(blob_name)
         try:
             props = blob.get_blob_properties()
-            encrypted = (props.metadata or {}).get("encrypted") == "true"
+            encrypted = (props.metadata or {}).get("encrypted") == "true" or identifier.endswith(".enc")
             downloader = blob.download_blob()
         except ResourceNotFoundError as exc:  # pragma: no cover - network error
             raise StorageError(f"Blob {blob_name} is missing") from exc
@@ -217,7 +217,7 @@ class AzureBlobStorageBackend:
         blob_name = self._blob_name(category, identifier)
         blob = self._container.get_blob_client(blob_name)
         props = blob.get_blob_properties()
-        if (props.metadata or {}).get("encrypted") == "true":
+        if (props.metadata or {}).get("encrypted") == "true" or identifier.endswith(".enc"):
             raise StorageError("Encrypted blobs require server-side streaming.")
         expiry = datetime.utcnow() + timedelta(seconds=expires_in_seconds)
         disposition = "inline" if inline else "attachment"
@@ -244,7 +244,7 @@ class AzureBlobStorageBackend:
         blob = self._container.get_blob_client(blob_name)
         try:
             props = blob.get_blob_properties()
-            encrypted = (props.metadata or {}).get("encrypted") == "true"
+            encrypted = (props.metadata or {}).get("encrypted") == "true" or identifier.endswith(".enc")
             downloader = blob.download_blob()
             data = downloader.readall()
         except ResourceNotFoundError as exc:
