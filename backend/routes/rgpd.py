@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import datetime as dt
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 import models
 from database import get_db
 from dependencies.auth import get_current_user
 from dossier import models as dossier_models
+from dossier import service as dossier_service
+from core import security
+from repositories import user_repository
 
 router = APIRouter(prefix="/patient/me", tags=["rgpd"])
 
@@ -323,3 +328,131 @@ def export_patient_data(
             ],
         },
     }
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=1)
+
+
+class DeleteAccountResponse(BaseModel):
+    detail: str
+    deleted_email: EmailStr
+
+
+@router.post("/delete", response_model=DeleteAccountResponse, status_code=status.HTTP_200_OK)
+def delete_patient_account(
+    payload: DeleteAccountRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> DeleteAccountResponse:
+    """Soft delete the authenticated patient account (requires password)."""
+    if current_user.role != models.UserRole.patient:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to patient accounts.",
+        )
+
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password.",
+        )
+
+    deleted_email = f"deleted+{current_user.id}@medicapp.invalid"
+    current_user.email = deleted_email
+    current_user.hashed_password = security.hash_password(secrets.token_urlsafe(32))
+    current_user.email_verified = False
+    db.add(current_user)
+    db.commit()
+
+    return DeleteAccountResponse(detail="Compte supprime.", deleted_email=deleted_email)
+
+
+class RectifyAccountRequest(BaseModel):
+    email: EmailStr | None = None
+    phone_e164: str | None = None
+
+
+class RectifyAccountResponse(BaseModel):
+    detail: str
+    email: EmailStr | None = None
+    phone_e164: str | None = None
+
+
+@router.put("/rectify", response_model=RectifyAccountResponse, status_code=status.HTTP_200_OK)
+def rectify_patient_account(
+    payload: RectifyAccountRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> RectifyAccountResponse:
+    """Rectify patient contact data (email / phone)."""
+    if current_user.role != models.UserRole.patient:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to patient accounts.",
+        )
+
+    updated_email = None
+    updated_phone = None
+
+    if payload.email:
+        existing = user_repository.get_by_email(db, payload.email)
+        if existing and existing.id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already in use.",
+            )
+        if payload.email != current_user.email:
+            current_user.email = payload.email
+            current_user.email_verified = False
+            updated_email = payload.email
+
+    if payload.phone_e164:
+        updated_phone = dossier_service.normalize_phone(payload.phone_e164)
+
+    children = (
+        db.query(dossier_models.Child)
+        .filter(dossier_models.Child.patient_id == current_user.id)
+        .all()
+    )
+    child_ids = [child.id for child in children]
+
+    guardians = []
+    if child_ids:
+        guardians = (
+            db.query(dossier_models.Guardian)
+            .filter(
+                dossier_models.Guardian.child_id.in_(child_ids),
+                dossier_models.Guardian.role == dossier_models.GuardianRole.parent1.value,
+            )
+            .all()
+        )
+
+    for guardian in guardians:
+        if updated_email:
+            guardian.email = updated_email
+            guardian.email_verified_at = None
+        if updated_phone is not None:
+            guardian.phone_e164 = updated_phone
+            guardian.phone_verified_at = None
+
+    cases = (
+        db.query(models.ProcedureCase)
+        .filter(models.ProcedureCase.patient_id == current_user.id)
+        .all()
+    )
+    for case in cases:
+        if updated_email:
+            case.parent1_email = updated_email
+        if updated_phone is not None:
+            case.parent1_phone = updated_phone
+            case.parent1_phone_verified_at = None
+
+    db.add(current_user)
+    db.commit()
+
+    return RectifyAccountResponse(
+        detail="Profil mis a jour.",
+        email=updated_email or current_user.email,
+        phone_e164=updated_phone,
+    )

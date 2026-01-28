@@ -46,6 +46,11 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found.",
         )
+    if user.email and user.email.startswith("deleted+"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account deleted.",
+        )
     if user.role == models.UserRole.patient and not user.email_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -96,6 +101,11 @@ def get_optional_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found.",
+        )
+    if user.email and user.email.startswith("deleted+"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account deleted.",
         )
     if user.role == models.UserRole.patient and not user.email_verified:
         raise HTTPException(

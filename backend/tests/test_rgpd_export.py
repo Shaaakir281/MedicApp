@@ -60,3 +60,40 @@ def test_patient_export_forbidden_for_practitioner(client: TestClient, db_sessio
     response = client.get("/patient/me/export", headers=_auth_headers(practitioner))
 
     assert response.status_code == 403
+
+
+def test_patient_delete_requires_password(client: TestClient, db_session: Session) -> None:
+    user = _create_user(db_session, email="delete@example.com", password="Password123!")
+    response = client.post(
+        "/patient/me/delete",
+        json={"password": "Password123!"},
+        headers=_auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["deleted_email"].startswith("deleted+")
+
+
+def test_patient_delete_rejects_bad_password(client: TestClient, db_session: Session) -> None:
+    user = _create_user(db_session, email="delete2@example.com", password="Password123!")
+    response = client.post(
+        "/patient/me/delete",
+        json={"password": "wrong"},
+        headers=_auth_headers(user),
+    )
+
+    assert response.status_code == 401
+
+
+def test_patient_rectify_updates_email(client: TestClient, db_session: Session) -> None:
+    user = _create_user(db_session, email="rectify@example.com", password="Password123!")
+    response = client.put(
+        "/patient/me/rectify",
+        json={"email": "new.email@example.com"},
+        headers=_auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["email"] == "new.email@example.com"
