@@ -1,0 +1,325 @@
+"""RGPD endpoints for patient data export."""
+
+from __future__ import annotations
+
+import datetime as dt
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+import models
+from database import get_db
+from dependencies.auth import get_current_user
+from dossier import models as dossier_models
+
+router = APIRouter(prefix="/patient/me", tags=["rgpd"])
+
+
+def _iso(value):
+    if value is None:
+        return None
+    if isinstance(value, (dt.datetime, dt.date, dt.time)):
+        return value.isoformat()
+    return value
+
+
+def _serialize_user(user: models.User) -> dict:
+    return {
+        "id": user.id,
+        "email": user.email,
+        "role": user.role.value if hasattr(user.role, "value") else user.role,
+        "email_verified": user.email_verified,
+        "created_at": _iso(user.created_at),
+    }
+
+
+def _serialize_case(case: models.ProcedureCase) -> dict:
+    return {
+        "id": case.id,
+        "procedure_type": case.procedure_type.value if hasattr(case.procedure_type, "value") else case.procedure_type,
+        "child_full_name": case.child_full_name,
+        "child_birthdate": _iso(case.child_birthdate),
+        "child_weight_kg": float(case.child_weight_kg) if case.child_weight_kg is not None else None,
+        "parent1_name": case.parent1_name,
+        "parent1_first_name": case.parent1_first_name,
+        "parent1_last_name": case.parent1_last_name,
+        "parent1_email": case.parent1_email,
+        "parent2_name": case.parent2_name,
+        "parent2_first_name": case.parent2_first_name,
+        "parent2_last_name": case.parent2_last_name,
+        "parent2_email": case.parent2_email,
+        "parent1_phone": case.parent1_phone,
+        "parent2_phone": case.parent2_phone,
+        "parent1_sms_optin": case.parent1_sms_optin,
+        "parent2_sms_optin": case.parent2_sms_optin,
+        "parent1_phone_verified_at": _iso(case.parent1_phone_verified_at),
+        "parent2_phone_verified_at": _iso(case.parent2_phone_verified_at),
+        "parental_authority_ack": case.parental_authority_ack,
+        "notes": case.notes,
+        "document_download_token": case.document_download_token,
+        "preconsultation_date": _iso(case.preconsultation_date),
+        "ordonnance_pdf_path": case.ordonnance_pdf_path,
+        "dossier_completed": case.dossier_completed,
+        "missing_fields": case.missing_fields,
+        "created_at": _iso(case.created_at),
+        "updated_at": _iso(case.updated_at),
+    }
+
+
+def _serialize_appointment(appointment: models.Appointment) -> dict:
+    return {
+        "id": appointment.id,
+        "date": _iso(appointment.date),
+        "time": _iso(appointment.time),
+        "status": appointment.status.value if hasattr(appointment.status, "value") else appointment.status,
+        "appointment_type": appointment.appointment_type.value if hasattr(appointment.appointment_type, "value") else appointment.appointment_type,
+        "mode": appointment.mode.value if hasattr(appointment.mode, "value") else appointment.mode,
+        "procedure_case_id": appointment.procedure_id,
+        "created_at": _iso(appointment.created_at),
+        "reminder_sent_at": _iso(appointment.reminder_sent_at),
+        "reminder_opened_at": _iso(appointment.reminder_opened_at),
+        "reminder_token": appointment.reminder_token,
+    }
+
+
+def _serialize_prescription(prescription: models.Prescription) -> dict:
+    return {
+        "id": prescription.id,
+        "appointment_id": prescription.appointment_id,
+        "reference": prescription.reference,
+        "pdf_path": prescription.pdf_path,
+        "items": prescription.items,
+        "instructions": prescription.instructions,
+        "sent_at": _iso(prescription.sent_at),
+        "sent_via": prescription.sent_via,
+        "download_count": prescription.download_count,
+        "last_download_at": _iso(prescription.last_download_at),
+        "signed_at": _iso(prescription.signed_at),
+        "signed_by_id": prescription.signed_by_id,
+        "created_at": _iso(prescription.created_at),
+    }
+
+
+def _serialize_prescription_version(version: models.PrescriptionVersion) -> dict:
+    return {
+        "id": version.id,
+        "prescription_id": version.prescription_id,
+        "appointment_id": version.appointment_id,
+        "reference": version.reference,
+        "appointment_type": version.appointment_type,
+        "pdf_path": version.pdf_path,
+        "items": version.items,
+        "instructions": version.instructions,
+        "created_at": _iso(version.created_at),
+    }
+
+
+def _serialize_document_signature(signature: models.DocumentSignature) -> dict:
+    return {
+        "id": signature.id,
+        "procedure_case_id": signature.procedure_case_id,
+        "document_type": signature.document_type,
+        "document_version": signature.document_version,
+        "yousign_procedure_id": signature.yousign_procedure_id,
+        "parent1_status": signature.parent1_status,
+        "parent1_sent_at": _iso(signature.parent1_sent_at),
+        "parent1_signed_at": _iso(signature.parent1_signed_at),
+        "parent1_method": signature.parent1_method,
+        "parent2_status": signature.parent2_status,
+        "parent2_sent_at": _iso(signature.parent2_sent_at),
+        "parent2_signed_at": _iso(signature.parent2_signed_at),
+        "parent2_method": signature.parent2_method,
+        "overall_status": signature.overall_status.value if hasattr(signature.overall_status, "value") else signature.overall_status,
+        "signed_pdf_identifier": signature.signed_pdf_identifier,
+        "evidence_pdf_identifier": signature.evidence_pdf_identifier,
+        "final_pdf_identifier": signature.final_pdf_identifier,
+        "completed_at": _iso(signature.completed_at),
+        "yousign_purged_at": _iso(signature.yousign_purged_at),
+        "created_at": _iso(signature.created_at),
+        "updated_at": _iso(signature.updated_at),
+    }
+
+
+def _serialize_acknowledgement(entry: models.LegalAcknowledgement) -> dict:
+    return {
+        "id": entry.id,
+        "appointment_id": entry.appointment_id,
+        "document_type": entry.document_type.value if hasattr(entry.document_type, "value") else entry.document_type,
+        "signer_role": entry.signer_role.value if hasattr(entry.signer_role, "value") else entry.signer_role,
+        "case_key": entry.case_key,
+        "case_text": entry.case_text,
+        "catalog_version": entry.catalog_version,
+        "acknowledged_at": _iso(entry.acknowledged_at),
+        "ip": entry.ip,
+        "user_agent": entry.user_agent,
+        "source": entry.source,
+    }
+
+
+def _serialize_child(child: dossier_models.Child) -> dict:
+    return {
+        "id": child.id,
+        "patient_id": child.patient_id,
+        "procedure_case_id": child.procedure_case_id,
+        "first_name": child.first_name,
+        "last_name": child.last_name,
+        "birth_date": _iso(child.birth_date),
+        "weight_kg": float(child.weight_kg) if child.weight_kg is not None else None,
+        "medical_notes": child.medical_notes,
+        "created_at": _iso(child.created_at),
+        "updated_at": _iso(child.updated_at),
+    }
+
+
+def _serialize_guardian(guardian: dossier_models.Guardian) -> dict:
+    return {
+        "id": guardian.id,
+        "child_id": guardian.child_id,
+        "role": guardian.role,
+        "first_name": guardian.first_name,
+        "last_name": guardian.last_name,
+        "email": guardian.email,
+        "phone_e164": guardian.phone_e164,
+        "phone_verified_at": _iso(guardian.phone_verified_at),
+        "email_verified_at": _iso(guardian.email_verified_at),
+        "created_at": _iso(guardian.created_at),
+        "updated_at": _iso(guardian.updated_at),
+    }
+
+
+def _serialize_phone_verification(entry: dossier_models.GuardianPhoneVerification) -> dict:
+    return {
+        "id": entry.id,
+        "guardian_id": entry.guardian_id,
+        "phone_e164": entry.phone_e164,
+        "expires_at": _iso(entry.expires_at),
+        "cooldown_until": _iso(entry.cooldown_until),
+        "attempt_count": entry.attempt_count,
+        "max_attempts": entry.max_attempts,
+        "status": entry.status,
+        "sent_at": _iso(entry.sent_at),
+        "verified_at": _iso(entry.verified_at),
+        "ip_address": entry.ip_address,
+        "user_agent": entry.user_agent,
+    }
+
+
+def _serialize_email_verification(entry: dossier_models.GuardianEmailVerification) -> dict:
+    return {
+        "id": entry.id,
+        "guardian_id": entry.guardian_id,
+        "email": entry.email,
+        "expires_at": _iso(entry.expires_at),
+        "status": entry.status,
+        "sent_at": _iso(entry.sent_at),
+        "consumed_at": _iso(entry.consumed_at),
+        "ip_address": entry.ip_address,
+        "user_agent": entry.user_agent,
+    }
+
+
+@router.get("/export", status_code=status.HTTP_200_OK)
+def export_patient_data(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> dict:
+    """Export all personal data for the authenticated patient."""
+    if current_user.role != models.UserRole.patient:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to patient accounts.",
+        )
+
+    cases = db.query(models.ProcedureCase).filter(models.ProcedureCase.patient_id == current_user.id).all()
+    case_ids = [case.id for case in cases]
+
+    appointments = db.query(models.Appointment).filter(models.Appointment.user_id == current_user.id).all()
+    appointment_ids = [appointment.id for appointment in appointments]
+
+    prescriptions = []
+    prescription_versions = []
+    if appointment_ids:
+        prescriptions = (
+            db.query(models.Prescription)
+            .filter(models.Prescription.appointment_id.in_(appointment_ids))
+            .all()
+        )
+        prescription_ids = [prescription.id for prescription in prescriptions]
+        if prescription_ids:
+            prescription_versions = (
+                db.query(models.PrescriptionVersion)
+                .filter(models.PrescriptionVersion.prescription_id.in_(prescription_ids))
+                .all()
+            )
+
+    document_signatures = []
+    if case_ids:
+        document_signatures = (
+            db.query(models.DocumentSignature)
+            .filter(models.DocumentSignature.procedure_case_id.in_(case_ids))
+            .all()
+        )
+
+    legal_acknowledgements = []
+    if appointment_ids:
+        legal_acknowledgements = (
+            db.query(models.LegalAcknowledgement)
+            .filter(models.LegalAcknowledgement.appointment_id.in_(appointment_ids))
+            .all()
+        )
+
+    children = (
+        db.query(dossier_models.Child)
+        .filter(dossier_models.Child.patient_id == current_user.id)
+        .all()
+    )
+    child_ids = [child.id for child in children]
+
+    guardians = []
+    phone_verifications = []
+    email_verifications = []
+    if child_ids:
+        guardians = (
+            db.query(dossier_models.Guardian)
+            .filter(dossier_models.Guardian.child_id.in_(child_ids))
+            .all()
+        )
+        guardian_ids = [guardian.id for guardian in guardians]
+        if guardian_ids:
+            phone_verifications = (
+                db.query(dossier_models.GuardianPhoneVerification)
+                .filter(dossier_models.GuardianPhoneVerification.guardian_id.in_(guardian_ids))
+                .all()
+            )
+            email_verifications = (
+                db.query(dossier_models.GuardianEmailVerification)
+                .filter(dossier_models.GuardianEmailVerification.guardian_id.in_(guardian_ids))
+                .all()
+            )
+
+    return {
+        "generated_at": _iso(dt.datetime.utcnow()),
+        "user": _serialize_user(current_user),
+        "procedure_cases": [_serialize_case(case) for case in cases],
+        "appointments": [_serialize_appointment(appointment) for appointment in appointments],
+        "prescriptions": [_serialize_prescription(prescription) for prescription in prescriptions],
+        "prescription_versions": [
+            _serialize_prescription_version(version) for version in prescription_versions
+        ],
+        "document_signatures": [
+            _serialize_document_signature(signature) for signature in document_signatures
+        ],
+        "legal_acknowledgements": [
+            _serialize_acknowledgement(entry) for entry in legal_acknowledgements
+        ],
+        "dossier": {
+            "children": [_serialize_child(child) for child in children],
+            "guardians": [_serialize_guardian(guardian) for guardian in guardians],
+            "phone_verifications": [
+                _serialize_phone_verification(entry) for entry in phone_verifications
+            ],
+            "email_verifications": [
+                _serialize_email_verification(entry) for entry in email_verifications
+            ],
+        },
+    }
