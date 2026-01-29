@@ -268,6 +268,7 @@ def login(
 @limiter.limit("3/minute", key_func=user_key_func)
 def send_mfa_code(
     payload: MFASendRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user_allow_mfa),
 ) -> schemas.MFASendResponse:
@@ -298,6 +299,7 @@ def send_mfa_code(
 @limiter.limit("5/minute", key_func=user_key_func)
 def verify_mfa_code(
     payload: MFAVerifyRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user_allow_mfa),
 ) -> schemas.Token:
