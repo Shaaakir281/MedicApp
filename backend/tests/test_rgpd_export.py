@@ -73,6 +73,7 @@ def test_patient_delete_requires_password(client: TestClient, db_session: Sessio
     assert response.status_code == 200
     data = response.json()
     assert data["deleted_email"].startswith("deleted+")
+    assert data["deleted_email"].endswith("@medicapp.example")
 
 
 def test_patient_delete_rejects_bad_password(client: TestClient, db_session: Session) -> None:

@@ -358,7 +358,7 @@ def delete_patient_account(
             detail="Incorrect password.",
         )
 
-    deleted_email = f"deleted+{current_user.id}@medicapp.invalid"
+    deleted_email = f"deleted+{current_user.id}@medicapp.example"
     current_user.email = deleted_email
     current_user.hashed_password = security.hash_password(secrets.token_urlsafe(32))
     current_user.email_verified = False
