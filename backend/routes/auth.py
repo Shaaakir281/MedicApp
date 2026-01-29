@@ -4,8 +4,6 @@ This module defines the endpoints responsible for user authentication, tokens
 and e-mail verification.
 """
 
-from __future__ import annotations
-
 from urllib.parse import urlencode
 from datetime import datetime, timedelta
 import json
