@@ -4,13 +4,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { StatusDot } from '../../components/ui/StatusDot.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { usePractitionerMfa } from '../../hooks/usePractitionerMfa.js';
 import {
   createCabinetSession,
   fetchDocumentsDashboard,
   resendDocumentsDashboard,
 } from '../../lib/api.js';
 import { downloadDocumentSignatureFile, downloadLegalDocumentPreview } from '../../services/documentSignature.api.js';
-import { PractitionerHeader, PractitionerLogin, StatCard } from './components';
+import { PractitionerHeader, PractitionerLogin, PractitionerMfa, StatCard } from './components';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Tous statuts' },
@@ -68,7 +69,19 @@ const StatusCell = ({ status }) => {
 };
 
 export default function DocumentsDashboard() {
-  const { isAuthenticated, login, logout, token, user, loading: authLoading } = useAuth();
+  const { isAuthenticated, logout, token, user } = useAuth();
+  const {
+    mfaRequired,
+    mfaEmail,
+    mfaPhone,
+    startLogin,
+    sendCode,
+    verifyCode,
+    resetMfa,
+    loading: mfaLoading,
+    error: mfaError,
+    message: mfaMessage,
+  } = usePractitionerMfa();
   const [status, setStatus] = useState('all');
   const [dateRange, setDateRange] = useState('upcoming');
   const [actionMessage, setActionMessage] = useState(null);
@@ -170,7 +183,20 @@ export default function DocumentsDashboard() {
   if (!isAuthenticated) {
     return (
       <div className="max-w-6xl mx-auto py-10">
-        <PractitionerLogin onSubmit={login} loading={authLoading} />
+        {mfaRequired ? (
+          <PractitionerMfa
+            email={mfaEmail}
+            phone={mfaPhone}
+            onSend={sendCode}
+            onVerify={verifyCode}
+            onCancel={resetMfa}
+            loading={mfaLoading}
+            error={mfaError}
+            message={mfaMessage}
+          />
+        ) : (
+          <PractitionerLogin onSubmit={startLogin} loading={mfaLoading} error={mfaError} />
+        )}
       </div>
     );
   }

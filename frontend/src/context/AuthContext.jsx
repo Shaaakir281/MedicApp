@@ -197,24 +197,34 @@ export function AuthProvider({ children }) {
     });
   }, [logout, refreshAccessToken, refreshToken, token]);
 
+  const completeLogin = useCallback(
+    (data, fallbackEmail) => {
+      if (!data?.access_token || !data?.refresh_token) {
+        throw new Error("Reponse d'authentification invalide.");
+      }
+      const payload = parseJwtPayload(data.access_token) || {};
+      const currentUser = {
+        id: payload.sub ? Number(payload.sub) : null,
+        email: payload.email || fallbackEmail || null,
+        email_verified: true,
+      };
+      updateSession(buildSession(data.access_token, data.refresh_token, currentUser));
+      return currentUser;
+    },
+    [buildSession, updateSession],
+  );
+
   const handleLogin = useCallback(
     async (credentials) => {
       setLoading(true);
       try {
         const data = await loginUser(credentials);
-        const payload = parseJwtPayload(data.access_token) || {};
-        const currentUser = {
-          id: payload.sub ? Number(payload.sub) : null,
-          email: payload.email || credentials.email,
-          email_verified: true,
-        };
-        updateSession(buildSession(data.access_token, data.refresh_token, currentUser));
-        return currentUser;
+        return completeLogin(data, credentials.email);
       } finally {
         setLoading(false);
       }
     },
-    [buildSession, updateSession],
+    [completeLogin],
   );
 
   const handleRegister = useCallback(async (payload) => {
@@ -237,8 +247,9 @@ export function AuthProvider({ children }) {
       logout,
       refresh: refreshAccessToken,
       isAuthenticated: Boolean(token && user),
+      completeLogin,
     }),
-    [token, refreshToken, user, loading, handleLogin, handleRegister, logout, refreshAccessToken],
+    [token, refreshToken, user, loading, handleLogin, handleRegister, logout, refreshAccessToken, completeLogin],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

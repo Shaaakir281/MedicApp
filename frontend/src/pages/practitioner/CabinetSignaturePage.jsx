@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '../../context/AuthContext.jsx';
+import { usePractitionerMfa } from '../../hooks/usePractitionerMfa.js';
 import { createCabinetSession, fetchCabinetPatientsToday } from '../../lib/api.js';
-import { PractitionerHeader, PractitionerLogin } from './components';
+import { PractitionerHeader, PractitionerLogin, PractitionerMfa } from './components';
 
 const PRACTITIONER_PIN = '1234';
 
@@ -12,7 +13,19 @@ const hasAllSigned = (patient) =>
   Boolean(patient?.authorization_signed && patient?.consent_signed && patient?.fees_signed);
 
 export default function CabinetSignaturePage() {
-  const { isAuthenticated, login, logout, token, user, loading: authLoading } = useAuth();
+  const { isAuthenticated, logout, token, user } = useAuth();
+  const {
+    mfaRequired,
+    mfaEmail,
+    mfaPhone,
+    startLogin,
+    sendCode,
+    verifyCode,
+    resetMfa,
+    loading: mfaLoading,
+    error: mfaError,
+    message: mfaMessage,
+  } = usePractitionerMfa();
   const [pinInput, setPinInput] = useState(PRACTITIONER_PIN);
   const [unlocked, setUnlocked] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -66,7 +79,20 @@ export default function CabinetSignaturePage() {
   if (!isAuthenticated) {
     return (
       <div className="max-w-6xl mx-auto py-10">
-        <PractitionerLogin onSubmit={login} loading={authLoading} />
+        {mfaRequired ? (
+          <PractitionerMfa
+            email={mfaEmail}
+            phone={mfaPhone}
+            onSend={sendCode}
+            onVerify={verifyCode}
+            onCancel={resetMfa}
+            loading={mfaLoading}
+            error={mfaError}
+            message={mfaMessage}
+          />
+        ) : (
+          <PractitionerLogin onSubmit={startLogin} loading={mfaLoading} error={mfaError} />
+        )}
       </div>
     );
   }
