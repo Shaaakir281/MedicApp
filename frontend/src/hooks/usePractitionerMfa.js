@@ -4,6 +4,36 @@ import { loginUser } from '../lib/api.js';
 import { sendPractitionerMfaCode, verifyPractitionerMfaCode } from '../services/mfa.api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
+const PHONE_ERROR =
+  "Veuillez saisir un numero au format +33XXXXXXXXX (ex: +33612345678).";
+
+const normalizePhone = (rawPhone) => {
+  if (!rawPhone) return null;
+  const cleaned = String(rawPhone).replace(/[\s().-]/g, '');
+  if (!cleaned) return null;
+
+  let normalized = cleaned;
+
+  if (normalized.startsWith('00')) {
+    normalized = `+${normalized.slice(2)}`;
+  }
+
+  if (normalized.startsWith('+33')) {
+    normalized = normalized.replace(/^\+330/, '+33');
+  } else if (normalized.startsWith('0')) {
+    const digits = normalized.replace(/\D/g, '');
+    if (digits.length === 10) {
+      normalized = `+33${digits.slice(1)}`;
+    }
+  }
+
+  if (!/^\+33[1-9]\d{8}$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+};
+
 export function usePractitionerMfa() {
   const { completeLogin } = useAuth();
   const [mfaState, setMfaState] = useState({
@@ -51,15 +81,27 @@ export function usePractitionerMfa() {
         setError('Session MFA invalide.');
         return false;
       }
+      const trimmed = phone?.trim();
+      let normalizedPhone = null;
+      if (trimmed) {
+        normalizedPhone = normalizePhone(trimmed);
+        if (!normalizedPhone) {
+          setError(PHONE_ERROR);
+          return false;
+        }
+      }
       setLoading(true);
       setError(null);
       setMessage(null);
       try {
         const response = await sendPractitionerMfaCode({
           token: mfaState.tempToken,
-          phone,
+          phone: normalizedPhone ?? undefined,
         });
-        setMfaState((prev) => ({ ...prev, phone: phone || prev.phone }));
+        setMfaState((prev) => ({
+          ...prev,
+          phone: normalizedPhone || prev.phone,
+        }));
         setMessage(response?.message || 'Code envoye.');
         return true;
       } catch (err) {
