@@ -281,6 +281,28 @@ def send_password_reset_email(recipient: str, reset_link: str) -> None:
     send_email(subject, recipient, text_body, html_body=html_body)
 
 
+def send_account_locked_email(recipient: str, *, retry_after_minutes: int) -> None:
+    """Send a notification email when an account is temporarily locked."""
+    app_name = _app_name()
+    subject = f"[{app_name}] Compte temporairement verrouille"
+    text_body = (
+        f"Bonjour,\n\n"
+        f"Pour des raisons de securite, votre compte {app_name} a ete temporairement verrouille "
+        f"apres plusieurs tentatives de connexion infructueuses.\n\n"
+        f"Vous pourrez reessayer dans environ {retry_after_minutes} minutes.\n"
+        f"Si vous n'etes pas a l'origine de ces tentatives, nous vous recommandons de changer votre mot de passe.\n\n"
+        f"L'equipe {app_name}\n"
+    )
+    html_body = f"""
+    <p>Bonjour,</p>
+    <p>Pour des raisons de s&eacute;curit&eacute;, votre compte <strong>{app_name}</strong> a &eacute;t&eacute; temporairement verrouill&eacute; apr&egrave;s plusieurs tentatives de connexion infructueuses.</p>
+    <p>Vous pourrez r&eacute;essayer dans environ <strong>{retry_after_minutes} minutes</strong>.</p>
+    <p>Si vous n'&ecirc;tes pas &agrave; l'origine de ces tentatives, nous vous recommandons de changer votre mot de passe.</p>
+    <p>L'&eacute;quipe {app_name}</p>
+    """
+    send_email(subject, recipient, text_body, html_body=html_body)
+
+
 def send_guardian_verification_email(
     to_email: str,
     guardian_name: str,

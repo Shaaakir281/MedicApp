@@ -83,6 +83,12 @@ class User(Base):
     password_reset_tokens = relationship(
         "PasswordResetToken", back_populates="user", cascade="all,delete-orphan"
     )
+    mfa_codes = relationship(
+        "MFACode", back_populates="user", cascade="all,delete-orphan"
+    )
+    login_attempts = relationship(
+        "LoginAttempt", back_populates="user", cascade="all,delete-orphan"
+    )
     procedure_cases = relationship(
         "ProcedureCase",
         back_populates="patient",
@@ -156,6 +162,36 @@ class PasswordResetToken(Base):
     consumed_at: datetime.datetime | None = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="password_reset_tokens")
+
+
+class MFACode(Base):
+    __tablename__ = "mfa_codes"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    user_id: int = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    code: str = Column(String(6), nullable=False)
+    phone: str | None = Column(String(20), nullable=True)
+    expires_at: datetime.datetime = Column(DateTime, nullable=False)
+    used_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+
+    user = relationship("User", back_populates="mfa_codes")
+
+
+class LoginAttempt(Base):
+    __tablename__ = "login_attempts"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    user_id: int = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    ip: str | None = Column(String(64), nullable=True)
+    success: bool = Column(Boolean, nullable=False, default=False)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+
+    user = relationship("User", back_populates="login_attempts")
 
 
 class Questionnaire(Base):

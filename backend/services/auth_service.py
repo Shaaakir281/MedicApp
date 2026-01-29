@@ -76,10 +76,18 @@ def register_user(
     return user
 
 
-def issue_tokens(user_id: int) -> TokenPair:
+def issue_tokens(
+    user_id: int,
+    *,
+    access_claims: dict | None = None,
+    refresh_claims: dict | None = None,
+) -> TokenPair:
     subject = str(user_id)
-    access_token = security.create_access_token(subject)
-    refresh_token = security.create_refresh_token(subject)
+    access_token = security.create_access_token(subject, claims=access_claims)
+    refresh_token = security.create_refresh_token(
+        subject,
+        claims=refresh_claims if refresh_claims is not None else access_claims,
+    )
     return TokenPair(access_token=access_token, refresh_token=refresh_token)
 
 
@@ -94,7 +102,10 @@ def refresh_access_token(refresh_token: str) -> str:
     subject = claims.get("sub")
     if not subject:
         raise InvalidRefreshTokenError("Refresh token missing subject")
-    return security.create_access_token(str(subject))
+    access_claims = {}
+    if claims.get("mfa_verified") is True:
+        access_claims["mfa_verified"] = True
+    return security.create_access_token(str(subject), claims=access_claims or None)
 
 
 def decode_token(token: str) -> dict:
