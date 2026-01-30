@@ -145,6 +145,11 @@ export default function CabinetSignature() {
           setLocalError(null);
         }}
       />
+      {!signatureBase64 && (
+        <p className="text-xs text-slate-500">
+          Signez dans le cadre puis cliquez sur « Valider ».
+        </p>
+      )}
 
       <label className="flex items-center gap-2 text-sm">
         <input
