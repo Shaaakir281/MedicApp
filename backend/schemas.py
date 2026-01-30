@@ -595,6 +595,7 @@ class CabinetSignatureUploadRequest(BaseModel):
     signature_base64: str
     consent_confirmed: bool = True
     device_id: Optional[str] = None
+    device_id: Optional[str] = None
 
 
 class CabinetSignatureUploadResponse(BaseModel):
