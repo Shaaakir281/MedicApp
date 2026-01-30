@@ -502,6 +502,16 @@ class DocumentSignature(Base):
 
     # Relations
     procedure_case = relationship("ProcedureCase", back_populates="document_signatures")
+    cabinet_signatures = relationship(
+        "CabinetSignature",
+        back_populates="document_signature",
+        cascade="all,delete-orphan",
+    )
+    cabinet_signature_sessions = relationship(
+        "CabinetSignatureSession",
+        back_populates="document_signature",
+        cascade="all,delete-orphan",
+    )
 
 
 class SignatureCabinetSessionStatus(str, enum.Enum):
@@ -557,6 +567,59 @@ class SignatureCabinetSession(Base):
 
     appointment = relationship("Appointment")
     created_by_practitioner = relationship("User", foreign_keys=[created_by_practitioner_id])
+
+
+class CabinetSignatureSession(Base):
+    __tablename__ = "cabinet_signature_sessions"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    document_signature_id: int = Column(
+        Integer,
+        ForeignKey("document_signatures.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    parent_role: SignerRole = Column(Enum(SignerRole), nullable=False)
+    token: str = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at: datetime.datetime = Column(DateTime, nullable=False)
+    completed_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    initiated_by_practitioner_id: int | None = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    document_hash: str | None = Column(String(128), nullable=True)
+    device_id: str | None = Column(String(128), nullable=True)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+
+    document_signature = relationship("DocumentSignature", back_populates="cabinet_signature_sessions")
+    initiated_by_practitioner = relationship("User", foreign_keys=[initiated_by_practitioner_id])
+
+
+class CabinetSignature(Base):
+    __tablename__ = "cabinet_signatures"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    document_signature_id: int = Column(
+        Integer,
+        ForeignKey("document_signatures.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    parent_role: SignerRole = Column(Enum(SignerRole), nullable=False)
+    signature_image_base64: str = Column(Text, nullable=False)
+    signature_hash: str | None = Column(String(128), nullable=True)
+    consent_confirmed: bool = Column(Boolean, nullable=False, default=False)
+    signed_at: datetime.datetime = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    ip_address: str | None = Column(String(45), nullable=True)
+    user_agent: str | None = Column(String(255), nullable=True)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+
+    document_signature = relationship("DocumentSignature", back_populates="cabinet_signatures")
 
 
 class PharmacyContact(Base):

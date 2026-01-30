@@ -571,3 +571,45 @@ class DocumentsDashboardStats(BaseModel):
 class DocumentsDashboardResponse(BaseModel):
     stats: DocumentsDashboardStats
     cases: List[DocumentsDashboardCaseEntry] = Field(default_factory=list)
+
+
+# =============================================================================
+# Cabinet signature (tablet) schemas
+# =============================================================================
+
+
+class CabinetSignatureInitiateRequest(BaseModel):
+    document_signature_id: int
+    parent_role: SignerRole
+
+    model_config = ConfigDict(use_enum_values=True)
+
+
+class CabinetSignatureInitiateResponse(BaseModel):
+    session_id: int
+    sign_url: str
+    expires_at: datetime
+
+
+class CabinetSignatureUploadRequest(BaseModel):
+    signature_base64: str
+    consent_confirmed: bool = True
+    device_id: Optional[str] = None
+
+
+class CabinetSignatureUploadResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class CabinetSignatureStatusResponse(BaseModel):
+    session_id: int
+    document_signature_id: Optional[int] = None
+    parent_role: SignerRole
+    expires_at: datetime
+    completed_at: Optional[datetime] = None
+    document_type: Optional[str] = None
+    patient_name: Optional[str] = None
+    valid: bool = True
+
+    model_config = ConfigDict(use_enum_values=True)
