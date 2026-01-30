@@ -9,6 +9,7 @@ import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import VerifyEmail from './pages/VerifyEmail.jsx';
 import TabletSession from './pages/TabletSession.jsx';
+import CabinetSignature from './pages/CabinetSignature.jsx';
 
 /**
  * Top‑level component defining the navigation bar and routes for the application.
@@ -45,6 +46,7 @@ function App() {
             <Route path="/auth/reset-password" element={<ResetPassword />} />
             <Route path="/auth/verify-email" element={<VerifyEmail />} />
             <Route path="/tablet/:sessionCode" element={<TabletSession />} />
+            <Route path="/sign/:token" element={<CabinetSignature />} />
           </Routes>
         </main>
       </div>

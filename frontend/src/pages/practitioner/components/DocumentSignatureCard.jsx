@@ -6,12 +6,14 @@ import { IconDocument } from './icons';
 /**
  * Affiche un document de signature avec son statut et ses actions
  */
-export function DocumentSignatureCard({ document, onPreview }) {
+export function DocumentSignatureCard({ document, onPreview, onCabinetSign }) {
   const statusVariant = {
     completed: 'success',
     partial: 'warning',
     pending: 'neutral',
   }[document.status];
+
+  const isCompleted = document.status === 'completed';
 
   return (
     <div className="border rounded-lg p-3 bg-white space-y-2">
@@ -45,6 +47,16 @@ export function DocumentSignatureCard({ document, onPreview }) {
         >
           Voir
         </button>
+        {onCabinetSign && (
+          <button
+            type="button"
+            className="btn btn-xs btn-primary"
+            onClick={onCabinetSign}
+            disabled={isCompleted}
+          >
+            Signer en cabinet
+          </button>
+        )}
       </div>
     </div>
   );
