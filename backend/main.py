@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import get_settings
 from core.logging_config import configure_application_insights
 from middleware.audit_logging import audit_logging_middleware
+from middleware.rate_limiter import configure_rate_limiter
 from routes import all_routers
 
 
@@ -21,6 +22,7 @@ def create_application() -> FastAPI:
     settings = get_settings()
     configure_application_insights(settings.applicationinsights_connection_string)
     app.middleware("http")(audit_logging_middleware)
+    configure_rate_limiter(app)
 
     allow_origins = settings.cors_allow_origins or ["http://localhost:3000"]
     app.add_middleware(

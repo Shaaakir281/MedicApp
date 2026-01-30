@@ -1,4 +1,4 @@
-"""Logging configuration helpers for production telemetry."""
+"""Logging helpers for Application Insights."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Optional
 
 try:
     from opencensus.ext.azure.log_exporter import AzureLogHandler
-except ImportError:  # pragma: no cover - optional dependency
+except Exception:  # pragma: no cover - optional dependency
     AzureLogHandler = None  # type: ignore[assignment]
 
 
@@ -18,7 +18,7 @@ def configure_application_insights(connection_string: Optional[str]) -> None:
 
     if AzureLogHandler is None:
         logging.getLogger(__name__).warning(
-            "Application Insights disabled: opencensus-ext-azure not installed."
+            "Application Insights logger unavailable; continuing without it."
         )
         return
 
@@ -32,6 +32,7 @@ def configure_application_insights(connection_string: Optional[str]) -> None:
         logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
     )
 
+    root_logger.addHandler(handler)
     root_logger.addHandler(handler)
     if root_logger.level > logging.INFO:
         root_logger.setLevel(logging.INFO)

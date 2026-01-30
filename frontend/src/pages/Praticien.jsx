@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext.jsx';
+import { usePractitionerMfa } from '../hooks/usePractitionerMfa.js';
 import {
   updatePrescription,
   updatePatientCase,
@@ -10,6 +11,7 @@ import {
 } from '../lib/api.js';
 import {
   PractitionerLogin,
+  PractitionerMfa,
   StatCard,
   PrescriptionEditor,
   PatientDetailsDrawer,
@@ -55,10 +57,21 @@ const normalizeISODate = (value) => {
 };
 
 const Praticien = () => {
-  const { isAuthenticated, login, logout, token, user, loading: authLoading } = useAuth();
+  const { isAuthenticated, logout, token, user } = useAuth();
+  const {
+    mfaRequired,
+    mfaEmail,
+    mfaPhone,
+    startLogin,
+    sendCode,
+    verifyCode,
+    resetMfa,
+    loading: mfaLoading,
+    error: mfaError,
+    message: mfaMessage,
+  } = usePractitionerMfa();
   const [viewMode, setViewMode] = useState('agenda');
   const [error, setError] = useState(null);
-  const [loginError, setLoginError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [editorState, setEditorState] = useState({
     open: false,
@@ -153,15 +166,6 @@ const Praticien = () => {
   const createAppointmentMutation = useMutation({
     mutationFn: (payload) => createPractitionerAppointment(token, payload),
   });
-
-  const handleLogin = async (credentials) => {
-    setLoginError(null);
-    try {
-      await login(credentials);
-    } catch (err) {
-      setLoginError(err.message || 'Echec de la connexion');
-    }
-  };
 
   const handleOpenEditor = (appointment) => {
     // Ferme la fenêtre dossier patient pour éviter toute superposition
@@ -329,7 +333,20 @@ const Praticien = () => {
   if (!isAuthenticated) {
     return (
       <div className="max-w-6xl mx-auto py-10">
-        <PractitionerLogin onSubmit={handleLogin} loading={authLoading} error={loginError} />
+        {mfaRequired ? (
+          <PractitionerMfa
+            email={mfaEmail}
+            phone={mfaPhone}
+            onSend={sendCode}
+            onVerify={verifyCode}
+            onCancel={resetMfa}
+            loading={mfaLoading}
+            error={mfaError}
+            message={mfaMessage}
+          />
+        ) : (
+          <PractitionerLogin onSubmit={startLogin} loading={mfaLoading} error={mfaError} />
+        )}
       </div>
     );
   }

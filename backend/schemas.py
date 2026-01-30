@@ -22,6 +22,21 @@ class TokenRefresh(BaseModel):
     token_type: str = Field(default="bearer")
 
 
+class LoginResponse(BaseModel):
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    token_type: str = Field(default="bearer")
+    requires_mfa: bool = False
+    temp_token: Optional[str] = None
+    expires_in: Optional[int] = None
+    message: Optional[str] = None
+
+
+class MFASendResponse(BaseModel):
+    message: str
+    expires_in: int
+
+
 class UserBase(BaseModel):
     email: EmailStr
 

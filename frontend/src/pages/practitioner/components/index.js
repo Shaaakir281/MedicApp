@@ -1,4 +1,5 @@
 export * from './PractitionerLogin.jsx';
+export * from './PractitionerMfa.jsx';
 export * from './StatCard.jsx';
 export * from './AgendaControls.jsx';
 export * from './AgendaDay.jsx';

@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     app_name: str = Field(default="MedicApp", alias="APP_NAME")
     app_base_url: str = Field(default="http://localhost:8000", alias="APP_BASE_URL")
     frontend_base_url: str = Field(default="http://localhost:5173", alias="FRONTEND_BASE_URL")
+    applicationinsights_connection_string: Optional[str] = Field(
+        default=None,
+        alias="APPLICATIONINSIGHTS_CONNECTION_STRING",
+    )
     cors_allow_origins_raw: str | List[str] | None = Field(default=None, alias="BACKEND_CORS_ORIGINS")
 
     smtp_host: Optional[str] = Field(default=None, alias="SMTP_HOST")
@@ -76,6 +80,7 @@ class Settings(BaseSettings):
         default=False, alias="FEATURE_ENFORCE_LEGAL_CHECKLIST"
     )
     require_guardian_2: bool = Field(default=False, alias="REQUIRE_GUARDIAN_2")
+    require_mfa_practitioner: bool = Field(default=False, alias="REQUIRE_MFA_PRACTITIONER")
 
     # Vérification quotidienne documents
     document_verification_recipient_email: Optional[str] = Field(
