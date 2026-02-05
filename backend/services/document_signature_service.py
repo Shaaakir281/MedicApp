@@ -84,6 +84,17 @@ def get_signatures_for_case(
     ).order_by(models.DocumentSignature.created_at).all()
 
 
+def ensure_signatures_for_case(
+    db: Session,
+    procedure_case_id: int,
+) -> list[models.DocumentSignature]:
+    """Assure qu'un DocumentSignature existe pour chaque type supporte."""
+    signatures = []
+    for doc_type in VALID_DOCUMENT_TYPES:
+        signatures.append(get_or_create_document_signature(db, procedure_case_id, doc_type))
+    return signatures
+
+
 def get_or_create_document_signature(
     db: Session,
     procedure_case_id: int,

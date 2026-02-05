@@ -1,9 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { downloadDocumentSignatureFile, downloadLegalDocumentPreview } from '../../../services/documentSignature.api.js';
+import {
+  downloadDocumentSignatureFile,
+  downloadLegalDocumentPreview,
+  getCaseDocumentSignatures,
+} from '../../../services/documentSignature.api.js';
 import { createCabinetSignatureSession } from '../../../services/cabinetSignature.api.js';
 import Modal from '../../../components/Modal.jsx';
 import { DocumentSignatureCard } from './DocumentSignatureCard';
+import { DocumentSignatureVM } from '../../../types/patientDashboard.vm.js';
 
 /**
  * Section complète affichant tous les documents de signature d'un dossier
@@ -11,6 +16,8 @@ import { DocumentSignatureCard } from './DocumentSignatureCard';
 export function DocumentSignatureSection({ documentSignatures, caseId, token }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const blobUrlCacheRef = useRef(new Map());
+  const [remoteDocs, setRemoteDocs] = useState([]);
+  const [loadingRemoteDocs, setLoadingRemoteDocs] = useState(false);
   const [cabinetDoc, setCabinetDoc] = useState(null);
   const [cabinetRole, setCabinetRole] = useState('parent1');
   const [cabinetSession, setCabinetSession] = useState(null);
@@ -27,6 +34,40 @@ export function DocumentSignatureSection({ documentSignatures, caseId, token }) 
       blobUrlCacheRef.current.clear();
     };
   }, []);
+
+  useEffect(() => {
+    if (!token || !caseId) return;
+    const hasIds = (documentSignatures || []).some((doc) => doc?.id);
+    if (hasIds) {
+      setRemoteDocs([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingRemoteDocs(true);
+    getCaseDocumentSignatures(token, caseId)
+      .then((payload) => {
+        const rawDocs = payload?.document_signatures || payload?.documentSignatures || [];
+        const mapped = rawDocs.map((doc) => new DocumentSignatureVM(doc));
+        if (!cancelled) {
+          setRemoteDocs(mapped);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRemoteDocs([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingRemoteDocs(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, caseId, documentSignatures]);
 
   const handlePreview = async (document) => {
     if (!token || !caseId) return;
@@ -98,7 +139,11 @@ export function DocumentSignatureSection({ documentSignatures, caseId, token }) 
 
   const handleCreateCabinetSession = async () => {
     if (!token || !cabinetDoc?.id) {
-      setCabinetError('Document indisponible.');
+      setCabinetError(
+        loadingRemoteDocs
+          ? 'Chargement des documents...'
+          : 'Document non initialisé. Rafraîchissez la page puis réessayez.',
+      );
       return;
     }
     setCabinetLoading(true);
@@ -160,8 +205,9 @@ export function DocumentSignatureSection({ documentSignatures, caseId, token }) 
     },
   ];
 
+  const effectiveDocs = remoteDocs.length ? remoteDocs : (documentSignatures || []);
   const docsByType = new Map(
-    (documentSignatures || []).map((doc) => [normalizeDocType(doc.documentType), doc]),
+    effectiveDocs.map((doc) => [normalizeDocType(doc.documentType), doc]),
   );
   const mergedDocs = baseDocuments.map((doc) => docsByType.get(doc.documentType) || doc);
 
@@ -212,6 +258,10 @@ export function DocumentSignatureSection({ documentSignatures, caseId, token }) 
         <div className="text-xs text-slate-500 italic">
           {signedCount} / {sortedDocs.length} signes
         </div>
+      )}
+
+      {loadingRemoteDocs && (
+        <div className="text-xs text-slate-400 italic">Chargement des documents...</div>
       )}
 
       <Modal isOpen={Boolean(cabinetDoc)} onClose={closeCabinetModal}>

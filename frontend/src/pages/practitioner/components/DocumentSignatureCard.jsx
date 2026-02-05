@@ -14,6 +14,7 @@ export function DocumentSignatureCard({ document, onPreview, onCabinetSign }) {
   }[document.status];
 
   const isCompleted = document.status === 'completed';
+  const cabinetDisabled = !document?.id || isCompleted;
 
   return (
     <div className="border rounded-lg p-3 bg-white space-y-2">
@@ -52,7 +53,7 @@ export function DocumentSignatureCard({ document, onPreview, onCabinetSign }) {
             type="button"
             className="btn btn-xs btn-primary"
             onClick={onCabinetSign}
-            disabled={isCompleted}
+            disabled={cabinetDisabled}
           >
             Signer en cabinet
           </button>

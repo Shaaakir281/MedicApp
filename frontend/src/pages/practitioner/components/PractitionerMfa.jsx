@@ -13,14 +13,43 @@ export function PractitionerMfa({
 }) {
   const [code, setCode] = useState('');
   const [phoneValue, setPhoneValue] = useState(phone || '');
+  const [phoneError, setPhoneError] = useState('');
 
   useEffect(() => {
     setPhoneValue(phone || '');
   }, [phone]);
 
+  const normalizePhone = (raw) => {
+    const cleaned = String(raw || '').trim().replace(/[\s().-]/g, '');
+    if (!cleaned) return { value: '', error: '' };
+
+    let normalized = cleaned;
+    if (cleaned.startsWith('+')) {
+      normalized = cleaned;
+    } else if (cleaned.startsWith('00')) {
+      normalized = `+${cleaned.slice(2)}`;
+    } else if (cleaned.startsWith('0')) {
+      normalized = `+33${cleaned.slice(1)}`;
+    } else if (cleaned.startsWith('33')) {
+      normalized = `+${cleaned}`;
+    }
+
+    if (!/^\+\d{8,15}$/.test(normalized)) {
+      return { value: normalized, error: 'Format invalide. Exemple : +33600000000' };
+    }
+
+    return { value: normalized, error: '' };
+  };
+
   const handleSend = async () => {
     const trimmed = phoneValue.trim();
-    await onSend(trimmed || undefined);
+    const { value, error } = normalizePhone(trimmed);
+    if (error) {
+      setPhoneError(error);
+      return;
+    }
+    setPhoneError('');
+    await onSend(value || undefined);
   };
 
   const handleVerify = async (event) => {
@@ -49,6 +78,7 @@ export function PractitionerMfa({
           onChange={(event) => setPhoneValue(event.target.value)}
           placeholder="+33600000000"
         />
+        {phoneError && <p className="text-xs text-red-500">{phoneError}</p>}
         <Button type="button" className="w-full" onClick={handleSend} disabled={loading}>
           {loading ? 'Envoi...' : phoneValue ? 'Renvoyer le code' : 'Envoyer le code'}
         </Button>

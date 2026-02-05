@@ -277,7 +277,7 @@ def get_case_document_signatures(
     if current_user.role == models.UserRole.patient and case.patient_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès refusé.")
 
-    signatures = document_signature_service.get_signatures_for_case(db, procedure_case_id)
+    signatures = document_signature_service.ensure_signatures_for_case(db, procedure_case_id)
 
     return schemas.CaseDocumentSignaturesSummary(
         procedure_case_id=procedure_case_id,

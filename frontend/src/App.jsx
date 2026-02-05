@@ -1,6 +1,6 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import Home from './pages/Home.jsx';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import HomePage from './pages/HomePage.jsx';
 import Patient from './pages/Patient.jsx';
 import Praticien from './pages/Praticien.jsx';
 import DocumentsDashboard from './pages/practitioner/DocumentsDashboard.jsx';
@@ -10,15 +10,16 @@ import ResetPassword from './pages/ResetPassword.jsx';
 import VerifyEmail from './pages/VerifyEmail.jsx';
 import TabletSession from './pages/TabletSession.jsx';
 import CabinetSignature from './pages/CabinetSignature.jsx';
+import { MentionsLegales } from './pages/legal/MentionsLegales.jsx';
+import { PolitiqueConfidentialite } from './pages/legal/PolitiqueConfidentialite.jsx';
 
-/**
- * Top‑level component defining the navigation bar and routes for the application.
- */
-function App() {
+function AppShell() {
+  const location = useLocation();
+  const isHome = location.pathname === '/';
+
   return (
-    <Router>
-      <div className="min-h-screen flex flex-col">
-        {/* Navigation bar */}
+    <div className="min-h-screen flex flex-col">
+      {!isHome && (
         <nav className="navbar bg-base-200">
           <div className="flex-1">
             <Link to="/" className="btn btn-ghost normal-case text-xl">
@@ -34,22 +35,31 @@ function App() {
             </Link>
           </div>
         </nav>
-        {/* Main content area */}
-        <main className="flex-1 p-4">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/patient" element={<Patient />} />
-            <Route path="/praticien" element={<Praticien />} />
-            <Route path="/praticien/documents" element={<DocumentsDashboard />} />
-            <Route path="/praticien/signature-cabinet" element={<CabinetSignaturePage />} />
-            <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />
-            <Route path="/auth/reset-password" element={<ResetPassword />} />
-            <Route path="/auth/verify-email" element={<VerifyEmail />} />
-            <Route path="/tablet/:sessionCode" element={<TabletSession />} />
-            <Route path="/sign/:token" element={<CabinetSignature />} />
-          </Routes>
-        </main>
-      </div>
+      )}
+      <main className={isHome ? 'flex-1' : 'flex-1 p-4'}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/patient" element={<Patient />} />
+          <Route path="/praticien" element={<Praticien />} />
+          <Route path="/praticien/documents" element={<DocumentsDashboard />} />
+          <Route path="/praticien/signature-cabinet" element={<CabinetSignaturePage />} />
+          <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
+          <Route path="/auth/verify-email" element={<VerifyEmail />} />
+          <Route path="/mentions-legales" element={<MentionsLegales />} />
+          <Route path="/confidentialite" element={<PolitiqueConfidentialite />} />
+          <Route path="/tablet/:sessionCode" element={<TabletSession />} />
+          <Route path="/sign/:token" element={<CabinetSignature />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppShell />
     </Router>
   );
 }
