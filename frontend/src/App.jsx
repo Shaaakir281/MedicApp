@@ -12,10 +12,16 @@ import TabletSession from './pages/TabletSession.jsx';
 import CabinetSignature from './pages/CabinetSignature.jsx';
 import { MentionsLegales } from './pages/legal/MentionsLegales.jsx';
 import { PolitiqueConfidentialite } from './pages/legal/PolitiqueConfidentialite.jsx';
+import VideoRassurance from './pages/VideoRassurance.jsx';
+import GuideFAQ from './pages/GuideFAQ.jsx';
+import { Footer } from './components/Footer.jsx';
 
 function AppShell() {
   const location = useLocation();
   const isHome = location.pathname === '/';
+  const isPractitionerRoute = location.pathname.startsWith('/praticien');
+  const isTabletRoute = location.pathname.startsWith('/tablet') || location.pathname.startsWith('/sign');
+  const showFooter = !isPractitionerRoute && !isTabletRoute;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -48,10 +54,13 @@ function AppShell() {
           <Route path="/auth/verify-email" element={<VerifyEmail />} />
           <Route path="/mentions-legales" element={<MentionsLegales />} />
           <Route path="/confidentialite" element={<PolitiqueConfidentialite />} />
+          <Route path="/video-rassurance" element={<VideoRassurance />} />
+          <Route path="/guide" element={<GuideFAQ />} />
           <Route path="/tablet/:sessionCode" element={<TabletSession />} />
           <Route path="/sign/:token" element={<CabinetSignature />} />
         </Routes>
       </main>
+      {showFooter && <Footer />}
     </div>
   );
 }

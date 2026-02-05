@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Link } from 'react-router-dom';
 import { PRACTITIONER } from '../config/practitioner.js';
 
@@ -6,10 +6,7 @@ const HomePage = () => {
   const safePhone = (PRACTITIONER.hospitalPhone || '').replace(/\s/g, '');
 
   return (
-    <div
-      className="min-h-screen bg-slate-50 flex flex-col"
-      style={{ fontFamily: "'Source Sans 3', 'Segoe UI', sans-serif" }}
-    >
+    <div className="bg-slate-50 flex flex-col h-full" style={{ fontFamily: "'Source Sans 3', 'Segoe UI', sans-serif" }}>
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
@@ -121,32 +118,6 @@ const HomePage = () => {
           </section>
         </div>
       </main>
-
-      <footer className="bg-white border-t border-slate-200 mt-auto">
-        <div className="max-w-5xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="text-sm text-slate-500">
-              <p className="font-medium text-slate-600 mb-1">Cabinet du Dr {PRACTITIONER.doctorName}</p>
-              <p>{PRACTITIONER.cabinetAddress}</p>
-            </div>
-
-            <div className="flex flex-wrap gap-4 sm:gap-6 text-sm">
-              <Link to="/mentions-legales" className="text-slate-500 hover:text-slate-700 transition-colors">
-                Mentions legales
-              </Link>
-              <Link to="/confidentialite" className="text-slate-500 hover:text-slate-700 transition-colors">
-                Politique de confidentialite
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-slate-100 text-center sm:text-left">
-            <p className="text-xs text-slate-400">
-              © 2026 Cabinet du Dr {PRACTITIONER.doctorName}. Tous droits reserves.
-            </p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };

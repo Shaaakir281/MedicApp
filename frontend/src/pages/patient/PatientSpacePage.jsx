@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import PdfPreviewModal from '../../components/PdfPreviewModal.jsx';
 import Toast from '../../components/Toast.jsx';
 import { HeaderSummary } from '../../components/patient/HeaderSummary.jsx';
@@ -104,6 +105,27 @@ export function PatientSpacePage({
         dossierComplete={controller.dossierComplete}
         actionRequired={controller.actionRequired}
       />
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Link
+          to="/video-rassurance"
+          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
+        >
+          <h3 className="text-base font-semibold text-slate-800">Preparer l'intervention</h3>
+          <p className="text-sm text-slate-500 mt-2">
+            Regardez la video explicative et retrouvez les points cles avant le jour J.
+          </p>
+        </Link>
+        <Link
+          to="/guide"
+          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
+        >
+          <h3 className="text-base font-semibold text-slate-800">Guide & FAQ</h3>
+          <p className="text-sm text-slate-500 mt-2">
+            Trouvez rapidement les reponses aux questions les plus frequentes.
+          </p>
+        </Link>
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="tabs tabs-boxed flex-wrap gap-1">
