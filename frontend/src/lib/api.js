@@ -139,6 +139,10 @@ export async function fetchPatientDashboard(appointmentId, token) {
   return apiRequest(`/patient-dashboard/${appointmentId}`, { token });
 }
 
+export async function fetchPatientJourney(token) {
+  return apiRequest('/patient/me', { token });
+}
+
 export async function acknowledgeLegalCase({
   appointmentId,
   signerRole,

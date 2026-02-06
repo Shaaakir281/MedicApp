@@ -2,13 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PdfPreviewModal from '../../components/PdfPreviewModal.jsx';
 import Toast from '../../components/Toast.jsx';
-import { HeaderSummary } from '../../components/patient/HeaderSummary.jsx';
+import { PatientJourneyHeader } from '../../components/PatientJourneyHeader.jsx';
 import { TabAppointments } from '../../components/patient/tabs/TabAppointments.jsx';
 import { TabPrescriptions } from '../../components/patient/tabs/TabPrescriptions.jsx';
 import { TabLegalDocs } from '../../components/patient/tabs/TabLegalDocs.jsx';
 import { FourteenDayRuleModal } from '../../components/patient/FourteenDayRuleModal.jsx';
 import { LABELS_FR } from '../../constants/labels.fr.js';
 import { useDossier } from '../../hooks/useDossier.js';
+import { usePatientJourney } from '../../hooks/usePatientJourney.js';
 import { PatientTabDossierView } from './PatientTabDossier.jsx';
 import { usePatientSpaceController } from './usePatientSpaceController.js';
 
@@ -46,6 +47,7 @@ export function PatientSpacePage({
       });
     },
   });
+  const journey = usePatientJourney({ token });
   const [activeTab, setActiveTab] = useState(TABS.file);
   const [pendingPrescriptionId, setPendingPrescriptionId] = useState(null);
 
@@ -58,6 +60,42 @@ export function PatientSpacePage({
       dossier.load?.();
       controller.procedure.loadProcedureCase?.();
       controller.reloadDashboard?.();
+    }
+  };
+
+  const childName = useMemo(() => {
+    const first =
+      dossier.formState?.childFirstName ||
+      dossier.vm?.child?.firstName ||
+      controller.vm?.child?.firstName ||
+      '';
+    const last =
+      dossier.formState?.childLastName ||
+      dossier.vm?.child?.lastName ||
+      controller.vm?.child?.lastName ||
+      '';
+    const joined = [first, last].filter(Boolean).join(' ').trim();
+    return joined || '-';
+  }, [
+    dossier.formState?.childFirstName,
+    dossier.formState?.childLastName,
+    dossier.vm?.child?.firstName,
+    dossier.vm?.child?.lastName,
+    controller.vm?.child?.firstName,
+    controller.vm?.child?.lastName,
+  ]);
+
+  const handleJourneyNavigate = (target) => {
+    if (target === 'dossier') {
+      handleTabChange(TABS.file);
+      return;
+    }
+    if (target === 'rdv') {
+      handleTabChange(TABS.appointments);
+      return;
+    }
+    if (target === 'documents' || target === 'signatures') {
+      handleTabChange(TABS.documents);
     }
   };
 
@@ -96,14 +134,12 @@ export function PatientSpacePage({
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-16">
-      <HeaderSummary
-        vm={controller.vm}
-        dossierForm={dossier.formState}
-        dossierVm={dossier.vm}
-        userEmail={user?.email}
+      <PatientJourneyHeader
+        childName={childName}
+        email={user?.email}
+        journeyStatus={journey.journeyStatus}
         onLogout={onLogout}
-        dossierComplete={controller.dossierComplete}
-        actionRequired={controller.actionRequired}
+        onNavigate={handleJourneyNavigate}
       />
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -164,6 +200,7 @@ export function PatientSpacePage({
         </button>
       </div>
 
+      {journey.error && <div className="alert alert-warning">{journey.error}</div>}
       {controller.dashboardError && <div className="alert alert-warning">{controller.dashboardError}</div>}
       {controller.error && <div className="alert alert-error">{controller.error}</div>}
 

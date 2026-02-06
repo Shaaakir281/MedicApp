@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import secrets
+import unicodedata
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
@@ -18,6 +19,32 @@ from core import security
 from repositories import user_repository
 
 router = APIRouter(prefix="/patient/me", tags=["rgpd"])
+
+
+PLACEHOLDER_NAMES = {
+    "prenom",
+    "nom",
+    "parent",
+    "parent 1",
+    "parent 2",
+    "parent1",
+    "parent2",
+    "pere",
+    "mere",
+}
+
+
+def _normalize_text(value: str | None) -> str:
+    if not value:
+        return ""
+    normalized = unicodedata.normalize("NFD", value)
+    stripped = "".join(char for char in normalized if unicodedata.category(char) != "Mn")
+    return stripped.strip().lower()
+
+
+def _is_placeholder(value: str | None) -> bool:
+    normalized = _normalize_text(value)
+    return normalized in PLACEHOLDER_NAMES
 
 
 def _iso(value):
@@ -221,6 +248,197 @@ def _serialize_email_verification(entry: dossier_models.GuardianEmailVerificatio
         "ip_address": entry.ip_address,
         "user_agent": entry.user_agent,
     }
+
+
+def _appointment_datetime(appointment: models.Appointment | None) -> dt.datetime | None:
+    if appointment is None or appointment.date is None:
+        return None
+    time_value = appointment.time or dt.time.min
+    return dt.datetime.combine(appointment.date, time_value)
+
+
+class JourneyDossierStatus(BaseModel):
+    created: bool = False
+    complete: bool = False
+    missing_fields: list[str] = Field(default_factory=list)
+
+
+class JourneyAppointmentStatus(BaseModel):
+    booked: bool = False
+    date: dt.datetime | None = None
+
+
+class JourneyReflectionDelay(BaseModel):
+    can_sign: bool = False
+    days_left: int | None = None
+    available_date: dt.date | None = None
+
+
+class JourneySignaturesStatus(BaseModel):
+    complete: bool = False
+    parent1_signed: bool = False
+    parent2_signed: bool = False
+    reflection_delay: JourneyReflectionDelay = Field(default_factory=JourneyReflectionDelay)
+
+
+class PatientJourneyStatus(BaseModel):
+    dossier: JourneyDossierStatus
+    pre_consultation: JourneyAppointmentStatus
+    rdv_acte: JourneyAppointmentStatus
+    signatures: JourneySignaturesStatus
+
+
+class PatientJourneyResponse(BaseModel):
+    journey_status: PatientJourneyStatus
+
+
+def _resolve_guardian(guardians: list[dossier_models.Guardian], role: str) -> dossier_models.Guardian | None:
+    return next((guardian for guardian in guardians if guardian.role == role), None)
+
+
+def _guardian_name_missing(guardian: dossier_models.Guardian | None) -> bool:
+    if guardian is None:
+        return True
+    if _is_placeholder(guardian.first_name) or _is_placeholder(guardian.last_name):
+        return True
+    return not guardian.first_name.strip() or not guardian.last_name.strip()
+
+
+def _build_dossier_status(dossier: dossier_models.Child, guardians: list[dossier_models.Guardian]) -> JourneyDossierStatus:
+    missing: list[str] = []
+
+    if not dossier.first_name or _is_placeholder(dossier.first_name):
+        missing.append("child_first_name")
+    if not dossier.last_name or _is_placeholder(dossier.last_name):
+        missing.append("child_last_name")
+    if not dossier.birth_date:
+        missing.append("child_birth_date")
+
+    parent1 = _resolve_guardian(guardians, dossier_models.GuardianRole.parent1.value)
+    parent2 = _resolve_guardian(guardians, dossier_models.GuardianRole.parent2.value)
+
+    if _guardian_name_missing(parent1):
+        missing.append("parent1_name")
+    if not parent1 or not parent1.email:
+        missing.append("parent1_email")
+
+    if _guardian_name_missing(parent2):
+        missing.append("parent2_name")
+    if not parent2 or not parent2.email:
+        missing.append("parent2_email")
+    if not parent2 or not parent2.phone_e164:
+        missing.append("parent2_phone")
+
+    created = bool(
+        dossier.first_name
+        and dossier.last_name
+        and not _is_placeholder(dossier.first_name)
+        and not _is_placeholder(dossier.last_name)
+    )
+
+    return JourneyDossierStatus(
+        created=created,
+        complete=len(missing) == 0,
+        missing_fields=missing,
+    )
+
+
+def _appointment_key(appointment: models.Appointment) -> dt.datetime:
+    date_value = appointment.date or dt.date.min
+    time_value = appointment.time or dt.time.min
+    return dt.datetime.combine(date_value, time_value)
+
+
+def _find_latest_appointment(appointments: list[models.Appointment], appointment_type: str) -> models.Appointment | None:
+    matching = []
+    for appointment in appointments:
+        appt_type = appointment.appointment_type.value if hasattr(appointment.appointment_type, "value") else appointment.appointment_type
+        if appt_type == appointment_type:
+            matching.append(appointment)
+    if not matching:
+        return None
+    return max(matching, key=_appointment_key)
+
+
+def _signature_complete(signature: models.DocumentSignature) -> bool:
+    overall_status = signature.overall_status.value if hasattr(signature.overall_status, "value") else signature.overall_status
+    if overall_status == models.DocumentSignatureStatus.completed.value:
+        return True
+    return signature.parent1_status == "signed" and signature.parent2_status == "signed"
+
+
+def _parent_signed(signature: models.DocumentSignature, parent: str) -> bool:
+    if parent == "parent1":
+        return signature.parent1_status == "signed" or _signature_complete(signature)
+    if parent == "parent2":
+        return signature.parent2_status == "signed" or _signature_complete(signature)
+    return False
+
+
+@router.get("", response_model=PatientJourneyResponse, status_code=status.HTTP_200_OK)
+def get_patient_journey(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> PatientJourneyResponse:
+    """Return patient journey status for the UI header."""
+    if current_user.role != models.UserRole.patient:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to patient accounts.",
+        )
+
+    dossier = dossier_service.get_dossier_current(db, current_user)
+    dossier_status = _build_dossier_status(dossier.child, dossier.guardians)
+
+    case = (
+        db.query(models.ProcedureCase)
+        .filter(models.ProcedureCase.patient_id == current_user.id)
+        .order_by(models.ProcedureCase.created_at.desc())
+        .first()
+    )
+
+    appointments = list(case.appointments) if case else []
+    preconsultation = _find_latest_appointment(appointments, models.AppointmentType.preconsultation.value)
+    act_appointment = _find_latest_appointment(appointments, models.AppointmentType.act.value)
+
+    preconsultation_date = _appointment_datetime(preconsultation)
+    act_date = _appointment_datetime(act_appointment)
+
+    reflection_delay = JourneyReflectionDelay()
+    if preconsultation_date:
+        available_date = preconsultation_date.date() + dt.timedelta(days=15)
+        today = dt.date.today()
+        days_left = max(0, (available_date - today).days)
+        reflection_delay = JourneyReflectionDelay(
+            can_sign=available_date <= today,
+            days_left=days_left,
+            available_date=available_date,
+        )
+
+    signatures = list(case.document_signatures) if case else []
+    parent1_signed = bool(signatures) and all(_parent_signed(sig, "parent1") for sig in signatures)
+    parent2_signed = bool(signatures) and all(_parent_signed(sig, "parent2") for sig in signatures)
+    signatures_complete = bool(signatures) and all(_signature_complete(sig) for sig in signatures)
+
+    journey_status = PatientJourneyStatus(
+        dossier=dossier_status,
+        pre_consultation=JourneyAppointmentStatus(
+            booked=preconsultation is not None,
+            date=preconsultation_date,
+        ),
+        rdv_acte=JourneyAppointmentStatus(
+            booked=act_appointment is not None,
+            date=act_date,
+        ),
+        signatures=JourneySignaturesStatus(
+            complete=signatures_complete,
+            parent1_signed=parent1_signed,
+            parent2_signed=parent2_signed,
+            reflection_delay=reflection_delay,
+        ),
+    )
+
+    return PatientJourneyResponse(journey_status=journey_status)
 
 
 @router.get("/export", status_code=status.HTTP_200_OK)
