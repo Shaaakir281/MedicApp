@@ -1,18 +1,22 @@
-"""Export critical data to JSON/ZIP (manual backup).
+﻿"""Export critical data to JSON/ZIP (manual backup).
 
 Usage examples:
-  python -m scripts.export_critical_data --output-dir ./exports
-  python -m scripts.export_critical_data --output-dir ./exports --anonymize
-  python -m scripts.export_critical_data --output-dir ./exports --since 2026-01-01
-  python -m scripts.export_critical_data --output-dir ./exports --encrypt --password "..."
+  # Requires: EXPORT_CRITICAL_DATA_ALLOWED=true + --reason
+  python -m scripts.export_critical_data --output-dir ./exports --reason "RGPD-REQ-123"
+  python -m scripts.export_critical_data --output-dir ./exports --anonymize --reason "PRA-TEST-2026-01"
+  python -m scripts.export_critical_data --output-dir ./exports --since 2026-01-01 --reason "PCA-001"
+  python -m scripts.export_critical_data --output-dir ./exports --encrypt --password "..." --reason "RGPD-REQ-456"
 """
 
 from __future__ import annotations
 
 import argparse
 import base64
+import getpass
 import hashlib
 import json
+import os
+import platform
 import shutil
 import zipfile
 from datetime import date, datetime
@@ -110,7 +114,23 @@ def main() -> int:
     parser.add_argument("--encrypt", action="store_true", help="Encrypt the ZIP archive with a password.")
     parser.add_argument("--password", help="Password used for encryption (required if --encrypt).")
     parser.add_argument("--keep-plain", action="store_true", help="Keep the plain ZIP when encrypted.")
+    parser.add_argument(
+        "--reason",
+        required=True,
+        help="Reason/ticket for export (required for RGPD traceability).",
+    )
+    parser.add_argument(
+        "--requested-by",
+        help="Person or service requesting the export (defaults to current user).",
+    )
     args = parser.parse_args()
+
+    allow_export = os.getenv("EXPORT_CRITICAL_DATA_ALLOWED", "").strip().lower()
+    if allow_export not in {"true", "1", "yes"}:
+        raise SystemExit(
+            "Export blocked: set EXPORT_CRITICAL_DATA_ALLOWED=true in the environment "
+            "and provide --reason for RGPD traceability."
+        )
 
     if args.encrypt and not args.password:
         raise SystemExit("Missing --password for encryption.")
@@ -218,6 +238,11 @@ def main() -> int:
         "exported_at": datetime.utcnow().isoformat(),
         "since": args.since,
         "anonymized": args.anonymize,
+        "reason": args.reason,
+        "requested_by": args.requested_by or getpass.getuser(),
+        "executed_by": getpass.getuser(),
+        "host": platform.node(),
+        "pid": os.getpid(),
         "counts": {
             "patients": len(users_payload),
             "appointments": len(appointments_payload),
@@ -241,14 +266,22 @@ def main() -> int:
         encrypted_path.write_bytes(encrypted)
         if not args.keep_plain:
             zip_path.unlink(missing_ok=True)
+        metadata["encrypted_path"] = str(encrypted_path)
+    else:
+        metadata["zip_path"] = str(zip_path)
 
     # Optional cleanup of raw folder (keep if needed for audit)
     if not args.keep_plain:
         shutil.rmtree(export_root, ignore_errors=True)
 
-    print(f"Export terminé dans {output_dir}")
+    audit_path = output_dir / "export_audit.jsonl"
+    with audit_path.open("a", encoding="utf-8") as audit_file:
+        audit_file.write(json.dumps(metadata, ensure_ascii=False) + "\n")
+
+    print(f"Export termine dans {output_dir}")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
