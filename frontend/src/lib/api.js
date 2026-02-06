@@ -355,4 +355,16 @@ export async function resendDocumentsDashboard(token, caseId, parentRole) {
   });
 }
 
+export async function fetchAdminOverview(token) {
+  return apiRequest('/admin/stats/overview', { token });
+}
+
+export async function fetchAdminRecentActivity(token) {
+  return apiRequest('/admin/stats/recent-activity', { token });
+}
+
+export async function fetchAdminHealth(token) {
+  return apiRequest('/admin/health', { token });
+}
+
 export { API_BASE_URL };

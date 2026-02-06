@@ -341,6 +341,27 @@ class PractitionerStats(BaseModel):
     pending_documents: int
 
 
+class AdminOverviewStats(BaseModel):
+    total_patients: int
+    pending_signatures: int
+    appointments_this_week: int
+    storage_used_mb: Optional[float] = None
+    last_backup: Optional[datetime] = None
+
+
+class AdminRecentActivity(BaseModel):
+    type: str
+    date: datetime
+    details: str
+
+
+class AdminHealthStatus(BaseModel):
+    database: str
+    storage: str
+    email_service: str
+    sms_service: str
+
+
 class PractitionerNewPatient(BaseModel):
     case_id: int
     created_at: datetime
