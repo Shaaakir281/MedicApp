@@ -81,6 +81,11 @@ class Settings(BaseSettings):
     )
     require_guardian_2: bool = Field(default=False, alias="REQUIRE_GUARDIAN_2")
     require_mfa_practitioner: bool = Field(default=False, alias="REQUIRE_MFA_PRACTITIONER")
+    maintenance_alert_enabled: bool = Field(default=False, alias="MAINTENANCE_ALERT_ENABLED")
+    maintenance_alert_recipient_email: Optional[str] = Field(
+        default=None,
+        alias="MAINTENANCE_ALERT_RECIPIENT_EMAIL",
+    )
 
     # Vérification quotidienne documents
     document_verification_recipient_email: Optional[str] = Field(
