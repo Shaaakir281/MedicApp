@@ -19,6 +19,7 @@ import {
   PractitionerHeader,
   ViewToggle,
   AgendaView,
+  MaintenanceView,
 } from './practitioner/components';
 import PdfPreviewModal from '../components/PdfPreviewModal.jsx';
 import { usePractitionerData } from '../hooks/usePractitionerData.js';
@@ -400,12 +401,25 @@ const Praticien = () => {
           sendingId={activeSendId}
           token={token}
         />
-      ) : (
+      ) : viewMode === 'patients' ? (
         <NewPatientsList
           patients={newPatientsQuery.data}
           loading={newPatientsQuery.isLoading}
           error={newPatientsQuery.error}
           onSelect={handleSelectNewPatient}
+        />
+      ) : (
+        <MaintenanceView
+          displayedDays={displayedDays}
+          viewLength={viewLength}
+          startDate={startDate}
+          endDate={endDate}
+          viewOptions={VIEW_OPTIONS}
+          onChangeStart={setStartDate}
+          onChangeLength={setViewLength}
+          onRefresh={handleRefresh}
+          loadingData={loadingData}
+          token={token}
         />
       )}
 

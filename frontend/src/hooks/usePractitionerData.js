@@ -24,11 +24,14 @@ export function usePractitionerData({ token, viewMode }) {
 
   const endDate = useMemo(() => addDays(startDate, viewLength - 1), [startDate, viewLength]);
 
+  const autoRefreshAgenda =
+    token && (viewMode === 'agenda' || viewMode === 'maintenance');
+
   const agendaQuery = useQuery({
     queryKey: ['practitionerAgenda', startDate, endDate, refreshIndex],
     queryFn: () => fetchPractitionerAgenda({ start: startDate, end: endDate }, token),
     enabled: Boolean(token),
-    refetchInterval: token && viewMode === 'agenda' ? AUTO_REFRESH_INTERVAL_MS : false,
+    refetchInterval: autoRefreshAgenda ? AUTO_REFRESH_INTERVAL_MS : false,
     refetchIntervalInBackground: false,
   });
 

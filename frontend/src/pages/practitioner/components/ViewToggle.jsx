@@ -1,6 +1,6 @@
 import React from 'react';
 import clsx from 'clsx';
-import { IconCalendar, IconUsers } from './icons';
+import { IconCalendar, IconUsers, IconDocument } from './icons';
 
 /**
  * ViewToggle moderne avec icons et états actifs élégants
@@ -10,6 +10,7 @@ export const ViewToggle = ({ viewMode, onChange }) => {
   const views = [
     { id: 'agenda', label: 'Agenda', icon: IconCalendar },
     { id: 'patients', label: 'Nouveaux dossiers', icon: IconUsers },
+    { id: 'maintenance', label: 'Maintenance', icon: IconDocument },
   ];
 
   return (

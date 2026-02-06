@@ -9,6 +9,7 @@ export * from './NewPatientsList.jsx';
 export * from './PractitionerHeader.jsx';
 export * from './ViewToggle.jsx';
 export * from './AgendaView.jsx';
+export * from './MaintenanceView.jsx';
 export * from './DrawerHeader.jsx';
 export * from './CaseSummary.jsx';
 export * from './CaseForm.jsx';
