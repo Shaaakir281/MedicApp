@@ -290,6 +290,21 @@ def save_dossier(db: Session, child_id: str, payload: schemas.DossierPayload, cu
     roles = [GuardianRole(g.role) for g in payload.guardians]
     if GuardianRole.parent1 not in roles:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Parent/Tuteur 1 est requis.")
+    if len(set(roles)) != len(roles):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Chaque parent ne peut être renseigné qu'une seule fois.",
+        )
+
+    if not payload.child.first_name.strip():
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Prénom de l'enfant requis.")
+    if not payload.child.last_name.strip():
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Nom de l'enfant requis.")
+    if not payload.child.birth_date:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Date de naissance de l'enfant requise.",
+        )
 
     child = db.get(Child, child_id)
     if child:

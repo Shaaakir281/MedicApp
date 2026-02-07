@@ -17,6 +17,8 @@ jobs:
     env:
       VITE_API_BASE_URL: https://medicapp-backend-prod.azurewebsites.net
       VITE_FEATURE_NEW_DOSSIER: "true"
+      VITE_AUTH_STORAGE_SECRET: ${{ secrets.VITE_AUTH_STORAGE_SECRET }}
+
     steps:
       - uses: actions/checkout@v3
         with:

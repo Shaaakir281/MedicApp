@@ -5,6 +5,7 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import models
@@ -47,6 +48,14 @@ def save_current_dossier(
         return dossier_service.save_dossier_current(db, payload, current_user)
     except dossier_service.InvalidPhoneNumber as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Enregistrement impossible : données déjà existantes ou invalides.",
+        ) from exc
 
 
 @router.get("/{child_id}", response_model=schemas.DossierResponse)
@@ -81,6 +90,14 @@ def save_dossier(
         return dossier_service.save_dossier(db, str(child_id), payload, current_user)
     except dossier_service.InvalidPhoneNumber as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Enregistrement impossible : données déjà existantes ou invalides.",
+        ) from exc
 
 
 @router.post(

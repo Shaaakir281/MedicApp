@@ -134,7 +134,7 @@ export function TabLegalDocs({
       setLegalStatus?.(nextStatus);
       await onReloadDashboard?.();
     } catch (err) {
-      setCatalogError(err?.message || 'Ã‰chec de sauvegarde de la case.');
+      setCatalogError(err?.message || 'Échec de sauvegarde de la case.');
     } finally {
       setSubmitting(false);
     }
@@ -149,8 +149,8 @@ export function TabLegalDocs({
             <ul className="list-disc list-inside mt-1 space-y-1">
               <li>Commencez par un rendez-vous de consultation d'information.</li>
               <li>
-                Après ce rendez-vous, un <strong>délai de réflexion de 15 jours</strong> est
-                obligatoire avant de pouvoir signer.
+                La signature n'est disponible qu'après un <strong>délai de réflexion de 15 jours</strong>
+                suivant ce rendez-vous.
               </li>
               <li>Les 2 parents doivent signer chaque document.</li>
             </ul>
@@ -166,13 +166,13 @@ export function TabLegalDocs({
         <div className="text-sm">
           <p className="font-semibold">Informations importantes :</p>
           <ul className="list-disc list-inside mt-1 space-y-1">
-            <li>Les 2 parents doivent signer chaque document</li>
+            <li>Les 2 parents doivent signer chaque document.</li>
             <li>
-              Un délai de 15 jours de réflexion après l'entretien d'information est obligatoire
-              avant de signer ces documents
+              La signature n'est possible qu'après un délai de réflexion de <strong>15 jours</strong>
+              suivant la consultation d'information.
             </li>
             <li>
-              Pour signer à distance, chaque parent doit compléter son dossier (email + téléphone)
+              Pour signer à distance, chaque parent doit compléter son dossier (email + téléphone).
             </li>
           </ul>
           {onNavigateDossier && (

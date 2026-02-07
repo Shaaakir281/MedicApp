@@ -46,8 +46,8 @@ export function TabLegalDocsByParent({
             />
           </svg>
           <p className="text-sm text-blue-700">
-            <strong>Mode démonstration :</strong> Ceci est une démo. En production, le remplissage
-            des documents sera autorisé 15 jours après la consultation pré-opératoire.
+            <strong>Délai de réflexion :</strong> la signature est disponible 15 jours après la
+            consultation d'information.
           </p>
         </div>
       </div>
