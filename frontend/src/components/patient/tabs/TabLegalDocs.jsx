@@ -134,7 +134,7 @@ export function TabLegalDocs({
       setLegalStatus?.(nextStatus);
       await onReloadDashboard?.();
     } catch (err) {
-      setCatalogError(err?.message || 'Échec de sauvegarde de la case.');
+      setCatalogError(err?.message || 'Ã‰chec de sauvegarde de la case.');
     } finally {
       setSubmitting(false);
     }
@@ -144,14 +144,16 @@ export function TabLegalDocs({
     return (
       <div className="space-y-4">
         <div className="alert alert-info">
-          <div>
-            <h3 className="font-semibold mb-2">Parcours de signature des documents</h3>
-            <ol className="list-decimal list-inside space-y-1 text-sm">
-              <li>Prenez un rendez-vous pour l'acte dans l'onglet "Rendez-vous"</li>
-              <li>Le praticien vous informera sur la procédure avant l'acte</li>
-              <li>Les 2 parents doivent signer chaque document</li>
-              <li>Une fois tous les documents signés, le rendez-vous d'acte peut ?tre confirm?</li>
-            </ol>
+          <div className="text-sm">
+            <p className="font-semibold">Avant de signer les documents</p>
+            <ul className="list-disc list-inside mt-1 space-y-1">
+              <li>Commencez par un rendez-vous de consultation d'information.</li>
+              <li>
+                Après ce rendez-vous, un <strong>délai de réflexion de 15 jours</strong> est
+                obligatoire avant de pouvoir signer.
+              </li>
+              <li>Les 2 parents doivent signer chaque document.</li>
+            </ul>
           </div>
         </div>
       </div>
