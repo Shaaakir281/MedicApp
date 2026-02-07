@@ -24,7 +24,7 @@ const HomePage = () => {
               <h1 className="text-lg sm:text-xl font-semibold text-slate-800 leading-tight">
                 Cabinet du Dr {PRACTITIONER.doctorName}
               </h1>
-              <p className="text-sm text-slate-500">Chirurgien pediatrique</p>
+              <p className="text-sm text-slate-500">Chirurgien pédiatrique</p>
             </div>
           </div>
         </div>
@@ -36,9 +36,9 @@ const HomePage = () => {
             <h2 className="text-2xl sm:text-3xl font-semibold text-slate-800 mb-4">Bienvenue</h2>
             <p className="text-slate-600 max-w-2xl mx-auto leading-relaxed">
               Ce site vous permet de prendre rendez-vous pour une circoncision rituelle
-              pediatrique avec le Dr {PRACTITIONER.doctorName}, chirurgien pediatrique a{' '}
-              {PRACTITIONER.city}. Les informations detaillees sur l&apos;intervention et le
-              suivi seront accessibles apres creation de votre compte.
+              pédiatrique avec le Dr {PRACTITIONER.doctorName}, chirurgien pédiatrique à{' '}
+              {PRACTITIONER.city}. Les informations détaillées sur l&apos;intervention et le
+              suivi seront accessibles après création de votre compte.
             </p>
           </section>
 
@@ -58,7 +58,7 @@ const HomePage = () => {
 
                 <h3 className="text-xl font-semibold text-slate-800 mb-2">Circoncision rituelle</h3>
                 <p className="text-slate-500 mb-6 flex-1">
-                  Prendre rendez-vous pour une circoncision rituelle pediatrique
+                  Prendre rendez-vous pour une circoncision rituelle pédiatrique
                 </p>
 
                 <Link
@@ -86,14 +86,14 @@ const HomePage = () => {
                   </svg>
                 </div>
 
-                <h3 className="text-xl font-semibold text-slate-700 mb-2">Autre motif medical</h3>
+                <h3 className="text-xl font-semibold text-slate-700 mb-2">Autre motif médical</h3>
                 <p className="text-slate-500 mb-4">
-                  Pour toute pathologie necessitant une intervention chirurgicale
+                  Pour toute pathologie nécessitant une intervention chirurgicale
                 </p>
 
                 <div className="bg-white rounded-lg p-4 border border-slate-200 mt-auto">
                   <p className="text-sm text-slate-500 mb-2">Veuillez contacter directement :</p>
-                  <p className="font-medium text-slate-700">Hopital Victor Jousselin - Dreux</p>
+                  <p className="font-medium text-slate-700">Hôpital Victor Jousselin - Dreux</p>
                   {safePhone ? (
                     <a
                       href={`tel:${safePhone}`}
@@ -110,7 +110,7 @@ const HomePage = () => {
                       {PRACTITIONER.hospitalPhone}
                     </a>
                   ) : (
-                    <p className="text-sm text-slate-500 mt-2">Telephone a renseigner</p>
+                    <p className="text-sm text-slate-500 mt-2">Téléphone à renseigner</p>
                   )}
                 </div>
               </div>

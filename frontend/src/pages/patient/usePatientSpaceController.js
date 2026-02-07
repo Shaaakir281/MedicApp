@@ -162,20 +162,37 @@ export function usePatientSpaceController({
 
   const dossierComplete = procedure.procedureCase ? Boolean(procedure.procedureCase.dossier_completed) : null;
 
+  const parent1ContactComplete = Boolean(vm.guardians?.parent1?.email && vm.guardians?.parent1?.phone);
+  const parent2ContactComplete = Boolean(vm.guardians?.parent2?.email && vm.guardians?.parent2?.phone);
+
   const actionRequired = useMemo(() => {
     if (!procedure.procedureCase) return null;
     if (!vm.legalComplete) return LABELS_FR.patientSpace.documents.reasons.checklistIncomplete;
     if (vm.legalComplete && !vm.signatureComplete) {
+      if (!parent2ContactComplete) {
+        return 'Parent 2 : renseignez email et téléphone pour signer à distance.';
+      }
       if (!vm.guardians.parent2.verified) {
-        return 'Parent 2 : vérifiez le téléphone pour signer à distance (ou signer en cabinet).';
+        return 'Parent 2 : vérifiez le téléphone pour signer à distance.';
+      }
+      if (!parent1ContactComplete) {
+        return 'Parent 1 : renseignez email et téléphone pour signer à distance.';
       }
       if (!vm.guardians.parent1.verified) {
-        return 'Parent 1 : vérifiez le téléphone pour signer à distance (ou signer en cabinet).';
+        return 'Parent 1 : vérifiez le téléphone pour signer à distance.';
       }
-      return 'Signature à finaliser.';
+      return 'Signature ? finaliser.';
     }
     return null;
-  }, [procedure.procedureCase, vm.legalComplete, vm.signatureComplete, vm.guardians.parent1.verified, vm.guardians.parent2.verified]);
+  }, [
+    parent1ContactComplete,
+    parent2ContactComplete,
+    procedure.procedureCase,
+    vm.guardians.parent1.verified,
+    vm.guardians.parent2.verified,
+    vm.legalComplete,
+    vm.signatureComplete,
+  ]);
 
   const handleClosePreview = () => {
     if (previewState?.url?.startsWith('blob:')) {

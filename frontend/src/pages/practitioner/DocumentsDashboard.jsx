@@ -20,7 +20,7 @@ const STATUS_OPTIONS = [
 ];
 
 const DATE_OPTIONS = [
-  { value: 'upcoming', label: 'A venir' },
+  { value: 'upcoming', label: 'À venir' },
   { value: 'today', label: "Aujourd'hui" },
   { value: 'week', label: '7 jours' },
   { value: 'all', label: 'Toutes dates' },
@@ -47,7 +47,7 @@ const formatTime = (value) => {
 
 const formatType = (value) => {
   if (value === 'act') return 'Acte';
-  if (value === 'preconsultation') return 'Pre-consultation';
+  if (value === 'preconsultation') return 'Pré-consultation';
   return value || '--';
 };
 

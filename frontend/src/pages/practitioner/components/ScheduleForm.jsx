@@ -29,7 +29,7 @@ export const ScheduleForm = ({
             value={scheduleForm.appointment_type}
             onChange={onChange}
           >
-            <option value="preconsultation">Pre-consultation</option>
+            <option value="preconsultation">Pré-consultation</option>
             <option value="act">Acte</option>
             <option value="general">General</option>
           </select>

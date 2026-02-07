@@ -51,7 +51,7 @@
       },
       {
         "question": "À quoi sert la vérification du numéro de téléphone par SMS ?",
-        "answer": "Cette vérification permet de sécuriser votre dossier et de s'assurer que les communications importantes (confirmations de rendez-vous, rappels) vous parviennent bien. Elle est obligatoire pour finaliser votre inscription.",
+        "answer": "Cette verification sert a signer vos documents a distance (code SMS) et a securiser votre dossier. Elle est requise pour la signature a distance.",
         "bullets": []
       },
       {

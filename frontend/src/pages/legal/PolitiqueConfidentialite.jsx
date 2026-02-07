@@ -3,5 +3,5 @@ import { LegalPage } from '../../components/LegalPage.jsx';
 import privacyContent from '../../content/politique-confidentialite.md?raw';
 
 export function PolitiqueConfidentialite() {
-  return <LegalPage title="Politique de confidentialite" content={privacyContent} />;
+  return <LegalPage title="Politique de confidentialité" content={privacyContent} />;
 }

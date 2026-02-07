@@ -13,7 +13,7 @@ export const AppointmentCard = ({
   isCanceling,
   onViewPrescription,
 }) => {
-  const label = appt?.appointment_type === 'act' ? 'Acte' : 'Pre-consultation';
+  const label = appt?.appointment_type === 'act' ? 'Acte' : 'Pré-consultation';
   const dateDisplay = appt?.date ? new Date(appt.date).toLocaleDateString('fr-FR') : '--';
   const timeDisplay = appt?.time ? appt.time.slice(0, 5) : '';
   const badgeClass =

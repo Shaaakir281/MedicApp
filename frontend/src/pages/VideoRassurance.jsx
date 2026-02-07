@@ -1,5 +1,6 @@
-﻿import React, { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { BackToPatient } from '../components/BackToPatient.jsx';
 
 const buildYouTubeEmbed = (url) => {
   const match = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
@@ -14,10 +15,11 @@ const VideoRassurance = () => {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
+      <BackToPatient />
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-semibold text-slate-800">Preparer le jour de l'intervention</h1>
+        <h1 className="text-2xl sm:text-3xl font-semibold text-slate-800">Préparer le jour de l'intervention</h1>
         <p className="text-slate-600 mt-2">
-          Cette video vous explique les etapes importantes et vous aide a preparer votre enfant sereinement.
+          Cette vidéo vous explique les ?tapes importantes et vous aide ? préparer votre enfant sereinement.
         </p>
       </div>
 
@@ -38,15 +40,15 @@ const VideoRassurance = () => {
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-slate-500">
-            La video sera disponible prochainement. Merci de revenir plus tard.
+            La vidéo sera disponible prochainement. Merci de revenir plus tard.
           </div>
         )}
 
         <div className="mt-6">
           <h2 className="text-lg font-semibold text-slate-800">Transcription</h2>
           <p className="text-slate-600 mt-2 leading-relaxed">
-            Cette section contient la transcription de la video pour faciliter l'accessibilite. Vous pourrez
-            la completer avec le texte officiel une fois la video finalisee.
+            Cette section contient la transcription de la vidéo pour faciliter l'accessibilit?. Vous pourrez
+            la compléter avec le texte officiel une fois la vidéo finalisée.
           </p>
         </div>
       </div>
@@ -56,7 +58,7 @@ const VideoRassurance = () => {
           Consulter le guide FAQ
         </Link>
         <Link to="/patient" className="btn btn-primary btn-sm">
-          Retour a mon espace patient
+          Retour ? mon espace patient
         </Link>
       </div>
     </div>

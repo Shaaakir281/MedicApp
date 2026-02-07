@@ -41,7 +41,7 @@ export function NewPatientsList({ patients, loading, error, onSelect }) {
           </div>
           <div className="text-xs text-slate-600 flex flex-wrap gap-4">
             <span>
-              Pre-consultation :{' '}
+              Pré-consultation :{' '}
               {patient.next_preconsultation_date
                 ? new Date(patient.next_preconsultation_date).toLocaleDateString('fr-FR')
                 : 'Non planifiee'}

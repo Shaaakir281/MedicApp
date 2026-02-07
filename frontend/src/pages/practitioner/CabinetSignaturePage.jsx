@@ -228,11 +228,11 @@ export default function CabinetSignaturePage() {
                     <div>
                       <h2 className="card-title text-xl">{patient.child_name}</h2>
                       <p className="text-sm text-slate-600">
-                        {timeLabel} {patient.appointment_type === 'act' ? 'Acte' : 'Pre-consultation'}
+                        {timeLabel} {patient.appointment_type === 'act' ? 'Acte' : 'Pré-consultation'}
                       </p>
                     </div>
                     <div className="text-right text-xs text-slate-500">
-                      <div>Documents a signer</div>
+                      <div>Documents ? signer</div>
                       <div className="flex gap-1 justify-end mt-1">
                         {!patient.authorization_signed && (
                           <span className="badge badge-warning badge-sm">Autorisation</span>

@@ -1,31 +1,30 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 
 import { LABELS_FR } from '../../../constants/labels.fr.js';
 import { startDocumentSignature } from '../../../services/patientDashboard.api.js';
 import { downloadDocumentSignatureFile } from '../../../services/documentSignature.api.js';
-import { SendLinkPanel } from './SendLinkPanel.jsx';
 import { SignedDocumentActions } from './SignedDocumentActions.jsx';
 
 export function SignatureActions({
   doc,
   role,
   token,
-  sessionCode,
-  cabinetStatus,
   appointmentId,
   procedureCaseId,
   parentVerified,
   parentEmail,
+  parentPhone,
   otherParentEmail,
   onReloadCase,
   onReloadDashboard,
   setError,
   setSuccessMessage,
   setPreviewState,
+  onNavigateDossier,
 }) {
   const [signing, setSigning] = useState(false);
   const [downloadingEvidence, setDownloadingEvidence] = useState(false);
-  const hasAccess = Boolean(token || sessionCode);
+  const hasAccess = Boolean(token);
 
   const parentState = doc?.byParent?.[role] || {
     completedCount: 0,
@@ -45,47 +44,34 @@ export function SignatureActions({
     parentState.signedAt ||
       String(parentState.signatureStatus || '').toLowerCase() === 'signed',
   );
-  const cabinetEnabled = Boolean(
-    sessionCode ||
-      (cabinetStatus && (role === 'parent1' ? cabinetStatus.parent1_active : cabinetStatus.parent2_active)),
-  );
   const parent1Required = doc?.byParent?.parent1?.total > 0;
   const parent2Required = doc?.byParent?.parent2?.total > 0;
   const parent1Signed = String(doc?.byParent?.parent1?.signatureStatus || '').toLowerCase() === 'signed';
   const parent2Signed = String(doc?.byParent?.parent2?.signatureStatus || '').toLowerCase() === 'signed';
   const fullySigned = (!parent1Required || parent1Signed) && (!parent2Required || parent2Signed);
+  const parentContactComplete = Boolean(String(parentEmail || '').trim()) && Boolean(String(parentPhone || '').trim());
 
-  const canSignCabinet = Boolean(
+  const canSignRemote = Boolean(
     signatureSupported &&
       appointmentId &&
       checklistComplete &&
-      hasAccess &&
-      cabinetEnabled &&
-      !alreadySigned
-  );
-  const canSignRemote = Boolean(
-    signatureSupported && appointmentId && checklistComplete && parentVerified && token && !alreadySigned,
+      parentVerified &&
+      parentContactComplete &&
+      token &&
+      !alreadySigned,
   );
 
   const disabledReason = useMemo(() => {
     if (!signatureSupported) return LABELS_FR.patientSpace.documents.reasons.featureUnavailable;
     if (!appointmentId) return LABELS_FR.patientSpace.documents.reasons.missingAppointment;
     if (!checklistComplete) return LABELS_FR.patientSpace.documents.reasons.checklistIncomplete;
-    if (alreadySigned) return 'Document deja signe pour ce parent.';
+    if (alreadySigned) return 'Document déjà signé pour ce parent.';
     if (!hasAccess) return 'Session invalide.';
     return null;
   }, [alreadySigned, appointmentId, checklistComplete, hasAccess, signatureSupported]);
 
-  const cabinetDisabledReason = useMemo(() => {
-    if (sessionCode) return null;
-    if (!cabinetEnabled && token) {
-      return 'Signature en cabinet non activee par le praticien.';
-    }
-    return null;
-  }, [cabinetEnabled, sessionCode, token]);
-
   const handleStartSignature = async (mode) => {
-    if (!token && !sessionCode) return;
+    if (!token) return;
     if (!appointmentId) {
       setError?.(LABELS_FR.patientSpace.documents.reasons.missingAppointment);
       return;
@@ -99,7 +85,6 @@ export function SignatureActions({
         procedureCaseId,
         parentRole: role,
         mode,
-        sessionCode,
         token,
         docType: doc?.docType,
       });
@@ -159,27 +144,26 @@ export function SignatureActions({
       <div className="flex gap-2 flex-wrap items-center">
         <button
           type="button"
-          className={`btn btn-sm ${canSignCabinet ? 'btn-primary' : 'btn-disabled'}`}
-          onClick={() => handleStartSignature('cabinet')}
-          disabled={!canSignCabinet || signing}
-        >
-          {signing ? 'Ouverture…' : LABELS_FR.patientSpace.documents.signature.signCabinet}
-        </button>
-        <button
-          type="button"
           className={`btn btn-sm ${canSignRemote ? 'btn-outline' : 'btn-disabled'}`}
           onClick={() => handleStartSignature('remote')}
           disabled={!canSignRemote || signing}
         >
-          {signing ? 'Ouverture…' : LABELS_FR.patientSpace.documents.signature.signRemote}
+          {signing ? 'Ouverture...' : LABELS_FR.patientSpace.documents.signature.signRemote}
         </button>
-        {!parentVerified && signatureSupported && token && (
+        {!parentVerified && signatureSupported && token && parentContactComplete && (
           <span className="text-xs text-slate-500">{LABELS_FR.patientSpace.documents.reasons.phoneNotVerified}</span>
         )}
       </div>
 
-      {cabinetDisabledReason && (
-        <div className="text-xs text-slate-500">{cabinetDisabledReason}</div>
+      {signatureSupported && token && !parentContactComplete && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <p>Compléter votre dossier pour signer à distance.</p>
+          {onNavigateDossier && (
+            <button type="button" className="btn btn-xs btn-outline mt-2" onClick={onNavigateDossier}>
+              Compléter votre dossier
+            </button>
+          )}
+        </div>
       )}
 
       <div className="flex gap-3 flex-wrap text-sm">
@@ -209,24 +193,6 @@ export function SignatureActions({
           hasFinalPdf={Boolean(doc?.finalPdfAvailable)}
           hasSignedPdf={Boolean(doc?.signedPdfAvailable)}
           previewType="document"
-        />
-      )}
-
-      {signatureSupported && token && (
-        <SendLinkPanel
-          token={token}
-          documentType={doc?.docType}
-          primaryLabel={LABELS_FR.patientSpace.guardians[role]}
-          primaryEmail={parentEmail}
-          secondaryLabel={
-            role === 'parent1'
-              ? LABELS_FR.patientSpace.guardians.parent2
-              : LABELS_FR.patientSpace.guardians.parent1
-          }
-          secondaryEmail={otherParentEmail}
-          onReloadDashboard={onReloadDashboard}
-          setError={setError}
-          setSuccessMessage={setSuccessMessage}
         />
       )}
     </div>

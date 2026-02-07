@@ -11,17 +11,17 @@ export function PatientTabDossierView({ dossier, currentUser }) {
   const [verifyingRole, setVerifyingRole] = useState(null);
   const [sendingEmailRole, setSendingEmailRole] = useState(null);
   const autoFilledEmailRef = useRef(false);
-  const userEmailVerified = Boolean(currentUser?.email_verified ?? currentUser?.email);
+  const userEmailVerified = Boolean(currentUser?.email_verified && currentUser?.email);
   const parent1EmailVerified = Boolean(
     dossier.vm?.guardians?.PARENT_1?.emailVerifiedAt || userEmailVerified,
   );
   const parent1PhoneVerified = Boolean(dossier.vm?.guardians?.PARENT_1?.phoneVerifiedAt);
   const missingRequiredFields = [];
   const hasValue = (value) => Boolean(String(value || '').trim());
-  if (!hasValue(dossier.formState?.childFirstName)) missingRequiredFields.push("Prenom de l'enfant");
+  if (!hasValue(dossier.formState?.childFirstName)) missingRequiredFields.push("Prénom de l'enfant");
   if (!hasValue(dossier.formState?.childLastName)) missingRequiredFields.push("Nom de l'enfant");
   if (!hasValue(dossier.formState?.birthDate)) missingRequiredFields.push('Date de naissance');
-  if (!hasValue(dossier.formState?.parent1FirstName)) missingRequiredFields.push('Prenom du parent 1');
+  if (!hasValue(dossier.formState?.parent1FirstName)) missingRequiredFields.push('Prénom du parent 1');
   if (!hasValue(dossier.formState?.parent1LastName)) missingRequiredFields.push('Nom du parent 1');
   if (!hasValue(dossier.formState?.parent1Email)) {
     missingRequiredFields.push('Email du parent 1');
@@ -37,6 +37,23 @@ export function PatientTabDossierView({ dossier, currentUser }) {
     dossier.formState.procedure_info_acknowledged &&
     missingRequiredFields.length === 0;
 
+
+  const signatureMissing = {
+    parent1: [],
+    parent2: [],
+  };
+  if (!hasValue(dossier.formState?.parent1FirstName)) signatureMissing.parent1.push('prénom');
+  if (!hasValue(dossier.formState?.parent1LastName)) signatureMissing.parent1.push('nom');
+  if (!hasValue(dossier.formState?.parent1Email)) signatureMissing.parent1.push('email');
+  if (!hasValue(dossier.formState?.parent1Phone)) signatureMissing.parent1.push('téléphone');
+  if (!hasValue(dossier.formState?.parent2FirstName)) signatureMissing.parent2.push('prénom');
+  if (!hasValue(dossier.formState?.parent2LastName)) signatureMissing.parent2.push('nom');
+  if (!hasValue(dossier.formState?.parent2Email)) signatureMissing.parent2.push('email');
+  if (!hasValue(dossier.formState?.parent2Phone)) signatureMissing.parent2.push('téléphone');
+  const signatureMissingSummary = [
+    signatureMissing.parent1.length ? `Parent 1 : ${signatureMissing.parent1.join(', ')}` : null,
+    signatureMissing.parent2.length ? `Parent 2 : ${signatureMissing.parent2.join(', ')}` : null,
+  ].filter(Boolean);
 
   useEffect(() => {
     if (autoFilledEmailRef.current) return;
@@ -77,7 +94,7 @@ export function PatientTabDossierView({ dossier, currentUser }) {
       <InfoBanner warnings={dossier.vm?.warnings || []} />
 
       <Card className="space-y-6">
-        <SectionHeading title="Dossier patient" subtitle="Identité de l'enfant et responsables légaux." />
+        <SectionHeading title="Compléter votre dossier" subtitle="Identité de l'enfant et responsables légaux." />
 
         {dossier.isEditing ? (
           <div className="space-y-6">
@@ -138,10 +155,10 @@ export function PatientTabDossierView({ dossier, currentUser }) {
                 {(parent1PhoneVerified || parent1EmailVerified) && (
                   <div className="flex items-center gap-2">
                     {parent1PhoneVerified && (
-                      <span className="badge badge-success badge-xs">Tel. verifie</span>
+                      <span className="badge badge-success badge-xs">Tél. vérifié</span>
                     )}
                     {parent1EmailVerified && (
-                      <span className="badge badge-success badge-xs">Email verifie</span>
+                      <span className="badge badge-success badge-xs">Email vérifié</span>
                     )}
                   </div>
                 )}
@@ -183,7 +200,7 @@ export function PatientTabDossierView({ dossier, currentUser }) {
               {missingRequiredFields.length > 0 && (
                 <BlockingNotice
                   title="Dossier incomplet"
-                  message="Pour cocher la case et enregistrer, completez :"
+                  message="Pour cocher la case et enregistrer, complétez :"
                   items={missingRequiredFields}
                 />
               )}
@@ -194,10 +211,18 @@ export function PatientTabDossierView({ dossier, currentUser }) {
                   avant de pouvoir signer les documents
                 </li>
                 <li>
+                  Pour signer à distance, chaque parent doit renseigner son email et son numéro de téléphone
+                </li>
+                <li>
                   Les <strong>2 parents</strong> doivent signer tous les documents (autorisation chirurgicale,
                   consentement éclairé, devis)
                 </li>
               </ul>
+              {signatureMissingSummary.length > 0 && (
+                <p className="text-sm text-blue-900">
+                  Points à compléter pour signer à distance ({signatureMissingSummary.join(' ; ')}).
+                </p>
+              )}
               <div className="flex items-start gap-2 mt-3">
                 <input
                   type="checkbox"
@@ -217,7 +242,7 @@ export function PatientTabDossierView({ dossier, currentUser }) {
           <div className="flex justify-end gap-3">
             {!dossier.isEditing && (
               <Button type="button" onClick={dossier.enableEdit} variant="secondary">
-                Modifier
+                Compléter / Modifier
               </Button>
             )}
             {dossier.isEditing && (

@@ -28,7 +28,7 @@ export const CaseStatus = ({
           <li>Documents : {documentsLabel}</li>
           <li>Ordonnance : {procedure?.has_ordonnance ? 'OK' : 'Non generee'}</li>
           <li>
-            Pre-consultation :{' '}
+            Pré-consultation :{' '}
             {procedure?.has_preconsultation
               ? (
                 <button

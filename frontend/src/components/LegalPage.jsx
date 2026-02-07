@@ -1,10 +1,12 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { BackToPatient } from './BackToPatient.jsx';
 
 export function LegalPage({ title, content }) {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6 text-slate-700">
+      <BackToPatient />
       <h1 className="text-2xl font-semibold text-slate-800">{title}</h1>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}

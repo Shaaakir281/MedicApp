@@ -21,7 +21,7 @@ const buildSignatureMessage = (journeyStatus) => {
   if (journeyStatus?.dossier && !journeyStatus.dossier.complete) {
     return {
       type: 'action',
-      text: 'Completez le dossier pour signer a distance',
+      text: 'Complétez le dossier pour signer à distance',
       clickable: true,
     };
   }

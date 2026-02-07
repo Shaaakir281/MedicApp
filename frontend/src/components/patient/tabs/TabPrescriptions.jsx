@@ -45,7 +45,7 @@ export function TabPrescriptions({ appointments, onDownload, highlightAppointmen
       {withPrescriptions.map((appt) => {
         const apptId = getAppointmentId(appt);
         const isHighlighted = highlightAppointmentId && String(apptId) === String(highlightAppointmentId);
-        const typeLabel = appt?.appointment_type === 'act' ? 'Acte' : 'Pre-consultation';
+        const typeLabel = appt?.appointment_type === 'act' ? 'Acte' : 'Pré-consultation';
         return (
           <div
             key={apptId || `${appt?.appointment_type || 'appt'}-${appt?.date || 'unknown'}`}

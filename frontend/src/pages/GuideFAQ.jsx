@@ -1,16 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import faqDataRaw from '../data/faqData.json';
+import { BackToPatient } from '../components/BackToPatient.jsx';
 
 const CATEGORY_LABELS = {
   "INSCRIPTION ET COMPTE": 'Inscription et compte',
   "DOSSIER DE L'ENFANT": "Dossier de l'enfant",
   "ENTRETIEN D'INFORMATION": "Entretien d'information",
-  "DÉLAI DE RÉFLEXION": 'Delai de reflexion',
+  "DÉLAI DE RÉFLEXION": 'Délai de réflexion',
   "RENDEZ-VOUS POUR L'ACTE": "Rendez-vous pour l'acte",
   "SIGNATURE DES DOCUMENTS": 'Signature des documents',
   "LE JOUR DE L'INTERVENTION": "Le jour de l'intervention",
-  "APRÈS L'INTERVENTION": "Apres l'intervention",
+  "APRÈS L'INTERVENTION": "Après l'intervention",
   "TARIFS ET PAIEMENT": 'Tarifs et paiement',
   "AUTRES QUESTIONS": 'Autres questions',
 };
@@ -137,10 +138,11 @@ const GuideFAQ = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
+      <BackToPatient />
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-semibold text-slate-800">Guide & FAQ</h1>
         <p className="text-slate-600 mt-2">
-          Retrouvez toutes les reponses pour votre parcours patient. Utilisez la recherche ou les categories pour aller
+          Retrouvez toutes les réponses pour votre parcours patient. Utilisez la recherche ou les catégories pour aller
           plus vite.
         </p>
       </div>
@@ -155,7 +157,7 @@ const GuideFAQ = () => {
               id="faq-search"
               type="search"
               className="input input-bordered w-full mt-2"
-              placeholder="Mots-cles, symptomes, rendez-vous..."
+              placeholder="Mots-clés, symptômes, rendez-vous..."
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
             />
@@ -163,7 +165,7 @@ const GuideFAQ = () => {
 
           <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-700">Categories</p>
+              <p className="text-sm font-semibold text-slate-700">Catégories</p>
               <button type="button" className="btn btn-ghost btn-xs" onClick={() => setActiveCategory('')}>
                 Tout
               </button>
@@ -191,7 +193,7 @@ const GuideFAQ = () => {
             <p className="text-sm font-semibold text-slate-700 mb-3">Actions rapides</p>
             <div className="flex flex-wrap gap-2">
               <button type="button" className="btn btn-outline btn-xs" onClick={handleExpandAll}>
-                Tout deplier
+                Tout déplier
               </button>
               <button type="button" className="btn btn-outline btn-xs" onClick={handleCollapseAll}>
                 Tout replier
@@ -206,7 +208,7 @@ const GuideFAQ = () => {
         <section className="space-y-6">
           {filteredFaq.length === 0 && (
             <div className="text-slate-500 bg-slate-50 border border-dashed border-slate-200 rounded-xl p-6">
-              Aucun resultat. Essayez un autre mot-cle.
+              Aucun résultat. Essayez un autre mot-clé.
             </div>
           )}
 
@@ -275,7 +277,7 @@ const GuideFAQ = () => {
                             >
                               Copier le lien
                             </button>
-                            <span className="text-xs text-slate-400">| Cette reponse vous a-t-elle aide ?</span>
+                            <span className="text-xs text-slate-400">| Cette réponse vous a-t-elle aidé ?</span>
                             <button type="button" className="btn btn-xs btn-outline">
                               Oui
                             </button>
@@ -296,10 +298,10 @@ const GuideFAQ = () => {
 
       <div className="mt-8 flex flex-wrap gap-3">
         <Link to="/video-rassurance" className="btn btn-outline btn-sm">
-          Voir la video de preparation
+          Voir la vidéo de préparation
         </Link>
         <Link to="/patient" className="btn btn-primary btn-sm">
-          Retour a mon espace patient
+          Retour à mon espace patient
         </Link>
       </div>
 
@@ -312,14 +314,14 @@ const GuideFAQ = () => {
               {supportEmail}
             </a>
           ) : (
-            <span className="text-slate-400">Email du cabinet a renseigner</span>
+            <span className="text-slate-400">Email du cabinet à renseigner</span>
           )}
           {supportPhone ? (
             <a className="text-blue-600 hover:text-blue-700" href={`tel:${supportPhone.replace(/\s/g, '')}`}>
               {supportPhone}
             </a>
           ) : (
-            <span className="text-slate-400">Telephone du cabinet a renseigner</span>
+            <span className="text-slate-400">Téléphone du cabinet à renseigner</span>
           )}
         </div>
       </div>

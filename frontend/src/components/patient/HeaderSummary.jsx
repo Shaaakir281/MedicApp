@@ -67,13 +67,13 @@ const buildDossierSnapshot = (dossierForm, dossierVm) => {
 const getMissingDossierFields = (snapshot) => {
   if (!snapshot) return null;
   const missing = [];
-  if (!snapshot.childFirstName) missing.push("Prenom de l'enfant");
+  if (!snapshot.childFirstName) missing.push("Prénom de l'enfant");
   if (!snapshot.childLastName) missing.push("Nom de l'enfant");
   if (!snapshot.birthDate) missing.push('Date de naissance');
-  if (!snapshot.parent1FirstName) missing.push('Prenom Parent 1');
+  if (!snapshot.parent1FirstName) missing.push('Prénom Parent 1');
   if (!snapshot.parent1LastName) missing.push('Nom Parent 1');
   if (!snapshot.parent1Email) missing.push('Email Parent 1');
-  if (!snapshot.parent2FirstName) missing.push('Prenom Parent 2');
+  if (!snapshot.parent2FirstName) missing.push('Prénom Parent 2');
   if (!snapshot.parent2LastName) missing.push('Nom Parent 2');
   if (!snapshot.parent2Email) missing.push('Email Parent 2');
   return missing;
@@ -87,14 +87,14 @@ const getNextAction = ({ dossierForm, dossierVm, dossierComplete, vm }) => {
       ? `${missingFields.slice(0, 3).join(', ')} (+${missingFields.length - 3})`
       : missingFields.join(', ');
     return {
-      label: 'Completer le dossier',
+      label: 'Compléter le dossier',
       detail: `Manquant: ${detail}`,
       variant: 'error',
     };
   }
   if (!snapshot && dossierComplete === false) {
     return {
-      label: 'Completer le dossier',
+      label: 'Compléter le dossier',
       detail: 'Informations manquantes',
       variant: 'error',
     };
@@ -117,8 +117,8 @@ const getNextAction = ({ dossierForm, dossierVm, dossierComplete, vm }) => {
     if (!parent2Verified) unverified.push('Parent 2');
     if (unverified.length) {
       return {
-        label: 'Verifier vos contacts',
-        detail: `A verifier: ${unverified.join(', ')}`,
+        label: 'Vérifier vos contacts',
+        detail: `À vérifier: ${unverified.join(', ')}`,
         variant: 'warning',
       };
     }
@@ -141,15 +141,15 @@ const getNextAction = ({ dossierForm, dossierVm, dossierComplete, vm }) => {
   if (!hasUpcoming) {
     return {
       label: 'Planifier un rendez-vous',
-      detail: 'Preconsultation ou acte',
+      detail: 'Préconsultation ou acte',
       variant: 'info',
     };
   }
 
   if (!vm?.legalComplete) {
     return {
-      label: 'Completer les documents',
-      detail: 'Checklist a valider',
+      label: 'Compléter les documents',
+      detail: 'Checklist à valider',
       variant: 'warning',
     };
   }
@@ -219,7 +219,7 @@ export function HeaderSummary({
   };
 
   const dossierTone = dossierComplete === null
-    ? nextAction?.label === 'Completer le dossier'
+    ? nextAction?.label === 'Compléter le dossier'
       ? 'warn'
       : 'neutral'
     : dossierComplete

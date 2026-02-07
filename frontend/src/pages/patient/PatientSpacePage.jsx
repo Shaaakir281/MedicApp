@@ -24,13 +24,12 @@ export function PatientSpacePage({
   token,
   user,
   onLogout,
-  procedureSelection,
-  onChangeProcedure,
 }) {
   const dossier = useDossier({ token });
+  const procedureSelection = 'circumcision';
   const [fourteenDayModal, setFourteenDayModal] = useState({
     open: false,
-    title: 'Regle des 14 jours',
+    title: 'Règle des 14 jours',
     message: '',
   });
   const controller = usePatientSpaceController({
@@ -42,7 +41,7 @@ export function PatientSpacePage({
       if (!payload) return;
       setFourteenDayModal({
         open: true,
-        title: payload.title || 'Regle des 14 jours',
+        title: payload.title || 'Règle des 14 jours',
         message: payload.message || '',
       });
     },
@@ -147,9 +146,9 @@ export function PatientSpacePage({
           to="/video-rassurance"
           className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
         >
-          <h3 className="text-base font-semibold text-slate-800">Preparer l'intervention</h3>
+          <h3 className="text-base font-semibold text-slate-800">Préparer l'intervention</h3>
           <p className="text-sm text-slate-500 mt-2">
-            Regardez la video explicative et retrouvez les points cles avant le jour J.
+            Regardez la vidéo explicative et retrouvez les points clés avant le jour J.
           </p>
         </Link>
         <Link
@@ -158,7 +157,7 @@ export function PatientSpacePage({
         >
           <h3 className="text-base font-semibold text-slate-800">Guide & FAQ</h3>
           <p className="text-sm text-slate-500 mt-2">
-            Trouvez rapidement les reponses aux questions les plus frequentes.
+            Trouvez rapidement les réponses aux questions les plus frequentes.
           </p>
         </Link>
       </div>
@@ -194,10 +193,6 @@ export function PatientSpacePage({
             {LABELS_FR.patientSpace.tabs.documents}
           </button>
         </div>
-
-        <button type="button" className="btn btn-outline btn-sm" onClick={onChangeProcedure}>
-          Changer de parcours
-        </button>
       </div>
 
       {journey.error && <div className="alert alert-warning">{journey.error}</div>}
@@ -251,6 +246,7 @@ export function PatientSpacePage({
           setError={controller.setError}
           setSuccessMessage={controller.setSuccessMessage}
           setPreviewState={controller.setPreviewState}
+          onNavigateDossier={() => handleTabChange(TABS.file)}
         />
       )}
 

@@ -65,7 +65,7 @@ const buildSignatureMessage = (journeyStatus) => {
   if (dossier && !dossier.complete) {
     return {
       type: 'action',
-      text: 'Completez le dossier pour signer a distance',
+      text: 'Complétez le dossier pour signer à distance',
       icon: FileText,
       clickable: true,
     };
@@ -113,15 +113,15 @@ export function PatientJourneyHeader({
       label: 'Dossier',
       Icon: FileText,
       status: dossier.created ? 'complete' : 'current',
-      subtext: dossier.created ? 'Cree' : 'A creer',
+      subtext: dossier.created ? 'Créé' : 'À créer',
       onClick: () => onNavigate?.('dossier'),
     },
     {
       id: 'preconsult',
-      label: 'Pre-consultation',
+      label: 'Pré-consultation',
       Icon: Phone,
       status: preConsultation.booked ? 'complete' : 'pending',
-      subtext: preConsultation.booked ? 'RDV pris' : 'A planifier',
+      subtext: preConsultation.booked ? 'RDV pris' : 'À planifier',
       onClick: () => onNavigate?.('rdv'),
     },
     {
@@ -129,7 +129,7 @@ export function PatientJourneyHeader({
       label: 'RDV Acte',
       Icon: Calendar,
       status: rdvActe.booked ? 'complete' : 'pending',
-      subtext: rdvActe.booked ? 'RDV pris' : 'A planifier',
+      subtext: rdvActe.booked ? 'RDV pris' : 'À planifier',
       onClick: () => onNavigate?.('rdv'),
     },
     {
@@ -137,7 +137,7 @@ export function PatientJourneyHeader({
       label: 'Signatures',
       Icon: PenTool,
       status: signatureStatus,
-      subtext: signatures.complete ? 'Termine' : 'En attente',
+      subtext: signatures.complete ? 'Terminé' : 'En attente',
       onClick: () => onNavigate?.('signatures'),
     },
   ];
@@ -158,7 +158,7 @@ export function PatientJourneyHeader({
             className="text-slate-500 hover:text-blue-800 transition-colors font-medium"
             onClick={onLogout}
           >
-            Se deconnecter
+            Se déconnecter
           </button>
         </div>
       </div>
@@ -184,7 +184,7 @@ export function PatientJourneyHeader({
                   type="button"
                   onClick={step.onClick}
                   className={`
-                    w-10 h-10 rounded-full flex items-center justify-center relative z-10
+                    w-10 h-10 rounded-full flex items-center justify-center relative z-20
                     border-2 transition-all duration-200 hover:scale-110 cursor-pointer
                     ${styles.circle}
                   `}
@@ -259,7 +259,7 @@ export function PatientJourneyHeader({
                   </div>
                   <span className={`mt-1 text-[10px] font-medium ${styles.label}`}>
                     {step.id === 'preconsult'
-                      ? 'Pre-consult'
+                      ? 'Pré-consult'
                       : step.id === 'rdvacte'
                         ? 'RDV'
                         : step.label}

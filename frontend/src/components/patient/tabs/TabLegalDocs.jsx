@@ -27,6 +27,7 @@ export function TabLegalDocs({
   setError,
   setSuccessMessage,
   setPreviewState,
+  onNavigateDossier,
 }) {
   const [catalog, setCatalog] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -98,10 +99,14 @@ export function TabLegalDocs({
 
   const parentVerifiedByRole = useMemo(
     () => ({
-      parent1:
-        dashboard?.contact_verification?.parent1_verified ?? Boolean(procedureCase?.parent1_phone_verified_at),
-      parent2:
-        dashboard?.contact_verification?.parent2_verified ?? Boolean(procedureCase?.parent2_phone_verified_at),
+      parent1: Boolean(
+        dashboard?.contact_verification?.parent1_verified &&
+          procedureCase?.parent1_phone_verified_at,
+      ),
+      parent2: Boolean(
+        dashboard?.contact_verification?.parent2_verified &&
+          procedureCase?.parent2_phone_verified_at,
+      ),
     }),
     [dashboard, procedureCase],
   );
@@ -143,9 +148,9 @@ export function TabLegalDocs({
             <h3 className="font-semibold mb-2">Parcours de signature des documents</h3>
             <ol className="list-decimal list-inside space-y-1 text-sm">
               <li>Prenez un rendez-vous pour l'acte dans l'onglet "Rendez-vous"</li>
-              <li>Le praticien vous informera sur la proc?dure avant l'acte</li>
+              <li>Le praticien vous informera sur la procédure avant l'acte</li>
               <li>Les 2 parents doivent signer chaque document</li>
-              <li>Une fois tous les documents sign?s, le rendez-vous d'acte peut ?tre confirm?</li>
+              <li>Une fois tous les documents signés, le rendez-vous d'acte peut ?tre confirm?</li>
             </ol>
           </div>
         </div>
@@ -160,8 +165,19 @@ export function TabLegalDocs({
           <p className="font-semibold">Informations importantes :</p>
           <ul className="list-disc list-inside mt-1 space-y-1">
             <li>Les 2 parents doivent signer chaque document</li>
-            <li>Les documents concernent uniquement le rendez-vous d'acte</li>
+            <li>
+              Un délai de 15 jours de réflexion après l'entretien d'information est obligatoire
+              avant de signer ces documents
+            </li>
+            <li>
+              Pour signer à distance, chaque parent doit compléter son dossier (email + téléphone)
+            </li>
           </ul>
+          {onNavigateDossier && (
+            <button type="button" className="btn btn-xs btn-outline mt-3" onClick={onNavigateDossier}>
+              Compléter votre dossier
+            </button>
+          )}
         </div>
       </div>
 
@@ -200,6 +216,10 @@ export function TabLegalDocs({
         procedureCaseId={procedureCase?.id}
         parentVerifiedByRole={parentVerifiedByRole}
         parentEmailByRole={parentEmailByRole}
+        parentContactByRole={{
+          parent1: vmWithDocs?.guardians?.parent1 || {},
+          parent2: vmWithDocs?.guardians?.parent2 || {},
+        }}
         onAcknowledgeCase={handleAcknowledgeCase}
         submitting={submitting}
         setError={setError}
@@ -207,6 +227,7 @@ export function TabLegalDocs({
         onReloadCase={onReloadCase}
         onReloadDashboard={onReloadDashboard}
         setPreviewState={setPreviewState}
+        onNavigateDossier={onNavigateDossier}
       />
     </div>
   );

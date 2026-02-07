@@ -8,12 +8,12 @@ import { SignatureActions } from './SignatureActions.jsx';
 export function LegalDocumentCard({
   doc,
   token,
-  sessionCode,
   cabinetStatus,
   appointmentId,
   procedureCaseId,
   parentVerifiedByRole,
   parentEmailByRole,
+  parentContactByRole,
   onAcknowledgeCase,
   submitting = false,
   fixedRole = null,
@@ -23,6 +23,7 @@ export function LegalDocumentCard({
   onReloadCase,
   onReloadDashboard,
   setPreviewState,
+  onNavigateDossier,
 }) {
   const [roleState, setRoleState] = useState('parent1');
   const [isChecklistExpanded, setIsChecklistExpanded] = useState(true);
@@ -99,12 +100,12 @@ export function LegalDocumentCard({
             doc={doc}
             role={role}
             token={token}
-            sessionCode={sessionCode}
             cabinetStatus={cabinetStatus}
             appointmentId={appointmentId}
             procedureCaseId={procedureCaseId}
             parentVerified={Boolean(parentVerifiedByRole?.[role])}
             parentEmail={parentEmailByRole?.[role] || ''}
+            parentPhone={parentContactByRole?.[role]?.phone || ''}
             otherParentEmail={
               role === 'parent1' ? parentEmailByRole?.parent2 : parentEmailByRole?.parent1
             }
@@ -113,6 +114,7 @@ export function LegalDocumentCard({
             setError={setError}
             setSuccessMessage={setSuccessMessage}
             setPreviewState={setPreviewState}
+            onNavigateDossier={onNavigateDossier}
           />
         )}
       </div>

@@ -378,7 +378,7 @@ const Praticien = () => {
           <StatCard title="Créations aujourd&apos;hui" value={stats?.bookings_created} tone="neutral" />
           <StatCard title="Nouveaux patients (7j)" value={stats?.new_patients_week} tone="success" />
           <StatCard title="Relances nécessaires" value={stats?.follow_ups_required} tone="warning" />
-          <StatCard title="Documents a signer" value={stats?.pending_documents} tone="danger" />
+          <StatCard title="Documents ? signer" value={stats?.pending_documents} tone="danger" />
         </section>
 
       {viewMode === 'agenda' ? (
@@ -409,18 +409,7 @@ const Praticien = () => {
           onSelect={handleSelectNewPatient}
         />
       ) : (
-        <MaintenanceView
-          displayedDays={displayedDays}
-          viewLength={viewLength}
-          startDate={startDate}
-          endDate={endDate}
-          viewOptions={VIEW_OPTIONS}
-          onChangeStart={setStartDate}
-          onChangeLength={setViewLength}
-          onRefresh={handleRefresh}
-          loadingData={loadingData}
-          token={token}
-        />
+        <MaintenanceView token={token} />
       )}
 
       <PrescriptionEditor

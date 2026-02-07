@@ -11,6 +11,7 @@ export function TabLegalDocsByParent({
   procedureCaseId,
   parentVerifiedByRole,
   parentEmailByRole,
+  parentContactByRole,
   onAcknowledgeCase,
   submitting = false,
   setError,
@@ -18,9 +19,10 @@ export function TabLegalDocsByParent({
   onReloadCase,
   onReloadDashboard,
   setPreviewState,
+  onNavigateDossier,
 }) {
   const parentLabel = parentRole === 'parent2' ? 'Parent 2' : 'Parent 1';
-  const parentEmail = parentEmailByRole?.[parentRole] || 'Email non renseigne';
+  const parentEmail = parentEmailByRole?.[parentRole] || 'Email non renseigné';
   const parentVerified = Boolean(parentVerifiedByRole?.[parentRole]);
 
   if (!legalDocuments?.length) {
@@ -44,8 +46,8 @@ export function TabLegalDocsByParent({
             />
           </svg>
           <p className="text-sm text-blue-700">
-            <strong>Mode demonstration :</strong> Ceci est une demo. En production, le remplissage
-            des documents sera autorise 14 jours apres la consultation pre-operatoire.
+            <strong>Mode démonstration :</strong> Ceci est une démo. En production, le remplissage
+            des documents sera autorisé 15 jours après la consultation pré-opératoire.
           </p>
         </div>
       </div>
@@ -54,7 +56,7 @@ export function TabLegalDocsByParent({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold text-slate-800">Documents pour {parentLabel}</h3>
           <span className={`badge badge-sm ${parentVerified ? 'badge-success' : 'badge-ghost'}`}>
-            {parentVerified ? 'Contact verifie' : 'Contact a verifier'}
+            {parentVerified ? 'Contact vérifié' : 'Contact à vérifier'}
           </span>
         </div>
         <p className="text-sm text-slate-600 mt-1">{parentEmail}</p>
@@ -71,6 +73,7 @@ export function TabLegalDocsByParent({
             procedureCaseId={procedureCaseId}
             parentVerifiedByRole={parentVerifiedByRole}
             parentEmailByRole={parentEmailByRole}
+            parentContactByRole={parentContactByRole}
             onAcknowledgeCase={onAcknowledgeCase}
             submitting={submitting}
             fixedRole={parentRole}
@@ -79,6 +82,7 @@ export function TabLegalDocsByParent({
             onReloadCase={onReloadCase}
             onReloadDashboard={onReloadDashboard}
             setPreviewState={setPreviewState}
+            onNavigateDossier={onNavigateDossier}
           />
         ))}
       </div>

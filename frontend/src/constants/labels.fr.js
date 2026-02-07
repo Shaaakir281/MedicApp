@@ -49,14 +49,13 @@ export const LABELS_FR = {
       signature: {
         title: 'Actions de signature',
         signRemote: 'Signer à distance (OTP SMS)',
-        signCabinet: 'Signer en cabinet',
         openLink: 'Ouvrir le lien',
         sendLink: 'Envoyer le lien',
         downloadSigned: 'Télécharger signé',
         downloadEvidence: 'Télécharger preuve',
       },
       reasons: {
-        checklistIncomplete: 'Checklist incomplète.',
+        checklistIncomplete: 'Cochez les cases.',
         phoneNotVerified: 'Téléphone non vérifié (requis pour signer à distance).',
         featureUnavailable: 'Fonctionnalité non disponible pour le moment.',
         missingAppointment: 'Sélectionnez un rendez-vous pour afficher les documents.',
