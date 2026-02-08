@@ -16,6 +16,7 @@ export function PatientTabDossierView({ dossier, currentUser }) {
     dossier.vm?.guardians?.PARENT_1?.emailVerifiedAt || userEmailVerified,
   );
   const parent1PhoneVerified = Boolean(dossier.vm?.guardians?.PARENT_1?.phoneVerifiedAt);
+  const parent2PhoneVerified = Boolean(dossier.vm?.guardians?.PARENT_2?.phoneVerifiedAt);
   const missingRequiredFields = [];
   const coreMissingFields = [];
   const hasValue = (value) => Boolean(String(value || '').trim());
@@ -59,21 +60,35 @@ export function PatientTabDossierView({ dossier, currentUser }) {
     parent1: [],
     parent2: [],
   };
+  const parent2Started = [
+    dossier.formState?.parent2FirstName,
+    dossier.formState?.parent2LastName,
+    dossier.formState?.parent2Email,
+    dossier.formState?.parent2Phone,
+  ].some(hasValue);
   if (!hasValue(dossier.formState?.parent1FirstName)) signatureMissing.parent1.push('prénom');
   if (!hasValue(dossier.formState?.parent1LastName)) signatureMissing.parent1.push('nom');
   if (!hasValue(dossier.formState?.parent1Email)) signatureMissing.parent1.push('email');
   if (!hasValue(dossier.formState?.parent1Phone)) signatureMissing.parent1.push('téléphone');
-  if (!hasValue(dossier.formState?.parent2FirstName)) signatureMissing.parent2.push('prénom');
-  if (!hasValue(dossier.formState?.parent2LastName)) signatureMissing.parent2.push('nom');
-  if (!hasValue(dossier.formState?.parent2Email)) signatureMissing.parent2.push('email');
-  if (!hasValue(dossier.formState?.parent2Phone)) signatureMissing.parent2.push('téléphone');
+  if (hasValue(dossier.formState?.parent1Phone) && !parent1PhoneVerified) {
+    signatureMissing.parent1.push('téléphone à vérifier');
+  }
+  if (parent2Started) {
+    if (!hasValue(dossier.formState?.parent2FirstName)) signatureMissing.parent2.push('prénom');
+    if (!hasValue(dossier.formState?.parent2LastName)) signatureMissing.parent2.push('nom');
+    if (!hasValue(dossier.formState?.parent2Email)) signatureMissing.parent2.push('email');
+    if (!hasValue(dossier.formState?.parent2Phone)) signatureMissing.parent2.push('téléphone');
+    if (hasValue(dossier.formState?.parent2Phone) && !parent2PhoneVerified) {
+      signatureMissing.parent2.push('téléphone à vérifier');
+    }
+  }
   const signatureMissingSummary = [
     signatureMissing.parent1.length ? `Parent 1 : ${signatureMissing.parent1.join(', ')}` : null,
     signatureMissing.parent2.length ? `Parent 2 : ${signatureMissing.parent2.join(', ')}` : null,
   ].filter(Boolean);
   const readyParents = [];
-  if (signatureMissing.parent1.length === 0) readyParents.push('Parent 1');
-  if (signatureMissing.parent2.length === 0) readyParents.push('Parent 2');
+  if (signatureMissing.parent1.length === 0 && parent1PhoneVerified) readyParents.push('Parent 1');
+  if (signatureMissing.parent2.length === 0 && parent2PhoneVerified) readyParents.push('Parent 2');
   const journeySteps = [];
   if (!isCoreComplete) {
     journeySteps.push(
