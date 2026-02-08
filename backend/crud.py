@@ -292,6 +292,7 @@ def create_procedure_case(
         parent1_sms_optin=bool(case_data.parent1_sms_optin),
         parent2_sms_optin=bool(case_data.parent2_sms_optin),
         parental_authority_ack=case_data.parental_authority_ack,
+        steps_acknowledged=bool(getattr(case_data, "steps_acknowledged", False)),
         notes=case_data.notes,
         preconsultation_date=case_data.preconsultation_date,
     )
@@ -325,6 +326,8 @@ def update_procedure_case(
     procedure.parent1_sms_optin = bool(case_data.parent1_sms_optin)
     procedure.parent2_sms_optin = bool(case_data.parent2_sms_optin)
     procedure.parental_authority_ack = case_data.parental_authority_ack
+    if getattr(case_data, "steps_acknowledged", None) is not None:
+        procedure.steps_acknowledged = bool(case_data.steps_acknowledged)
     procedure.notes = case_data.notes
     procedure.preconsultation_date = case_data.preconsultation_date
     _recompute_case_flags(procedure)

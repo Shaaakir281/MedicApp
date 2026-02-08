@@ -119,6 +119,7 @@ class ProcedureCaseBase(BaseModel):
     parent1_sms_optin: bool = False
     parent2_sms_optin: bool = False
     parental_authority_ack: bool = False
+    steps_acknowledged: Optional[bool] = None
     notes: Optional[str] = None
     preconsultation_date: Optional[date] = None
 
