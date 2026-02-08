@@ -16,6 +16,16 @@ const CATEGORY_LABELS = {
   "AUTRES QUESTIONS": 'Autres questions',
 };
 
+const TOPIC_TARGETS = {
+  rdv: { category_raw: "RENDEZ-VOUS POUR L'ACTE", index: 0 },
+  'rdv-info': { category_raw: "ENTRETIEN D'INFORMATION", index: 0 },
+  'rdv-acte': { category_raw: "RENDEZ-VOUS POUR L'ACTE", index: 0 },
+  signature: { category_raw: 'SIGNATURE DES DOCUMENTS', index: 1 },
+  'signature-distance': { category_raw: 'SIGNATURE DES DOCUMENTS', index: 2 },
+  'signature-delay': { category_raw: "ENTRETIEN D'INFORMATION", index: 5 },
+  dossier: { category_raw: "DOSSIER DE L'ENFANT", index: 0 },
+};
+
 const normalize = (value) => value.toLowerCase();
 
 const slugify = (text) =>
@@ -47,6 +57,19 @@ const parseAnswer = (answer, bullets) => {
     return { text: parts[0], bullets: parts.slice(1) };
   }
   return { text: answer, bullets: [] };
+};
+
+const resolveTopicTarget = (topic, faqData) => {
+  if (!topic) return null;
+  const target = TOPIC_TARGETS[topic];
+  if (!target) return null;
+  const category = faqData.find((item) => item.category_raw === target.category_raw);
+  if (!category || !category.questions.length) return null;
+  const question = category.questions[target.index] || category.questions[0];
+  return {
+    categoryRaw: category.category_raw,
+    questionId: buildQuestionId(category.category_raw, question.question),
+  };
 };
 
 const GuideFAQ = () => {
@@ -104,6 +127,23 @@ const GuideFAQ = () => {
   }, [filteredFaq]);
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const topic = params.get('topic');
+    if (topic) {
+      const target = resolveTopicTarget(topic, faqData);
+      if (target) {
+        setActiveCategory(target.categoryRaw);
+        setOpenQuestions((prev) => {
+          const next = new Set(prev);
+          next.add(target.questionId);
+          return next;
+        });
+        setTimeout(() => {
+          document.getElementById(target.questionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+        return;
+      }
+    }
     if (!location.hash) return;
     const target = decodeURIComponent(location.hash.replace('#', ''));
     setOpenQuestions((prev) => {

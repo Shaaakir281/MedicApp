@@ -321,6 +321,10 @@ def _build_dossier_status(dossier: dossier_models.Child, guardians: list[dossier
         missing.append("parent1_name")
     if not parent1 or not parent1.email:
         missing.append("parent1_email")
+    if not parent1 or not parent1.phone_e164:
+        missing.append("parent1_phone")
+    elif not parent1.phone_verified_at:
+        missing.append("parent1_phone_verified")
 
     if _guardian_name_missing(parent2):
         missing.append("parent2_name")
@@ -328,6 +332,8 @@ def _build_dossier_status(dossier: dossier_models.Child, guardians: list[dossier
         missing.append("parent2_email")
     if not parent2 or not parent2.phone_e164:
         missing.append("parent2_phone")
+    elif not parent2.phone_verified_at:
+        missing.append("parent2_phone_verified")
 
     created = bool(
         dossier.first_name
