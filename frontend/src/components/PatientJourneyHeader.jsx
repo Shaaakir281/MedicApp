@@ -46,11 +46,44 @@ const getStyles = (status) => {
   }
 };
 
-const buildSignatureMessage = (journeyStatus) => {
-  if (!journeyStatus?.signatures) return null;
+const buildJourneyMessage = (journeyStatus) => {
+  if (!journeyStatus) return null;
 
-  const { signatures, dossier } = journeyStatus;
+  const dossier = journeyStatus.dossier || defaultJourney.dossier;
+  const preConsultation = journeyStatus.pre_consultation || defaultJourney.pre_consultation;
+  const rdvActe = journeyStatus.rdv_acte || defaultJourney.rdv_acte;
+  const signatures = journeyStatus.signatures || defaultJourney.signatures;
   const delay = signatures.reflection_delay || {};
+
+  if (!dossier.created) {
+    return {
+      type: 'action',
+      text: "Pour commencer, compl?tez le dossier (nom, pr?nom et date de naissance de l?enfant + nom/pr?nom du parent 1) pour pouvoir planifier un rendez-vous.",
+      icon: FileText,
+      action: 'Compl?ter le dossier',
+      target: 'dossier',
+    };
+  }
+
+  if (!preConsultation.booked) {
+    return {
+      type: 'info',
+      text: 'Vous pouvez d?sormais prendre votre rendez-vous d?information.',
+      icon: Calendar,
+      action: 'Prendre rendez-vous',
+      target: 'rdv',
+    };
+  }
+
+  if (preConsultation.booked && !rdvActe.booked) {
+    return {
+      type: 'info',
+      text: 'Vous pouvez planifier votre rendez-vous pour l?acte.',
+      icon: Calendar,
+      action: 'Planifier l?acte',
+      target: 'rdv',
+    };
+  }
 
   if (signatures.complete) return null;
 
@@ -62,12 +95,13 @@ const buildSignatureMessage = (journeyStatus) => {
     };
   }
 
-  if (dossier && !dossier.complete) {
+  if (!dossier.complete) {
     return {
       type: 'action',
-      text: 'Complétez le dossier pour signer à distance',
+      text: 'Compl?tez le dossier pour signer ? distance',
       icon: FileText,
-      clickable: true,
+      action: 'Compl?ter le dossier',
+      target: 'dossier',
     };
   }
 
@@ -142,14 +176,8 @@ export function PatientJourneyHeader({
     },
   ];
 
-  const signatureMessage = buildSignatureMessage(resolvedJourney);
-  const starterMessage = useMemo(() => {
-    if (dossier.complete) return null;
-    return {
-      text: "Pour commencer, complétez le dossier (nom, prénom et date de naissance de l’enfant + nom/prénom du parent 1) pour pouvoir planifier un rendez-vous.",
-      action: "Compléter le dossier",
-    };
-  }, [dossier.complete]);
+  const journeyMessage = useMemo(() => buildJourneyMessage(resolvedJourney), [resolvedJourney]);
+
 
   return (
     <div className="bg-gradient-to-b from-slate-50 to-slate-100 border-b border-slate-200">
@@ -214,43 +242,36 @@ export function PatientJourneyHeader({
           })}
         </div>
 
-        {signatureMessage && (
+        {journeyMessage && (
           <div className="mt-5 flex justify-center">
-            {signatureMessage.clickable ? (
+            {journeyMessage.type === 'action' || journeyMessage.type === 'info' ? (
               <button
                 type="button"
-                onClick={() => onNavigate?.('dossier')}
-                className="inline-flex items-center gap-2 text-sm text-blue-800 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg py-2 px-4 transition-colors font-medium"
+                onClick={() => onNavigate?.(journeyMessage.target || 'dossier')}
+                className={`inline-flex items-center gap-2 text-sm rounded-lg py-2 px-4 transition-colors font-medium ${
+                  journeyMessage.type === 'info'
+                    ? 'text-blue-800 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200'
+                    : 'text-slate-700 bg-white border border-slate-200 shadow-sm hover:bg-slate-50'
+                }`}
               >
-                <signatureMessage.icon className="w-4 h-4" />
-                {signatureMessage.text}
+                <journeyMessage.icon className="w-4 h-4" />
+                {journeyMessage.text}
+                {journeyMessage.action && (
+                  <span className="ml-2 text-blue-700 font-semibold">{journeyMessage.action}</span>
+                )}
               </button>
             ) : (
               <div
                 className={`
                   inline-flex items-center gap-2 text-sm rounded-lg py-2 px-4 font-medium
-                  ${signatureMessage.type === 'waiting' ? 'text-amber-700 bg-amber-50 border border-amber-200' : ''}
-                  ${signatureMessage.type === 'ready' ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : ''}
+                  ${journeyMessage.type === 'waiting' ? 'text-amber-700 bg-amber-50 border border-amber-200' : ''}
+                  ${journeyMessage.type === 'ready' ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : ''}
                 `}
               >
-                <signatureMessage.icon className="w-4 h-4" />
-                {signatureMessage.text}
+                <journeyMessage.icon className="w-4 h-4" />
+                {journeyMessage.text}
               </div>
             )}
-          </div>
-        )}
-
-        {starterMessage && (
-          <div className="mt-3 flex justify-center">
-            <button
-              type="button"
-              onClick={() => onNavigate?.('dossier')}
-              className="inline-flex items-center gap-2 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg py-2 px-4 shadow-sm hover:bg-slate-50 transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              {starterMessage.text}
-              <span className="ml-2 text-blue-700 font-semibold">{starterMessage.action}</span>
-            </button>
           </div>
         )}
       </div>
@@ -300,42 +321,36 @@ export function PatientJourneyHeader({
           })}
         </div>
 
-        {signatureMessage && (
+        {journeyMessage && (
           <div className="flex justify-center">
-            {signatureMessage.clickable ? (
+            {journeyMessage.type === 'action' || journeyMessage.type === 'info' ? (
               <button
                 type="button"
-                onClick={() => onNavigate?.('dossier')}
-                className="inline-flex items-center gap-2 text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded-lg py-2 px-3 font-medium"
+                onClick={() => onNavigate?.(journeyMessage.target || 'dossier')}
+                className={`inline-flex items-center gap-2 text-xs rounded-lg py-2 px-3 font-medium ${
+                  journeyMessage.type === 'info'
+                    ? 'text-blue-800 bg-blue-50 border border-blue-200'
+                    : 'text-slate-700 bg-white border border-slate-200 shadow-sm'
+                }`}
               >
-                <signatureMessage.icon className="w-3.5 h-3.5" />
-                {signatureMessage.text}
+                <journeyMessage.icon className="w-3.5 h-3.5" />
+                {journeyMessage.text}
+                {journeyMessage.action && (
+                  <span className="ml-2 text-blue-700 font-semibold">{journeyMessage.action}</span>
+                )}
               </button>
             ) : (
               <div
                 className={`
                   inline-flex items-center gap-2 text-xs rounded-lg py-2 px-3 font-medium
-                  ${signatureMessage.type === 'waiting' ? 'text-amber-700 bg-amber-50 border border-amber-200' : ''}
-                  ${signatureMessage.type === 'ready' ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : ''}
+                  ${journeyMessage.type === 'waiting' ? 'text-amber-700 bg-amber-50 border border-amber-200' : ''}
+                  ${journeyMessage.type === 'ready' ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : ''}
                 `}
               >
-                <signatureMessage.icon className="w-3.5 h-3.5" />
-                {signatureMessage.text}
+                <journeyMessage.icon className="w-3.5 h-3.5" />
+                {journeyMessage.text}
               </div>
             )}
-          </div>
-        )}
-
-        {starterMessage && (
-          <div className="mt-3 flex justify-center">
-            <button
-              type="button"
-              onClick={() => onNavigate?.('dossier')}
-              className="inline-flex items-center gap-2 text-xs text-slate-700 bg-white border border-slate-200 rounded-lg py-2 px-3 shadow-sm"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              {starterMessage.text}
-            </button>
           </div>
         )}
       </div>
