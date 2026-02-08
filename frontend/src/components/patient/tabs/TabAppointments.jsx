@@ -15,6 +15,7 @@ export function TabAppointments({
   showScheduling,
   appointmentMissingFields = [],
   appointmentNeedsSave = false,
+  onCompleteDossier,
   setError,
   setPreviewState,
   onViewPrescription,
@@ -81,6 +82,7 @@ export function TabAppointments({
         missingFields={appointmentMissingFields}
         needsSave={appointmentNeedsSave}
         errorMessage={appointments.scheduleError}
+        onCompleteDossier={onCompleteDossier}
       />
 
       <AppointmentEditModal

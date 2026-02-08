@@ -143,6 +143,13 @@ export function PatientJourneyHeader({
   ];
 
   const signatureMessage = buildSignatureMessage(resolvedJourney);
+  const starterMessage = useMemo(() => {
+    if (dossier.complete) return null;
+    return {
+      text: "Pour commencer, complétez le dossier (nom, prénom et date de naissance de l’enfant + nom/prénom du parent 1) pour pouvoir planifier un rendez-vous.",
+      action: "Compléter le dossier",
+    };
+  }, [dossier.complete]);
 
   return (
     <div className="bg-gradient-to-b from-slate-50 to-slate-100 border-b border-slate-200">
@@ -232,6 +239,20 @@ export function PatientJourneyHeader({
             )}
           </div>
         )}
+
+        {starterMessage && (
+          <div className="mt-3 flex justify-center">
+            <button
+              type="button"
+              onClick={() => onNavigate?.('dossier')}
+              className="inline-flex items-center gap-2 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg py-2 px-4 shadow-sm hover:bg-slate-50 transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              {starterMessage.text}
+              <span className="ml-2 text-blue-700 font-semibold">{starterMessage.action}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="md:hidden px-4 py-4">
@@ -302,6 +323,19 @@ export function PatientJourneyHeader({
                 {signatureMessage.text}
               </div>
             )}
+          </div>
+        )}
+
+        {starterMessage && (
+          <div className="mt-3 flex justify-center">
+            <button
+              type="button"
+              onClick={() => onNavigate?.('dossier')}
+              className="inline-flex items-center gap-2 text-xs text-slate-700 bg-white border border-slate-200 rounded-lg py-2 px-3 shadow-sm"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              {starterMessage.text}
+            </button>
           </div>
         )}
       </div>

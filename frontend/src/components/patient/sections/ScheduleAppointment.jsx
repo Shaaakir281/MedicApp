@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { SchedulingPanel } from '../SchedulingPanel.jsx';
-import { BlockingNotice } from '../../ui';
+import { BlockingNotice, Button } from '../../ui';
 import { LABELS_FR } from '../../../constants/labels.fr.js';
 
 export function ScheduleAppointment({
@@ -10,23 +10,42 @@ export function ScheduleAppointment({
   missingFields = [],
   needsSave = false,
   errorMessage = null,
+  onCompleteDossier,
 }) {
   if (!show) {
     if (missingFields.length > 0) {
       return (
-        <BlockingNotice
-          title="Rendez-vous indisponible"
-          message="Completez d'abord :"
-          items={missingFields}
-        />
+        <div className="space-y-3">
+          <BlockingNotice
+            title="Rendez-vous indisponible"
+            message="Pour prendre rendez-vous, complétez les informations de l’enfant et du parent 1 (nom, prénom, date de naissance)."
+            items={missingFields}
+          />
+          {onCompleteDossier && (
+            <div className="flex justify-end">
+              <Button type="button" onClick={onCompleteDossier}>
+                Compléter le dossier
+              </Button>
+            </div>
+          )}
+        </div>
       );
     }
     if (needsSave) {
       return (
-        <BlockingNotice
-          title="Rendez-vous indisponible"
-          message="Enregistrez le dossier pour planifier un rendez-vous."
-        />
+        <div className="space-y-3">
+          <BlockingNotice
+            title="Rendez-vous indisponible"
+            message="Enregistrez le dossier pour planifier un rendez-vous."
+          />
+          {onCompleteDossier && (
+            <div className="flex justify-end">
+              <Button type="button" onClick={onCompleteDossier}>
+                Compléter le dossier
+              </Button>
+            </div>
+          )}
+        </div>
       );
     }
     return null;

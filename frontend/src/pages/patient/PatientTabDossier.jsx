@@ -197,13 +197,6 @@ export function PatientTabDossierView({ dossier, currentUser }) {
           {dossier.isEditing && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-blue-900">Parcours de prise en charge</h3>
-              {missingRequiredFields.length > 0 && (
-                <BlockingNotice
-                  title="Dossier incomplet"
-                  message="Pour cocher la case et enregistrer, complétez :"
-                  items={missingRequiredFields}
-                />
-              )}
               <ul className="text-sm text-blue-800 space-y-2 list-disc list-inside">
                 <li>Un rendez-vous de pré-consultation est <strong>obligatoire</strong> avant toute intervention</li>
                 <li>
@@ -236,6 +229,13 @@ export function PatientTabDossierView({ dossier, currentUser }) {
                   J'ai pris connaissance du parcours de prise en charge et j'accepte ces conditions
                 </label>
               </div>
+              {missingRequiredFields.length > 0 && (
+                <BlockingNotice
+                  title="Dossier incomplet"
+                  message="Pour cocher la case et enregistrer, compl?tez :"
+                  items={missingRequiredFields}
+                />
+              )}
             </div>
           )}
 

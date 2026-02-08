@@ -214,6 +214,7 @@ export function PatientSpacePage({
           showScheduling={controller.showScheduling}
           appointmentMissingFields={controller.appointmentMissingFields}
           appointmentNeedsSave={controller.appointmentNeedsSave}
+          onCompleteDossier={() => handleTabChange(TABS.file)}
           setError={controller.setError}
           setPreviewState={controller.setPreviewState}
           onViewPrescription={handleViewPrescription}
