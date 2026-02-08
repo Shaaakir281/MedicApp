@@ -233,10 +233,28 @@ def get_dossier(db: Session, child_id: str, current_user) -> schemas.DossierResp
         guardian.email_sent_at = latest_verification.sent_at if latest_verification else None
 
     warnings: List[str] = []
-    if not any(g.role == GuardianRole.parent2.value for g in guardians):
-        warnings.append("Parent 2 incomplet")
-        if get_settings().require_guardian_2:
-            warnings.append("Parent 2 requis : merci de le renseigner.")
+    parent2 = next((g for g in guardians if g.role == GuardianRole.parent2.value), None)
+    if parent2:
+        has_real_name = not _is_placeholder(parent2.first_name) or not _is_placeholder(parent2.last_name)
+        parent2_started = any(
+            [
+                (parent2.first_name or "").strip() and has_real_name,
+                (parent2.last_name or "").strip() and has_real_name,
+                (parent2.email or "").strip(),
+                (parent2.phone_e164 or "").strip(),
+            ]
+        )
+        missing_fields = []
+        if _guardian_name_missing(parent2):
+            missing_fields.append("nom/prénom")
+        if not parent2.email:
+            missing_fields.append("email")
+        if not parent2.phone_e164:
+            missing_fields.append("téléphone")
+        if parent2_started and missing_fields:
+            warnings.append("Parent 2 incomplet")
+    elif get_settings().require_guardian_2:
+        warnings.append("Parent 2 requis : merci de le renseigner.")
     return schemas.DossierResponse(child=child, guardians=guardians, warnings=warnings)
 
 
