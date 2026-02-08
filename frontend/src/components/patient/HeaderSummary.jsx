@@ -83,9 +83,10 @@ const getNextAction = ({ dossierForm, dossierVm, dossierComplete, vm }) => {
   const snapshot = buildDossierSnapshot(dossierForm, dossierVm);
   const missingFields = getMissingDossierFields(snapshot);
   if (missingFields && missingFields.length > 0) {
-    const detail = missingFields.length > 3
-      ? `${missingFields.slice(0, 3).join(', ')} (+${missingFields.length - 3})`
-      : missingFields.join(', ');
+    const detail =
+      missingFields.length > 3
+        ? `${missingFields.slice(0, 3).join(', ')} (+${missingFields.length - 3})`
+        : missingFields.join(', ');
     return {
       label: 'Compléter le dossier',
       detail: `Manquant: ${detail}`,
@@ -105,12 +106,12 @@ const getNextAction = ({ dossierForm, dossierVm, dossierComplete, vm }) => {
     const parent1Verified = Boolean(
       dossierVm?.guardians?.PARENT_1?.phoneVerifiedAt ||
         dossierVm?.guardians?.PARENT_1?.emailVerifiedAt ||
-        vm?.guardians?.parent1?.verified
+        vm?.guardians?.parent1?.verified,
     );
     const parent2Verified = Boolean(
       dossierVm?.guardians?.PARENT_2?.phoneVerifiedAt ||
         dossierVm?.guardians?.PARENT_2?.emailVerifiedAt ||
-        vm?.guardians?.parent2?.verified
+        vm?.guardians?.parent2?.verified,
     );
     const unverified = [];
     if (!parent1Verified) unverified.push('Parent 1');
@@ -218,13 +219,14 @@ export function HeaderSummary({
     success: 'bg-emerald-500/20 border-emerald-200/30 text-emerald-100',
   };
 
-  const dossierTone = dossierComplete === null
-    ? nextAction?.label === 'Compléter le dossier'
-      ? 'warn'
-      : 'neutral'
-    : dossierComplete
-      ? 'ok'
-      : 'warn';
+  const dossierTone =
+    dossierComplete === null
+      ? nextAction?.label === 'Compléter le dossier'
+        ? 'warn'
+        : 'neutral'
+      : dossierComplete
+        ? 'ok'
+        : 'warn';
   const appointmentsTone = (vm?.appointments?.upcoming || []).length ? 'info' : 'neutral';
   const documentsTone = vm?.legalComplete ? 'ok' : 'warn';
   const signatureTone = vm?.signatureComplete ? 'ok' : 'warn';

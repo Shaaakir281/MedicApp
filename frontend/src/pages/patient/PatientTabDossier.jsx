@@ -6,7 +6,7 @@ import { GuardianForm } from '../../components/patient/dossier/GuardianForm.jsx'
 import { BlockingNotice, Button, Card, SectionHeading } from '../../components/ui';
 import { useDossier } from '../../hooks/useDossier.js';
 
-export function PatientTabDossierView({ dossier, currentUser }) {
+export function PatientTabDossierView({ dossier, currentUser, journeyStatus }) {
   const [sendingRole, setSendingRole] = useState(null);
   const [verifyingRole, setVerifyingRole] = useState(null);
   const [sendingEmailRole, setSendingEmailRole] = useState(null);
@@ -20,6 +20,7 @@ export function PatientTabDossierView({ dossier, currentUser }) {
   const missingRequiredFields = [];
   const coreMissingFields = [];
   const hasValue = (value) => Boolean(String(value || '').trim());
+
   if (!hasValue(dossier.formState?.childFirstName)) {
     missingRequiredFields.push("Prénom de l'enfant");
     coreMissingFields.push("Prénom de l'enfant");
@@ -45,6 +46,7 @@ export function PatientTabDossierView({ dossier, currentUser }) {
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dossier.formState?.parent1Email)) {
     missingRequiredFields.push('Email du parent 1 invalide');
   }
+
   const canAcknowledge =
     missingRequiredFields.length === 0 || dossier.formState?.procedure_info_acknowledged;
   const canSave =
@@ -54,7 +56,6 @@ export function PatientTabDossierView({ dossier, currentUser }) {
     dossier.formState.procedure_info_acknowledged &&
     missingRequiredFields.length === 0;
   const isCoreComplete = coreMissingFields.length === 0;
-
 
   const signatureMissing = {
     parent1: [],
@@ -66,6 +67,7 @@ export function PatientTabDossierView({ dossier, currentUser }) {
     dossier.formState?.parent2Email,
     dossier.formState?.parent2Phone,
   ].some(hasValue);
+
   if (!hasValue(dossier.formState?.parent1FirstName)) signatureMissing.parent1.push('prénom');
   if (!hasValue(dossier.formState?.parent1LastName)) signatureMissing.parent1.push('nom');
   if (!hasValue(dossier.formState?.parent1Email)) signatureMissing.parent1.push('email');
@@ -82,33 +84,47 @@ export function PatientTabDossierView({ dossier, currentUser }) {
       signatureMissing.parent2.push('téléphone à vérifier');
     }
   }
+
   const signatureMissingSummary = [
     signatureMissing.parent1.length ? `Parent 1 : ${signatureMissing.parent1.join(', ')}` : null,
     signatureMissing.parent2.length ? `Parent 2 : ${signatureMissing.parent2.join(', ')}` : null,
   ].filter(Boolean);
+
   const readyParents = [];
   if (signatureMissing.parent1.length === 0 && parent1PhoneVerified) readyParents.push('Parent 1');
   if (signatureMissing.parent2.length === 0 && parent2PhoneVerified) readyParents.push('Parent 2');
+
+  const preConsultBooked = Boolean(journeyStatus?.pre_consultation?.booked);
+  const reflectionDelay = journeyStatus?.signatures?.reflection_delay;
+  const canSignNow = Boolean(reflectionDelay?.can_sign);
+
   const journeySteps = [];
   if (!isCoreComplete) {
     journeySteps.push(
       "Pour prendre rendez-vous, complétez le dossier (nom, prénom et date de naissance de l’enfant + nom/prénom du parent 1).",
     );
+  } else if (!preConsultBooked) {
+    journeySteps.push("Vous pouvez planifier le rendez-vous d’information dans l’onglet « Rendez-vous ».");
   } else {
     journeySteps.push('Pour signer à distance, chaque parent doit renseigner son email et son numéro de téléphone.');
   }
-  journeySteps.push("Le rendez-vous d’information est obligatoire avant toute intervention.");
-  journeySteps.push('Après ce rendez-vous, un délai de réflexion de 15 jours est requis avant de pouvoir signer.');
-  journeySteps.push('Les 2 parents doivent signer chaque document.');
-  const signatureReadyMessage = isCoreComplete
+  if (!preConsultBooked) {
+    journeySteps.push("Le rendez-vous d’information est obligatoire avant toute intervention.");
+  } else {
+    journeySteps.push('Après ce rendez-vous, un délai de réflexion de 15 jours est requis avant de pouvoir signer.');
+    journeySteps.push('Les 2 parents doivent signer chaque document.');
+  }
+
+  const showSignatureDetails = isCoreComplete && preConsultBooked && canSignNow;
+  const signatureReadyMessage = showSignatureDetails
     ? readyParents.length === 2
-      ? 'Les deux parents pourront signer à distance après le délai de réflexion.'
+      ? 'Les deux parents peuvent signer à distance.'
       : readyParents.length === 1
-        ? `${readyParents[0]} pourra signer à distance après le délai de réflexion.`
+        ? `${readyParents[0]} peut signer à distance.`
         : null
     : null;
   const signatureMissingMessage =
-    isCoreComplete && signatureMissingSummary.length
+    showSignatureDetails && signatureMissingSummary.length
       ? `Points à compléter pour signer à distance (${signatureMissingSummary.join(' ; ')}).`
       : null;
 
@@ -142,8 +158,6 @@ export function PatientTabDossierView({ dossier, currentUser }) {
     setSendingEmailRole(null);
   };
 
-
-
   return (
     <div className="space-y-4">
       {dossier.error && <div className="alert alert-error">{dossier.error}</div>}
@@ -161,51 +175,66 @@ export function PatientTabDossierView({ dossier, currentUser }) {
               disabled={false}
             />
             <GuardianForm
-                title="Parent / Tuteur 1"
-                prefix="parent1"
-                formState={dossier.formState || {}}
-                onChange={dossier.updateForm}
-                required
-                guardianData={dossier.vm?.guardians?.PARENT_1}
-                verificationState={dossier.vm?.verification?.PARENT_1}
-                onSendCode={() => handleSendOtp('PARENT_1')}
-                onVerifyCode={(code) => handleVerifyOtp('PARENT_1', code)}
-                sending={sendingRole === 'PARENT_1'}
-                verifying={verifyingRole === 'PARENT_1'}
-                isUserAccount={true}
-                userEmailVerified={userEmailVerified}
-                disabled={false}
-              />
+              title="Parent / Tuteur 1"
+              prefix="parent1"
+              formState={dossier.formState || {}}
+              onChange={dossier.updateForm}
+              required
+              guardianData={dossier.vm?.guardians?.PARENT_1}
+              verificationState={dossier.vm?.verification?.PARENT_1}
+              onSendCode={() => handleSendOtp('PARENT_1')}
+              onVerifyCode={(code) => handleVerifyOtp('PARENT_1', code)}
+              sending={sendingRole === 'PARENT_1'}
+              verifying={verifyingRole === 'PARENT_1'}
+              isUserAccount
+              userEmailVerified={userEmailVerified}
+              disabled={false}
+            />
             <GuardianForm
-                title="Parent / Tuteur 2"
-                prefix="parent2"
-                formState={dossier.formState || {}}
-                onChange={dossier.updateForm}
-                required={false}
-                guardianData={dossier.vm?.guardians?.PARENT_2}
-                verificationState={dossier.vm?.verification?.PARENT_2}
-                onSendCode={() => handleSendOtp('PARENT_2')}
-                onVerifyCode={(code) => handleVerifyOtp('PARENT_2', code)}
-                sending={sendingRole === 'PARENT_2'}
-                verifying={verifyingRole === 'PARENT_2'}
-                onSendEmailVerification={() => handleSendEmailVerification('PARENT_2')}
-                sendingEmail={sendingEmailRole === 'PARENT_2'}
-                disabled={false}
-              />
+              title="Parent / Tuteur 2"
+              prefix="parent2"
+              formState={dossier.formState || {}}
+              onChange={dossier.updateForm}
+              required={false}
+              guardianData={dossier.vm?.guardians?.PARENT_2}
+              verificationState={dossier.vm?.verification?.PARENT_2}
+              onSendCode={() => handleSendOtp('PARENT_2')}
+              onVerifyCode={(code) => handleVerifyOtp('PARENT_2', code)}
+              sending={sendingRole === 'PARENT_2'}
+              verifying={verifyingRole === 'PARENT_2'}
+              onSendEmailVerification={() => handleSendEmailVerification('PARENT_2')}
+              sendingEmail={sendingEmailRole === 'PARENT_2'}
+              disabled={false}
+            />
           </div>
         ) : (
           <div className="grid md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg">
-            {/* Enfant */}
             <div className="space-y-2">
               <h4 className="font-semibold text-sm text-slate-700 border-b pb-1">Enfant</h4>
               <div className="space-y-1 text-sm">
-                <div><span className="text-slate-600">Nom:</span> <span className="font-medium">{dossier.formState?.childFirstName} {dossier.formState?.childLastName}</span></div>
-                <div><span className="text-slate-600">Né(e) le:</span> <span className="font-medium">{dossier.formState?.birthDate ? new Date(dossier.formState.birthDate).toLocaleDateString('fr-FR') : '-'}</span></div>
-                {dossier.formState?.weightKg && <div><span className="text-slate-600">Poids:</span> <span className="font-medium">{dossier.formState.weightKg} kg</span></div>}
+                <div>
+                  <span className="text-slate-600">Nom:</span>{' '}
+                  <span className="font-medium">
+                    {dossier.formState?.childFirstName} {dossier.formState?.childLastName}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-600">Né(e) le:</span>{' '}
+                  <span className="font-medium">
+                    {dossier.formState?.birthDate
+                      ? new Date(dossier.formState.birthDate).toLocaleDateString('fr-FR')
+                      : '-'}
+                  </span>
+                </div>
+                {dossier.formState?.weightKg && (
+                  <div>
+                    <span className="text-slate-600">Poids:</span>{' '}
+                    <span className="font-medium">{dossier.formState.weightKg} kg</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Parent 1 */}
             <div className="space-y-2">
               <h4 className="font-semibold text-sm text-slate-700 border-b pb-1 flex items-center justify-between">
                 <span>Parent / Tuteur 1</span>
@@ -221,13 +250,23 @@ export function PatientTabDossierView({ dossier, currentUser }) {
                 )}
               </h4>
               <div className="space-y-1 text-sm">
-                <div><span className="text-slate-600">Nom:</span> <span className="font-medium">{dossier.formState?.parent1FirstName} {dossier.formState?.parent1LastName}</span></div>
-                <div><span className="text-slate-600">Email:</span> <span className="font-medium">{dossier.formState?.parent1Email}</span></div>
-                <div><span className="text-slate-600">Tél:</span> <span className="font-medium">{dossier.formState?.parent1Phone || '-'}</span></div>
+                <div>
+                  <span className="text-slate-600">Nom:</span>{' '}
+                  <span className="font-medium">
+                    {dossier.formState?.parent1FirstName} {dossier.formState?.parent1LastName}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-600">Email:</span>{' '}
+                  <span className="font-medium">{dossier.formState?.parent1Email}</span>
+                </div>
+                <div>
+                  <span className="text-slate-600">Tél:</span>{' '}
+                  <span className="font-medium">{dossier.formState?.parent1Phone || '-'}</span>
+                </div>
               </div>
             </div>
 
-            {/* Parent 2 */}
             <div className="space-y-2">
               <h4 className="font-semibold text-sm text-slate-700 border-b pb-1 flex items-center justify-between">
                 <span>Parent / Tuteur 2</span>
@@ -236,7 +275,12 @@ export function PatientTabDossierView({ dossier, currentUser }) {
                 )}
               </h4>
               <div className="space-y-1 text-sm">
-                <div><span className="text-slate-600">Nom:</span> <span className="font-medium">{dossier.formState?.parent2FirstName} {dossier.formState?.parent2LastName}</span></div>
+                <div>
+                  <span className="text-slate-600">Nom:</span>{' '}
+                  <span className="font-medium">
+                    {dossier.formState?.parent2FirstName} {dossier.formState?.parent2LastName}
+                  </span>
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-600">Email:</span>
                   <span className="font-medium">{dossier.formState?.parent2Email}</span>
@@ -244,7 +288,10 @@ export function PatientTabDossierView({ dossier, currentUser }) {
                     <span className="badge badge-success badge-xs">Vérifié</span>
                   )}
                 </div>
-                <div><span className="text-slate-600">Tél:</span> <span className="font-medium">{dossier.formState?.parent2Phone || '-'}</span></div>
+                <div>
+                  <span className="text-slate-600">Tél:</span>{' '}
+                  <span className="font-medium">{dossier.formState?.parent2Phone || '-'}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -259,12 +306,8 @@ export function PatientTabDossierView({ dossier, currentUser }) {
                   <li key={`${step}-${index}`}>{step}</li>
                 ))}
               </ul>
-              {signatureReadyMessage && (
-                <p className="text-sm text-blue-900">{signatureReadyMessage}</p>
-              )}
-              {signatureMissingMessage && (
-                <p className="text-sm text-blue-900">{signatureMissingMessage}</p>
-              )}
+              {signatureReadyMessage && <p className="text-sm text-blue-900">{signatureReadyMessage}</p>}
+              {signatureMissingMessage && <p className="text-sm text-blue-900">{signatureMissingMessage}</p>}
               <div className="flex items-start gap-2 mt-3">
                 <input
                   type="checkbox"
@@ -295,11 +338,7 @@ export function PatientTabDossierView({ dossier, currentUser }) {
               </Button>
             )}
             {dossier.isEditing && (
-              <Button
-                type="button"
-                disabled={!canSave}
-                onClick={dossier.save}
-              >
+              <Button type="button" disabled={!canSave} onClick={dossier.save}>
                 {dossier.saving ? 'Enregistrement…' : 'Enregistrer'}
               </Button>
             )}

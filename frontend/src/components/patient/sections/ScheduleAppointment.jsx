@@ -18,8 +18,7 @@ export function ScheduleAppointment({
         <div className="space-y-3">
           <BlockingNotice
             title="Rendez-vous indisponible"
-            message="Pour prendre rendez-vous, complétez les informations manquantes."
-            items={missingFields}
+            message="Pour prendre rendez-vous, complétez les informations de l’enfant et du parent 1 (nom, prénom, date de naissance)."
           />
           {onCompleteDossier && (
             <div className="flex justify-end">

@@ -65,7 +65,6 @@ const buildJourneyMessage = (journeyStatus) => {
       type: 'action',
       text: 'Complétez le dossier pour prendre rendez-vous.',
       icon: FileText,
-      action: 'Compléter le dossier',
       target: 'dossier',
       learnMore: '/guide?topic=rdv',
     };
@@ -74,9 +73,8 @@ const buildJourneyMessage = (journeyStatus) => {
   if (!preConsultation.booked) {
     return {
       type: 'info',
-      text: 'Prenez le rendez-vous d’information.',
+      text: "Prenez le rendez-vous d’information.",
       icon: Calendar,
-      action: 'Prendre rendez-vous',
       target: 'rdv',
       learnMore: '/guide?topic=rdv-info',
     };
@@ -85,9 +83,8 @@ const buildJourneyMessage = (journeyStatus) => {
   if (preConsultation.booked && !rdvActe.booked) {
     return {
       type: 'info',
-      text: 'Planifiez le rendez-vous pour l’acte.',
+      text: "Planifiez le rendez-vous pour l’acte.",
       icon: Calendar,
-      action: 'Planifier l’acte',
       target: 'rdv',
       learnMore: '/guide?topic=rdv-acte',
     };
@@ -96,23 +93,11 @@ const buildJourneyMessage = (journeyStatus) => {
   if (signatures.complete) return null;
 
   if (delay && delay.can_sign === false && typeof delay.days_left === 'number') {
-    const readyParents = [];
-    if (!parent1Missing) readyParents.push('Parent 1');
-    if (!parent2Missing) readyParents.push('Parent 2');
-    if (readyParents.length) {
-      const plural = readyParents.length > 1;
-      return {
-        type: 'waiting',
-        text: `${readyParents.join(' et ')} pourra${plural ? 'ont' : ''} signer dans ${delay.days_left} jour${delay.days_left > 1 ? 's' : ''}.`,
-        icon: Clock,
-        learnMore: '/guide?topic=signature',
-      };
-    }
     return {
       type: 'waiting',
       text: `Signature dans ${delay.days_left} jour${delay.days_left > 1 ? 's' : ''}.`,
       icon: Clock,
-      learnMore: '/guide?topic=signature',
+      learnMore: '/guide?topic=signature-delay',
     };
   }
 
@@ -121,7 +106,6 @@ const buildJourneyMessage = (journeyStatus) => {
       type: 'action',
       text: 'Complétez le dossier pour signer à distance.',
       icon: FileText,
-      action: 'Compléter le dossier',
       target: 'dossier',
       learnMore: '/guide?topic=signature-distance',
     };
@@ -134,7 +118,7 @@ const buildJourneyMessage = (journeyStatus) => {
   if (missingParents.length) {
     return {
       type: 'ready',
-      text: `${missingParents.join(' et ')} peut signer`,
+      text: `${missingParents.join(' et ')} peut signer.`,
       icon: PenTool,
       learnMore: '/guide?topic=signature',
     };
@@ -201,7 +185,6 @@ export function PatientJourneyHeader({
 
   const journeyMessage = useMemo(() => buildJourneyMessage(resolvedJourney), [resolvedJourney]);
 
-
   return (
     <div className="bg-gradient-to-b from-slate-50 to-slate-100 border-b border-slate-200">
       <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between border-b border-slate-200/60">
@@ -256,9 +239,7 @@ export function PatientJourneyHeader({
                   )}
                 </button>
 
-                <span className={`mt-2 text-sm font-medium ${styles.label}`}>
-                  {step.label}
-                </span>
+                <span className={`mt-2 text-sm font-medium ${styles.label}`}>{step.label}</span>
                 <span className={`text-xs ${styles.subtext}`}>{step.subtext}</span>
               </div>
             );
@@ -279,9 +260,6 @@ export function PatientJourneyHeader({
               >
                 <journeyMessage.icon className="w-4 h-4" />
                 {journeyMessage.text}
-                {journeyMessage.action && (
-                  <span className="ml-2 text-blue-700 font-semibold">{journeyMessage.action}</span>
-                )}
               </button>
             ) : (
               <div
@@ -293,8 +271,8 @@ export function PatientJourneyHeader({
               >
                 <journeyMessage.icon className="w-4 h-4" />
                 {journeyMessage.text}
-                </div>
-              )}
+              </div>
+            )}
             {journeyMessage.learnMore && (
               <a
                 href={journeyMessage.learnMore}
@@ -366,9 +344,6 @@ export function PatientJourneyHeader({
               >
                 <journeyMessage.icon className="w-3.5 h-3.5" />
                 {journeyMessage.text}
-                {journeyMessage.action && (
-                  <span className="ml-2 text-blue-700 font-semibold">{journeyMessage.action}</span>
-                )}
               </button>
             ) : (
               <div
@@ -380,8 +355,8 @@ export function PatientJourneyHeader({
               >
                 <journeyMessage.icon className="w-3.5 h-3.5" />
                 {journeyMessage.text}
-                </div>
-              )}
+              </div>
+            )}
             {journeyMessage.learnMore && (
               <a
                 href={journeyMessage.learnMore}

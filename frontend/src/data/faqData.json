@@ -4,22 +4,22 @@
     "category": "Inscription Et Compte",
     "questions": [
       {
-        "question": "Comment créer mon compte sur la plateforme ?",
+        "question": "Comment créer mon compte sur la plateforme ",
         "answer": "• Rendez-vous sur la plateforme via le lien qui vous a été communiqué • Cliquez sur « S'inscrire » ou « Créer un compte » • Renseignez votre adresse email et choisissez un mot de passe sécurisé • Validez votre inscription en cliquant sur le lien reçu par email • Connectez-vous ensuite avec vos identifiants",
         "bullets": []
       },
       {
-        "question": "J'ai oublié mon mot de passe, que faire ?",
+        "question": "J'ai oublié mon mot de passe, que faire ",
         "answer": "Sur la page de connexion, cliquez sur « Mot de passe oublié ». Vous recevrez un email avec un lien pour réinitialiser votre mot de passe. Vérifiez vos courriers indésirables si vous ne le trouvez pas.",
         "bullets": []
       },
       {
-        "question": "Puis-je modifier mon adresse email après inscription ?",
+        "question": "Puis-je modifier mon adresse email après inscription ",
         "answer": "Oui, vous pouvez modifier votre email depuis votre espace personnel, onglet « Mon compte ». Un email de vérification sera envoyé à votre nouvelle adresse pour confirmer le changement.",
         "bullets": []
       },
       {
-        "question": "La plateforme est-elle sécurisée ?",
+        "question": "La plateforme est-elle sécurisée ",
         "answer": "Oui, la plateforme utilise un hébergement certifié HDS (Hébergeur de Données de Santé), conforme aux normes françaises et européennes de protection des données médicales. Toutes vos données sont chiffrées et sécurisées.",
         "bullets": []
       }
@@ -30,32 +30,45 @@
     "category": "Dossier De L'Enfant",
     "questions": [
       {
-        "question": "Quelles informations dois-je fournir pour mon enfant ?",
+        "question": "Compléter le dossier pour prendre rendez-vous",
+        "answer": "Pour pouvoir prendre un rendez-vous, nous avons besoin des informations essentielles suivantes :",
+        "bullets": [
+          "Prénom et nom de l’enfant",
+          "Date de naissance de l’enfant",
+          "Prénom et nom du parent 1"
+        ]
+      },
+      {
+        "question": "Quelles informations dois-je fournir pour mon enfant ",
         "answer": "• Nom et prénom de l'enfant • Date de naissance • Poids actuel (très important pour l'anesthésie) • Les coordonnées des deux parents ou responsables légaux",
         "bullets": []
       },
       {
-        "question": "Pourquoi le poids de mon enfant est-il demandé ?",
-        "answer": "Le poids est essentiel pour calculer précisément le dosage de l'anesthésique local. C'est une mesure de sécurité standard en pédiatrie. Pesez votre enfant peu avant le rendez-vous pour avoir une valeur à jour.",
-        "bullets": []
+        "question": "Compléter le dossier pour prendre rendez-vous",
+        "answer": "Pour pouvoir prendre un rendez-vous, nous avons besoin des informations essentielles suivantes :",
+        "bullets": [
+          "Prénom et nom de l’enfant",
+          "Date de naissance de l’enfant",
+          "Prénom et nom du parent 1"
+        ]
       },
       {
-        "question": "Pourquoi les deux parents doivent-ils être renseignés ?",
+        "question": "Pourquoi les deux parents doivent-ils être renseignés ",
         "answer": "La loi française exige le consentement des deux parents (ou responsables légaux) pour toute intervention chirurgicale sur un enfant mineur. C'est une obligation légale que nous devons respecter pour protéger votre enfant.",
         "bullets": []
       },
       {
-        "question": "Je suis parent seul avec l'autorité parentale exclusive, que faire ?",
+        "question": "Je suis parent seul avec l'autorité parentale exclusive, que faire ",
         "answer": "Dans ce cas, vous devrez fournir un justificatif (jugement de divorce mentionnant l'autorité parentale exclusive, ou certificat de décès). Contactez le cabinet pour connaître les modalités.",
         "bullets": []
       },
       {
-        "question": "À quoi sert la vérification du numéro de téléphone par SMS ?",
+        "question": "À quoi sert la vérification du numéro de téléphone par SMS ",
         "answer": "Cette verification sert a signer vos documents a distance (code SMS) et a securiser votre dossier. Elle est requise pour la signature a distance.",
         "bullets": []
       },
       {
-        "question": "Mon enfant a-t-il un âge minimum ou maximum pour l'intervention ?",
+        "question": "Mon enfant a-t-il un âge minimum ou maximum pour l'intervention ",
         "answer": "Le médecin évalue chaque situation individuellement. L'intervention peut être réalisée à tout âge pédiatrique, mais les conditions d'anesthésie et de prise en charge sont adaptées selon l'âge. Cette question sera abordée lors de l'entretien d'information.",
         "bullets": []
       }
@@ -66,47 +79,52 @@
     "category": "Entretien D'Information",
     "questions": [
       {
-        "question": "En quoi consiste l'entretien d'information ?",
+        "question": "Comment prendre rendez-vous pour l’entretien d’information ?",
+        "answer": "Depuis votre espace patient, allez dans l’onglet « Rendez-vous » et choisissez un créneau disponible pour la consultation d’information.",
+        "bullets": []
+      },
+      {
+        "question": "En quoi consiste l'entretien d'information ",
         "answer": "C'est un échange avec le médecin au cours duquel il vous explique en détail l'intervention : son déroulement, son caractère irréversible, les risques possibles, les bénéfices attendus et les soins post-opératoires. C'est aussi l'occasion de poser toutes vos questions.",
         "bullets": []
       },
       {
-        "question": "Cet entretien est-il obligatoire ?",
+        "question": "Cet entretien est-il obligatoire ",
         "answer": "Oui, l'entretien d'information est une obligation légale et déontologique. Aucune intervention ne peut avoir lieu sans que vous ayez reçu une information complète et que vous ayez pu poser vos questions.",
         "bullets": []
       },
       {
-        "question": "Que va m'expliquer le médecin lors de cet entretien ?",
+        "question": "Que va m'expliquer le médecin lors de cet entretien ",
         "answer": "• La nature exacte de l'intervention (circoncision) • Le caractère irréversible de l'acte • Les risques et complications possibles (saignement, infection, douleur) • Les bénéfices attendus dans le cadre de votre démarche • Les soins post-opératoires à prévoir • Les alternatives : vous êtes libres de ne pas donner suite",
         "bullets": []
       },
       {
-        "question": "Est-ce que les deux parents doivent participer à l'entretien ?",
+        "question": "Est-ce que les deux parents doivent participer à l'entretien ",
         "answer": "Idéalement oui, afin que les deux parents disposent des mêmes informations avant de donner leur consentement. Si ce n'est pas possible, le parent présent devra transmettre les informations à l'autre parent.",
         "bullets": []
       },
       {
-        "question": "Que se passe-t-il après l'entretien d'information ?",
+        "question": "Que se passe-t-il après l'entretien d'information ",
         "answer": "Vous recevrez un récapitulatif des informations transmises ainsi que des fiches détaillées. Un délai de réflexion de 15 jours minimum est ensuite obligatoire avant de pouvoir programmer l'intervention. ⏳  DÉLAI DE RÉFLEXION",
         "bullets": []
       },
       {
-        "question": "Pourquoi y a-t-il un délai de 15 jours avant l'intervention ?",
+        "question": "Pourquoi y a-t-il un délai de 15 jours avant l'intervention ",
         "answer": "Ce délai de réflexion vous permet de prendre votre décision sereinement, sans précipitation. C'est une mesure de protection qui vous laisse le temps de réfléchir, de discuter en famille, et de poser des questions complémentaires si besoin.",
         "bullets": []
       },
       {
-        "question": "Le délai de 15 jours est-il obligatoire ?",
+        "question": "Le délai de 15 jours est-il obligatoire ",
         "answer": "Oui, ce délai est une règle de bonne pratique médicale pour ce type d'intervention. La plateforme ne vous permettra pas de réserver un créneau avant ce délai.",
         "bullets": []
       },
       {
-        "question": "Puis-je annuler ma décision pendant ce délai ?",
+        "question": "Puis-je annuler ma décision pendant ce délai ",
         "answer": "Absolument. Pendant ce délai de réflexion (et même après), vous pouvez annuler à tout moment et sans frais. Aucun engagement n'est définitif tant que l'intervention n'a pas eu lieu.",
         "bullets": []
       },
       {
-        "question": "Le délai commence quand exactement ?",
+        "question": "Le délai commence quand exactement ",
         "answer": "Le délai de 15 jours commence à compter de votre entretien d'information avec le médecin. La plateforme calcule automatiquement la première date disponible.",
         "bullets": []
       }
@@ -117,27 +135,27 @@
     "category": "Rendez-Vous Pour L'Acte",
     "questions": [
       {
-        "question": "Comment prendre rendez-vous pour l'intervention ?",
+        "question": "Comment prendre rendez-vous pour l'intervention ",
         "answer": "Depuis votre espace patient, accédez au calendrier dans l'onglet « Rendez-vous ». Sélectionnez une date disponible (minimum 15 jours après votre entretien d'information). Vous recevrez une confirmation par email et SMS.",
         "bullets": []
       },
       {
-        "question": "Puis-je modifier ou annuler mon rendez-vous ?",
+        "question": "Puis-je modifier ou annuler mon rendez-vous ",
         "answer": "Oui, vous pouvez modifier ou annuler votre rendez-vous depuis votre espace patient. Prévenez le plus tôt possible pour permettre à d'autres familles de bénéficier du créneau libéré.",
         "bullets": []
       },
       {
-        "question": "Les deux parents doivent-ils être présents le jour de l'intervention ?",
+        "question": "Les deux parents doivent-ils être présents le jour de l'intervention ",
         "answer": "Oui, la présence des deux parents (ou responsables légaux) est obligatoire le jour de l'acte pour confirmer leur consentement. Sans la présence des deux parents, l'intervention ne pourra pas avoir lieu.",
         "bullets": []
       },
       {
-        "question": "Que dois-je apporter le jour du rendez-vous ?",
+        "question": "Que dois-je apporter le jour du rendez-vous ",
         "answer": "• Une pièce d'identité pour chaque parent • Le carnet de santé de l'enfant • L'ordonnance si elle vous a déjà été transmise • Des vêtements amples et confortables pour votre enfant",
         "bullets": []
       },
       {
-        "question": "Combien de temps dure le rendez-vous ?",
+        "question": "Combien de temps dure le rendez-vous ",
         "answer": "Prévoyez environ 1h30 à 2h au total : accueil et vérification du consentement, préparation de l'enfant, intervention (15-30 minutes), surveillance post-opératoire et explications des soins.",
         "bullets": []
       }
@@ -148,32 +166,32 @@
     "category": "Signature Des Documents",
     "questions": [
       {
-        "question": "Quels documents dois-je signer ?",
+        "question": "Quels documents dois-je signer ",
         "answer": "• L'autorisation d'intervention : votre accord pour la réalisation de l'acte • Le consentement éclairé : confirmation que vous avez reçu toutes les informations • Le devis et honoraires : acceptation des conditions financières",
         "bullets": []
       },
       {
-        "question": "Les deux parents doivent-ils signer ?",
+        "question": "Les deux parents doivent-ils signer ",
         "answer": "Oui, les deux parents (ou responsables légaux) doivent signer chacun des trois documents. C'est une obligation légale pour toute intervention sur un enfant mineur.",
         "bullets": []
       },
       {
         "question": "Comment signer les documents ?",
-        "answer": "• À distance : vous recevez un lien sécurisé par email pour signer électroniquement • Au cabinet : vous signez sur tablette le jour de l'intervention",
+        "answer": "• À distance : vous recevez un lien sécurisé par email pour signer électroniquement. Un numéro de téléphone vérifié est obligatoire pour activer la signature à distance. • Au cabinet : vous signez sur tablette le jour de l’intervention.",
         "bullets": []
       },
       {
-        "question": "Puis-je signer les documents le jour de l'intervention ?",
+        "question": "Puis-je signer les documents le jour de l'intervention ",
         "answer": "Oui, la signature peut être effectuée le jour de l'acte, directement au cabinet sur tablette. Cependant, vous devez avoir reçu les informations et respecté le délai de réflexion de 15 jours.",
         "bullets": []
       },
       {
-        "question": "La signature électronique est-elle valable juridiquement ?",
+        "question": "La signature électronique est-elle valable juridiquement ",
         "answer": "Oui, la signature électronique a la même valeur juridique que la signature manuscrite (règlement européen eIDAS). Elle est sécurisée, horodatée et constitue une preuve légale.",
         "bullets": []
       },
       {
-        "question": "Comment récupérer les documents signés ?",
+        "question": "Comment récupérer les documents signés ",
         "answer": "Une fois tous les documents signés par les deux parents, vous pouvez les télécharger au format PDF depuis votre espace patient. Ils sont également conservés de manière sécurisée dans votre dossier.",
         "bullets": []
       }
@@ -184,62 +202,62 @@
     "category": "Le Jour De L'Intervention",
     "questions": [
       {
-        "question": "Comment se déroule l'accueil le jour J ?",
+        "question": "Comment se déroule l'accueil le jour J ",
         "answer": "• Vous serez accueillis par l'équipe médicale • Vérification de l'identité de l'enfant et des deux parents • Confirmation orale du consentement de chaque parent • Signature des documents si ce n'est pas déjà fait",
         "bullets": []
       },
       {
-        "question": "L'intervention est-elle douloureuse pour mon enfant ?",
+        "question": "L'intervention est-elle douloureuse pour mon enfant ",
         "answer": "L'intervention est réalisée sous anesthésie locale. Une crème anesthésiante est appliquée avant, puis une injection insensibilise complètement la zone. Votre enfant peut ressentir une légère piqûre (comme une vaccination), mais aucune douleur pendant l'intervention.",
         "bullets": []
       },
       {
-        "question": "Mon enfant sera-t-il immobilisé ?",
+        "question": "Mon enfant sera-t-il immobilisé ",
         "answer": "Oui, une immobilisation douce et sécurisée est nécessaire pour garantir la sécurité de votre enfant pendant l'intervention. C'est une mesure standard en pédiatrie, réalisée avec des dispositifs adaptés et sans douleur.",
         "bullets": []
       },
       {
-        "question": "Mon enfant sera-t-il rassuré pendant l'intervention ?",
+        "question": "Mon enfant sera-t-il rassuré pendant l'intervention ",
         "answer": "Oui, un écran au plafond diffuse des dessins animés pour distraire et rassurer votre enfant. L'environnement est conçu pour être le plus apaisant possible.",
         "bullets": []
       },
       {
-        "question": "Puis-je rester avec mon enfant pendant l'intervention ?",
+        "question": "Puis-je rester avec mon enfant pendant l'intervention ",
         "answer": "La politique dépend du praticien. En général, vous pouvez rassurer votre enfant par votre voix et rester à proximité. Si vous pensez ne pas supporter la vue de l'intervention, signalez-le : vous pourrez attendre dans la pièce voisine.",
         "bullets": []
       },
       {
-        "question": "Combien de temps dure l'intervention ?",
+        "question": "Combien de temps dure l'intervention ",
         "answer": "L'intervention elle-même dure généralement entre 15 et 30 minutes. Elle comprend : désinfection, anesthésie, intervention, suture avec fils résorbables, et pansement. 💊  APRÈS L'INTERVENTION",
         "bullets": []
       },
       {
-        "question": "Quels soins dois-je réaliser après l'intervention ?",
+        "question": "Quels soins dois-je réaliser après l'intervention ",
         "answer": "Vous recevrez des consignes détaillées et une ordonnance. En général : application d'une crème cicatrisante, changement de pansement, surveillance de la zone. Le médecin vous expliquera tout avant votre départ.",
         "bullets": []
       },
       {
-        "question": "Mon enfant aura-t-il mal après l'intervention ?",
+        "question": "Mon enfant aura-t-il mal après l'intervention ",
         "answer": "Une légère douleur ou gêne est normale pendant 2-3 jours. L'ordonnance comprend des antidouleurs adaptés à l'âge de votre enfant. Si la douleur persiste ou s'aggrave, contactez le cabinet.",
         "bullets": []
       },
       {
-        "question": "Quand mon enfant pourra-t-il prendre un bain ?",
+        "question": "Quand mon enfant pourra-t-il prendre un bain ",
         "answer": "Les consignes exactes vous seront données par le médecin. En général, les bains sont évités les premiers jours. La douche rapide est souvent possible plus tôt.",
         "bullets": []
       },
       {
-        "question": "Les fils de suture doivent-ils être retirés ?",
+        "question": "Les fils de suture doivent-ils être retirés ",
         "answer": "Non, les fils utilisés sont résorbables : ils disparaissent seuls en quelques semaines. Aucun rendez-vous de retrait n'est nécessaire.",
         "bullets": []
       },
       {
-        "question": "Combien de temps dure la cicatrisation ?",
+        "question": "Combien de temps dure la cicatrisation ",
         "answer": "La cicatrisation complète prend généralement 2 à 3 semaines. Un gonflement et des rougeurs sont normaux les premiers jours et diminuent progressivement.",
         "bullets": []
       },
       {
-        "question": "Quand dois-je m'inquiéter et consulter en urgence ?",
+        "question": "Quand dois-je m'inquiéter et consulter en urgence ",
         "answer": "• Saignement important qui ne s'arrête pas • Fièvre supérieure à 38,5°C • Rougeur qui s'étend autour de la zone • Écoulement anormal (pus) • Douleur intense malgré les antidouleurs • Dans ces cas, contactez immédiatement le cabinet ou les urgences.",
         "bullets": []
       }
@@ -250,27 +268,27 @@
     "category": "Tarifs Et Paiement",
     "questions": [
       {
-        "question": "Quel est le coût de l'intervention ?",
+        "question": "Quel est le coût de l'intervention ",
         "answer": "Le tarif vous sera communiqué lors de l'entretien d'information et figure sur le devis que vous devez signer. Il comprend l'acte chirurgical, l'anesthésie locale et les soins immédiats.",
         "bullets": []
       },
       {
-        "question": "L'intervention est-elle remboursée par la Sécurité Sociale ?",
+        "question": "L'intervention est-elle remboursée par la Sécurité Sociale ",
         "answer": "Non, la circoncision rituelle n'est pas un acte médical remboursé par l'Assurance Maladie. L'ordonnance porte la mention « NB » (Non Remboursable).",
         "bullets": []
       },
       {
-        "question": "Ma mutuelle peut-elle prendre en charge une partie ?",
+        "question": "Ma mutuelle peut-elle prendre en charge une partie ",
         "answer": "Certaines mutuelles peuvent prendre en charge une partie des frais. Nous vous recommandons de contacter votre mutuelle avant l'intervention pour connaître leurs conditions.",
         "bullets": []
       },
       {
-        "question": "Quels sont les moyens de paiement acceptés ?",
+        "question": "Quels sont les moyens de paiement acceptés ",
         "answer": "Les moyens de paiement acceptés sont précisés dans le devis. En général : carte bancaire, espèces. Renseignez-vous auprès du cabinet pour les modalités exactes.",
         "bullets": []
       },
       {
-        "question": "Le paiement se fait-il avant ou après l'intervention ?",
+        "question": "Le paiement se fait-il avant ou après l'intervention ",
         "answer": "Les modalités de paiement sont précisées dans le devis que vous signez. Le cabinet vous informera du moment du règlement.",
         "bullets": []
       }
@@ -281,22 +299,22 @@
     "category": "Autres Questions",
     "questions": [
       {
-        "question": "Mes données personnelles sont-elles protégées ?",
+        "question": "Mes données personnelles sont-elles protégées ",
         "answer": "Oui, vos données sont hébergées chez un prestataire certifié HDS (Hébergeur de Données de Santé), conformément à la réglementation française. Elles sont chiffrées et accessibles uniquement par le personnel médical autorisé. Vous disposez d'un droit d'accès, de rectification et de suppression (RGPD).",
         "bullets": []
       },
       {
-        "question": "Puis-je supprimer mon compte et mes données ?",
+        "question": "Puis-je supprimer mon compte et mes données ",
         "answer": "Oui, conformément au RGPD, vous pouvez demander la suppression de votre compte et de vos données personnelles. Notez cependant que certaines données médicales doivent être conservées pendant la durée légale (10 ans).",
         "bullets": []
       },
       {
-        "question": "Qui puis-je contacter en cas de problème technique ?",
+        "question": "Qui puis-je contacter en cas de problème technique ",
         "answer": "Pour tout problème technique (connexion, mot de passe, bug), vous pouvez contacter le cabinet par téléphone ou par email. Nous vous répondrons dans les meilleurs délais.",
         "bullets": []
       },
       {
-        "question": "La plateforme est-elle accessible sur mobile ?",
+        "question": "La plateforme est-elle accessible sur mobile ",
         "answer": "Oui, la plateforme est entièrement responsive et accessible depuis votre smartphone ou tablette. Vous pouvez compléter votre dossier et signer vos documents depuis n'importe quel appareil. 💡 [Email du cabinet]  •  [Téléphone du cabinet]",
         "bullets": []
       }

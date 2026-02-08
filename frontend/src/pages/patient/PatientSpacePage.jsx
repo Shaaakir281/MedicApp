@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PdfPreviewModal from '../../components/PdfPreviewModal.jsx';
 import Toast from '../../components/Toast.jsx';
@@ -47,6 +47,19 @@ export function PatientSpacePage({
     },
   });
   const journey = usePatientJourney({ token });
+
+  useEffect(() => {
+    if (dossier.success) {
+      journey.refetch?.();
+    }
+  }, [dossier.success, journey.refetch]);
+
+  useEffect(() => {
+    if (controller.successMessage) {
+      journey.refetch?.();
+    }
+  }, [controller.successMessage, journey.refetch]);
+
   const [activeTab, setActiveTab] = useState(TABS.file);
   const [pendingPrescriptionId, setPendingPrescriptionId] = useState(null);
 
@@ -157,7 +170,7 @@ export function PatientSpacePage({
         >
           <h3 className="text-base font-semibold text-slate-800">Guide & FAQ</h3>
           <p className="text-sm text-slate-500 mt-2">
-            Trouvez rapidement les réponses aux questions les plus frequentes.
+            Trouvez rapidement les réponses aux questions les plus fréquentes.
           </p>
         </Link>
       </div>
@@ -200,7 +213,7 @@ export function PatientSpacePage({
       {controller.error && <div className="alert alert-error">{controller.error}</div>}
 
       {activeTab === TABS.file && (
-        <PatientTabDossierView dossier={dossier} currentUser={user} />
+        <PatientTabDossierView dossier={dossier} currentUser={user} journeyStatus={journey.journeyStatus} />
       )}
 
       {activeTab === TABS.appointments && (

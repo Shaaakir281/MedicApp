@@ -17,16 +17,41 @@ const CATEGORY_LABELS = {
 };
 
 const TOPIC_TARGETS = {
-  rdv: { category_raw: "RENDEZ-VOUS POUR L'ACTE", index: 0 },
-  'rdv-info': { category_raw: "ENTRETIEN D'INFORMATION", index: 0 },
-  'rdv-acte': { category_raw: "RENDEZ-VOUS POUR L'ACTE", index: 0 },
-  signature: { category_raw: 'SIGNATURE DES DOCUMENTS', index: 1 },
-  'signature-distance': { category_raw: 'SIGNATURE DES DOCUMENTS', index: 2 },
-  'signature-delay': { category_raw: "ENTRETIEN D'INFORMATION", index: 5 },
-  dossier: { category_raw: "DOSSIER DE L'ENFANT", index: 0 },
+  rdv: {
+    category_raw: "DOSSIER DE L'ENFANT",
+    match: 'Compléter le dossier pour prendre rendez-vous',
+  },
+  'rdv-info': {
+    category_raw: "ENTRETIEN D'INFORMATION",
+    match: "Comment prendre rendez-vous pour l’entretien d’information",
+  },
+  'rdv-acte': {
+    category_raw: "RENDEZ-VOUS POUR L'ACTE",
+    match: "Comment prendre rendez-vous pour l'intervention",
+  },
+  signature: {
+    category_raw: 'SIGNATURE DES DOCUMENTS',
+    match: 'Comment signer les documents',
+  },
+  'signature-distance': {
+    category_raw: 'SIGNATURE DES DOCUMENTS',
+    match: 'Comment signer les documents',
+  },
+  'signature-delay': {
+    category_raw: "ENTRETIEN D'INFORMATION",
+    match: 'délai de 15 jours',
+  },
+  dossier: {
+    category_raw: "DOSSIER DE L'ENFANT",
+    match: 'Compléter le dossier pour prendre rendez-vous',
+  },
 };
 
-const normalize = (value) => value.toLowerCase();
+const normalize = (value) =>
+  value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
 const slugify = (text) =>
   text
@@ -65,7 +90,15 @@ const resolveTopicTarget = (topic, faqData) => {
   if (!target) return null;
   const category = faqData.find((item) => item.category_raw === target.category_raw);
   if (!category || !category.questions.length) return null;
-  const question = category.questions[target.index] || category.questions[0];
+  let question = null;
+  if (target.match) {
+    const match = normalize(target.match);
+    question = category.questions.find((item) => normalize(item.question).includes(match));
+  }
+  if (!question) {
+    const index = typeof target.index === 'number' ? target.index : 0;
+    question = category.questions[index] || category.questions[0];
+  }
   return {
     categoryRaw: category.category_raw,
     questionId: buildQuestionId(category.category_raw, question.question),
@@ -73,7 +106,6 @@ const resolveTopicTarget = (topic, faqData) => {
 };
 
 const GuideFAQ = () => {
-
   const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL || '';
   const supportPhone = import.meta.env.VITE_HOSPITAL_PHONE || '';
 
@@ -154,7 +186,7 @@ const GuideFAQ = () => {
     setTimeout(() => {
       document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);
-  }, [location.hash]);
+  }, [faqData, location.hash, location.search]);
 
   const handleToggleQuestion = (questionId) => {
     setOpenQuestions((prev) => {
@@ -302,7 +334,7 @@ const GuideFAQ = () => {
                                 <img
                                   key={src}
                                   src={src}
-                                  alt="Capture d'ecran"
+                                  alt="Capture d'écran"
                                   className="rounded-lg border border-slate-200"
                                   loading="lazy"
                                 />
@@ -313,7 +345,9 @@ const GuideFAQ = () => {
                             <button
                               type="button"
                               className="text-xs text-blue-600 hover:text-blue-700"
-                              onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/guide#${questionId}`)}
+                              onClick={() =>
+                                navigator.clipboard.writeText(`${window.location.origin}/guide#${questionId}`)
+                              }
                             >
                               Copier le lien
                             </button>

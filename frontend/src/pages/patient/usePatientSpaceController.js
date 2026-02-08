@@ -181,7 +181,7 @@ export function usePatientSpaceController({
       if (!vm.guardians.parent1.verified) {
         return 'Parent 1 : vérifiez le téléphone pour signer à distance.';
       }
-      return 'Signature ? finaliser.';
+      return 'Signature à finaliser.';
     }
     return null;
   }, [
