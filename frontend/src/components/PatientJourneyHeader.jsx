@@ -54,54 +54,76 @@ const buildJourneyMessage = (journeyStatus) => {
   const rdvActe = journeyStatus.rdv_acte || defaultJourney.rdv_acte;
   const signatures = journeyStatus.signatures || defaultJourney.signatures;
   const delay = signatures.reflection_delay || {};
+  const missingFields = dossier.missing_fields || [];
+  const parent1Missing = missingFields.some((field) => field.startsWith('parent1_'));
+  const parent2Missing = missingFields.some(
+    (field) => field.startsWith('parent2_') || field === 'parent2_contact',
+  );
 
   if (!dossier.created) {
     return {
       type: 'action',
-      text: "Pour commencer, compl?tez le dossier (nom, pr?nom et date de naissance de l?enfant + nom/pr?nom du parent 1) pour pouvoir planifier un rendez-vous.",
+      text: 'Complétez le dossier pour prendre rendez-vous.',
       icon: FileText,
-      action: 'Compl?ter le dossier',
+      action: 'Compléter le dossier',
       target: 'dossier',
+      learnMore: '/guide?topic=rdv',
     };
   }
 
   if (!preConsultation.booked) {
     return {
       type: 'info',
-      text: 'Vous pouvez d?sormais prendre votre rendez-vous d?information.',
+      text: 'Prenez le rendez-vous d’information.',
       icon: Calendar,
       action: 'Prendre rendez-vous',
       target: 'rdv',
+      learnMore: '/guide?topic=rdv-info',
     };
   }
 
   if (preConsultation.booked && !rdvActe.booked) {
     return {
       type: 'info',
-      text: 'Vous pouvez planifier votre rendez-vous pour l?acte.',
+      text: 'Planifiez le rendez-vous pour l’acte.',
       icon: Calendar,
-      action: 'Planifier l?acte',
+      action: 'Planifier l’acte',
       target: 'rdv',
+      learnMore: '/guide?topic=rdv-acte',
     };
   }
 
   if (signatures.complete) return null;
 
   if (delay && delay.can_sign === false && typeof delay.days_left === 'number') {
+    const readyParents = [];
+    if (!parent1Missing) readyParents.push('Parent 1');
+    if (!parent2Missing) readyParents.push('Parent 2');
+    if (readyParents.length) {
+      const plural = readyParents.length > 1;
+      return {
+        type: 'waiting',
+        text: `${readyParents.join(' et ')} pourra${plural ? 'ont' : ''} signer dans ${delay.days_left} jour${delay.days_left > 1 ? 's' : ''}.`,
+        icon: Clock,
+        learnMore: '/guide?topic=signature',
+      };
+    }
     return {
       type: 'waiting',
-      text: `Signature possible dans ${delay.days_left} jour${delay.days_left > 1 ? 's' : ''}`,
+      text: `Signature dans ${delay.days_left} jour${delay.days_left > 1 ? 's' : ''}.`,
       icon: Clock,
+      learnMore: '/guide?topic=signature',
     };
   }
 
-  if (!dossier.complete) {
+  if (parent1Missing || parent2Missing) {
     return {
       type: 'action',
-      text: 'Compl?tez le dossier pour signer ? distance',
+      text: 'Complétez le dossier pour signer à distance.',
       icon: FileText,
-      action: 'Compl?ter le dossier',
+      action: 'Compléter le dossier',
       target: 'dossier',
+      learnMore: '/guide?topic=signature-distance',
     };
   }
 
@@ -114,6 +136,7 @@ const buildJourneyMessage = (journeyStatus) => {
       type: 'ready',
       text: `${missingParents.join(' et ')} peut signer`,
       icon: PenTool,
+      learnMore: '/guide?topic=signature',
     };
   }
 
@@ -243,7 +266,7 @@ export function PatientJourneyHeader({
         </div>
 
         {journeyMessage && (
-          <div className="mt-5 flex justify-center">
+          <div className="mt-5 flex flex-col items-center gap-2">
             {journeyMessage.type === 'action' || journeyMessage.type === 'info' ? (
               <button
                 type="button"
@@ -270,7 +293,15 @@ export function PatientJourneyHeader({
               >
                 <journeyMessage.icon className="w-4 h-4" />
                 {journeyMessage.text}
-              </div>
+                </div>
+              )}
+            {journeyMessage.learnMore && (
+              <a
+                href={journeyMessage.learnMore}
+                className="text-xs text-slate-500 underline underline-offset-4 hover:text-slate-700"
+              >
+                En savoir plus
+              </a>
             )}
           </div>
         )}
@@ -322,7 +353,7 @@ export function PatientJourneyHeader({
         </div>
 
         {journeyMessage && (
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center gap-2">
             {journeyMessage.type === 'action' || journeyMessage.type === 'info' ? (
               <button
                 type="button"
@@ -349,7 +380,15 @@ export function PatientJourneyHeader({
               >
                 <journeyMessage.icon className="w-3.5 h-3.5" />
                 {journeyMessage.text}
-              </div>
+                </div>
+              )}
+            {journeyMessage.learnMore && (
+              <a
+                href={journeyMessage.learnMore}
+                className="text-[11px] text-slate-500 underline underline-offset-4 hover:text-slate-700"
+              >
+                En savoir plus
+              </a>
             )}
           </div>
         )}

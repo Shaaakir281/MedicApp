@@ -17,12 +17,28 @@ export function PatientTabDossierView({ dossier, currentUser }) {
   );
   const parent1PhoneVerified = Boolean(dossier.vm?.guardians?.PARENT_1?.phoneVerifiedAt);
   const missingRequiredFields = [];
+  const coreMissingFields = [];
   const hasValue = (value) => Boolean(String(value || '').trim());
-  if (!hasValue(dossier.formState?.childFirstName)) missingRequiredFields.push("Prénom de l'enfant");
-  if (!hasValue(dossier.formState?.childLastName)) missingRequiredFields.push("Nom de l'enfant");
-  if (!hasValue(dossier.formState?.birthDate)) missingRequiredFields.push('Date de naissance');
-  if (!hasValue(dossier.formState?.parent1FirstName)) missingRequiredFields.push('Prénom du parent 1');
-  if (!hasValue(dossier.formState?.parent1LastName)) missingRequiredFields.push('Nom du parent 1');
+  if (!hasValue(dossier.formState?.childFirstName)) {
+    missingRequiredFields.push("Prénom de l'enfant");
+    coreMissingFields.push("Prénom de l'enfant");
+  }
+  if (!hasValue(dossier.formState?.childLastName)) {
+    missingRequiredFields.push("Nom de l'enfant");
+    coreMissingFields.push("Nom de l'enfant");
+  }
+  if (!hasValue(dossier.formState?.birthDate)) {
+    missingRequiredFields.push('Date de naissance');
+    coreMissingFields.push('Date de naissance');
+  }
+  if (!hasValue(dossier.formState?.parent1FirstName)) {
+    missingRequiredFields.push('Prénom du parent 1');
+    coreMissingFields.push('Prénom du parent 1');
+  }
+  if (!hasValue(dossier.formState?.parent1LastName)) {
+    missingRequiredFields.push('Nom du parent 1');
+    coreMissingFields.push('Nom du parent 1');
+  }
   if (!hasValue(dossier.formState?.parent1Email)) {
     missingRequiredFields.push('Email du parent 1');
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dossier.formState?.parent1Email)) {
@@ -36,6 +52,7 @@ export function PatientTabDossierView({ dossier, currentUser }) {
     dossier.formState &&
     dossier.formState.procedure_info_acknowledged &&
     missingRequiredFields.length === 0;
+  const isCoreComplete = coreMissingFields.length === 0;
 
 
   const signatureMissing = {
@@ -54,6 +71,31 @@ export function PatientTabDossierView({ dossier, currentUser }) {
     signatureMissing.parent1.length ? `Parent 1 : ${signatureMissing.parent1.join(', ')}` : null,
     signatureMissing.parent2.length ? `Parent 2 : ${signatureMissing.parent2.join(', ')}` : null,
   ].filter(Boolean);
+  const readyParents = [];
+  if (signatureMissing.parent1.length === 0) readyParents.push('Parent 1');
+  if (signatureMissing.parent2.length === 0) readyParents.push('Parent 2');
+  const journeySteps = [];
+  if (!isCoreComplete) {
+    journeySteps.push(
+      "Pour prendre rendez-vous, complétez le dossier (nom, prénom et date de naissance de l’enfant + nom/prénom du parent 1).",
+    );
+  } else {
+    journeySteps.push('Pour signer à distance, chaque parent doit renseigner son email et son numéro de téléphone.');
+  }
+  journeySteps.push("Le rendez-vous d’information est obligatoire avant toute intervention.");
+  journeySteps.push('Après ce rendez-vous, un délai de réflexion de 15 jours est requis avant de pouvoir signer.');
+  journeySteps.push('Les 2 parents doivent signer chaque document.');
+  const signatureReadyMessage = isCoreComplete
+    ? readyParents.length === 2
+      ? 'Les deux parents pourront signer à distance après le délai de réflexion.'
+      : readyParents.length === 1
+        ? `${readyParents[0]} pourra signer à distance après le délai de réflexion.`
+        : null
+    : null;
+  const signatureMissingMessage =
+    isCoreComplete && signatureMissingSummary.length
+      ? `Points à compléter pour signer à distance (${signatureMissingSummary.join(' ; ')}).`
+      : null;
 
   useEffect(() => {
     if (autoFilledEmailRef.current) return;
@@ -198,23 +240,15 @@ export function PatientTabDossierView({ dossier, currentUser }) {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-blue-900">Parcours de prise en charge</h3>
               <ul className="text-sm text-blue-800 space-y-2 list-disc list-inside">
-                <li>Un rendez-vous de pré-consultation est <strong>obligatoire</strong> avant toute intervention</li>
-                <li>
-                  Après la pré-consultation, un délai de réflexion de <strong>15 jours minimum</strong> est requis
-                  avant de pouvoir signer les documents
-                </li>
-                <li>
-                  Pour signer à distance, chaque parent doit renseigner son email et son numéro de téléphone
-                </li>
-                <li>
-                  Les <strong>2 parents</strong> doivent signer tous les documents (autorisation chirurgicale,
-                  consentement éclairé, devis)
-                </li>
+                {journeySteps.map((step, index) => (
+                  <li key={`${step}-${index}`}>{step}</li>
+                ))}
               </ul>
-              {signatureMissingSummary.length > 0 && (
-                <p className="text-sm text-blue-900">
-                  Points à compléter pour signer à distance ({signatureMissingSummary.join(' ; ')}).
-                </p>
+              {signatureReadyMessage && (
+                <p className="text-sm text-blue-900">{signatureReadyMessage}</p>
+              )}
+              {signatureMissingMessage && (
+                <p className="text-sm text-blue-900">{signatureMissingMessage}</p>
               )}
               <div className="flex items-start gap-2 mt-3">
                 <input
@@ -232,7 +266,7 @@ export function PatientTabDossierView({ dossier, currentUser }) {
               {missingRequiredFields.length > 0 && (
                 <BlockingNotice
                   title="Dossier incomplet"
-                  message="Pour cocher la case et enregistrer, compl?tez :"
+                  message="Pour cocher la case et enregistrer, complétez :"
                   items={missingRequiredFields}
                 />
               )}
