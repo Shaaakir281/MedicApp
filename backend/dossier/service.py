@@ -4,6 +4,7 @@ import datetime as dt
 import hashlib
 import logging
 import random
+import unicodedata
 from typing import List, Tuple
 
 from fastapi import HTTPException, status
@@ -28,6 +29,31 @@ logger = logging.getLogger("uvicorn.error")
 CODE_LENGTH = 6  # Code à 6 chiffres (aligné avec ancien système)
 TTL_SECONDS = 600  # 10 minutes (aligné avec ancien système, marge pour délai SMS)
 COOLDOWN_SECONDS = 15  # 15 secondes (plus fluide, garde protection anti-spam)
+
+PLACEHOLDER_NAMES = {
+    "prenom",
+    "nom",
+    "parent",
+    "parent 1",
+    "parent 2",
+    "parent1",
+    "parent2",
+    "pere",
+    "mere",
+}
+
+
+def _normalize_text(value: str | None) -> str:
+    if not value:
+        return ""
+    normalized = unicodedata.normalize("NFD", value)
+    stripped = "".join(char for char in normalized if unicodedata.category(char) != "Mn")
+    return stripped.strip().lower()
+
+
+def _is_placeholder(value: str | None) -> bool:
+    normalized = _normalize_text(value)
+    return normalized in PLACEHOLDER_NAMES
 
 
 class InvalidPhoneNumber(ValueError):
