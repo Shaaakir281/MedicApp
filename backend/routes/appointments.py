@@ -90,19 +90,28 @@ def cancel_appointment(
     if appointment is None or appointment.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rendez-vous introuvable.")
 
-    # If cancelling preconsultation, also remove the act for the same procedure (if any)
-    if (
-        cascade_act
-        and appointment.appointment_type == models.AppointmentType.preconsultation
-        and appointment.procedure_id
-    ):
-        db.query(models.Appointment).filter(
-            models.Appointment.procedure_id == appointment.procedure_id,
-            models.Appointment.appointment_type == models.AppointmentType.act,
-        ).delete(synchronize_session=False)
+    linked_act_deleted = False
+    # Legal/business rule: if preconsultation is cancelled, linked act cannot be kept.
+    if appointment.appointment_type == models.AppointmentType.preconsultation and appointment.procedure_id:
+        if not cascade_act:
+            logging.getLogger(__name__).info(
+                "Ignoring cascade_act=false for preconsultation cancellation (appointment_id=%s).",
+                appointment_id,
+            )
+        deleted_rows = (
+            db.query(models.Appointment)
+            .filter(
+                models.Appointment.procedure_id == appointment.procedure_id,
+                models.Appointment.appointment_type == models.AppointmentType.act,
+            )
+            .delete(synchronize_session=False)
+        )
+        linked_act_deleted = deleted_rows > 0
 
     db.delete(appointment)
     db.commit()
+    if linked_act_deleted:
+        return schemas.Message(detail="Rendez-vous annulé. Le rendez-vous d'acte associé a également été annulé.")
     return schemas.Message(detail="Rendez-vous annulé.")
 
 

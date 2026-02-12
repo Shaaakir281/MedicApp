@@ -40,6 +40,29 @@ export function usePatientAppointments({
 
   const hasPreconsultation = appointmentsByType.has('preconsultation');
   const hasAct = appointmentsByType.has('act');
+  const minSelectableDate = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    if (appointmentType !== 'act') {
+      return todayStart;
+    }
+
+    const preconsultationAppt = appointmentsByType.get('preconsultation');
+    if (!preconsultationAppt?.date) {
+      return todayStart;
+    }
+
+    const preDate = parseISODateLocal(preconsultationAppt.date);
+    if (!preDate) {
+      return todayStart;
+    }
+
+    preDate.setHours(0, 0, 0, 0);
+    const earliestActDate = new Date(preDate);
+    earliestActDate.setDate(earliestActDate.getDate() + 15);
+    return earliestActDate > todayStart ? earliestActDate : todayStart;
+  }, [appointmentType, appointmentsByType]);
 
   useEffect(() => {
     if (
@@ -345,6 +368,7 @@ export function usePatientAppointments({
     cancelingId,
     hasPreconsultation,
     hasAct,
+    minSelectableDate,
     bothAppointmentsBooked,
     upcomingAppointments,
     pastAppointments,

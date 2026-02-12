@@ -12,6 +12,7 @@ export const AppointmentEditModal = ({
   hasAct,
   currentMonth,
   selectedDate,
+  minDate,
   availableSlots,
   selectedSlot,
   slotsLoading,
@@ -35,6 +36,7 @@ export const AppointmentEditModal = ({
           hasAct={hasAct}
           currentMonth={currentMonth}
           selectedDate={selectedDate}
+          minDate={minDate}
           availableSlots={availableSlots}
           selectedSlot={selectedSlot}
           slotsLoading={slotsLoading}

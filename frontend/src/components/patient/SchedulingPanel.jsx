@@ -22,6 +22,7 @@ export const SchedulingPanel = ({
   onSelectDate,
   onSelectSlot,
   onConfirm,
+  minDate,
   confirmLabel = 'Confirmer le rendez-vous',
   disabledConfirm = false,
   renderActions,
@@ -77,6 +78,7 @@ export const SchedulingPanel = ({
         onPrevMonth={onPrevMonth}
         onNextMonth={onNextMonth}
         onSelectDate={onSelectDate}
+        minDate={minDate}
       />
 
       {selectedDate && (

@@ -64,6 +64,7 @@ export function ScheduleAppointment({
         hasAct={appointments.hasAct}
         currentMonth={appointments.currentMonth}
         selectedDate={appointments.selectedDate}
+        minDate={appointments.minSelectableDate}
         availableSlots={appointments.availableSlots}
         selectedSlot={appointments.selectedSlot}
         slotsLoading={appointments.slotsLoading}
