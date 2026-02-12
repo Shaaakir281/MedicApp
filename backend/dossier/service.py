@@ -56,6 +56,14 @@ def _is_placeholder(value: str | None) -> bool:
     return normalized in PLACEHOLDER_NAMES
 
 
+def _guardian_name_missing(guardian: Guardian | None) -> bool:
+    if guardian is None:
+        return True
+    first = (guardian.first_name or "").strip()
+    last = (guardian.last_name or "").strip()
+    return not first or not last or _is_placeholder(first) or _is_placeholder(last)
+
+
 class InvalidPhoneNumber(ValueError):
     """Raised when phone cannot be normalized."""
 
