@@ -20,6 +20,30 @@ def _app_name() -> str:
     return get_settings().app_name
 
 
+def _build_alternative_links_block(alternative_links: list[str] | None) -> tuple[str, str]:
+    """Return text/html blocks with fallback links for multi-domain transitions."""
+    if not alternative_links:
+        return "", ""
+
+    unique_links = [link for link in dict.fromkeys(alternative_links) if link]
+    if not unique_links:
+        return "", ""
+
+    text_lines = "\n".join(f"- {link}" for link in unique_links)
+    text_block = (
+        "\n"
+        "Liens alternatifs (si le lien principal ne fonctionne pas) :\n"
+        f"{text_lines}\n"
+    )
+
+    html_lines = "".join(f'<li><a href="{link}">{link}</a></li>' for link in unique_links)
+    html_block = (
+        "<p>Liens alternatifs (si le lien principal ne fonctionne pas) :</p>"
+        f"<ul>{html_lines}</ul>"
+    )
+    return text_block, html_block
+
+
 def send_email(subject: str, recipient: str, text_body: str, html_body: str | None = None) -> None:
     """Send an email using the SMTP credentials configured in the environment.
 
@@ -67,15 +91,21 @@ def send_email(subject: str, recipient: str, text_body: str, html_body: str | No
     logger.info("Sent email to %s", recipient)
 
 
-def send_verification_email(recipient: str, verification_link: str) -> None:
+def send_verification_email(
+    recipient: str,
+    verification_link: str,
+    alternative_links: list[str] | None = None,
+) -> None:
     """Send the verification e-mail after registration."""
     app_name = _app_name()
+    alt_text, alt_html = _build_alternative_links_block(alternative_links)
     subject = f"[{app_name}] Vérifiez votre adresse e-mail"
     text_body = (
         f"Bonjour,\n\n"
         f"Merci de vous être inscrit sur {app_name}.\n"
         f"Veuillez confirmer votre adresse e-mail en cliquant sur le lien suivant :\n"
         f"{verification_link}\n\n"
+        f"{alt_text}"
         f"Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement ce message.\n"
     )
     html_body = f"""
@@ -83,6 +113,7 @@ def send_verification_email(recipient: str, verification_link: str) -> None:
     <p>Merci de vous être inscrit sur <strong>{app_name}</strong>.</p>
     <p>Veuillez confirmer votre adresse e-mail en cliquant sur le lien suivant :</p>
     <p><a href="{verification_link}">{verification_link}</a></p>
+    {alt_html}
     <p>Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement ce message.</p>
     """
     send_email(subject, recipient, text_body, html_body=html_body)
@@ -288,15 +319,21 @@ def send_appointment_reminder_email(
     send_email(subject, recipient, text_body, html_body=html_body)
 
 
-def send_password_reset_email(recipient: str, reset_link: str) -> None:
+def send_password_reset_email(
+    recipient: str,
+    reset_link: str,
+    alternative_links: list[str] | None = None,
+) -> None:
     """Send a password reset link with spam folder notice."""
     app_name = _app_name()
+    alt_text, alt_html = _build_alternative_links_block(alternative_links)
     subject = f"[{app_name}] Reinitialisation de votre mot de passe"
     spam_hint = "Si vous ne voyez pas l'e-mail, pensez a verifier votre dossier spam."
     text_body = (
         f"Bonjour,\n\n"
         f"Un lien de reinitialisation de mot de passe a ete genere pour votre compte {app_name} :\n"
         f"{reset_link}\n\n"
+        f"{alt_text}"
         f"Ce lien expire dans 60 minutes. {spam_hint}\n"
         f"Si vous n'etes pas a l'origine de cette demande, ignorez simplement ce message.\n"
     )
@@ -304,6 +341,7 @@ def send_password_reset_email(recipient: str, reset_link: str) -> None:
     <p>Bonjour,</p>
     <p>Un lien de r&eacute;initialisation de mot de passe a &eacute;t&eacute; g&eacute;n&eacute;r&eacute; pour votre compte <strong>{app_name}</strong> :</p>
     <p><a href="{reset_link}">{reset_link}</a></p>
+    {alt_html}
     <p>Ce lien expire dans 60 minutes. {spam_hint}</p>
     <p>Si vous n'&ecirc;tes pas &agrave; l'origine de cette demande, ignorez ce message.</p>
     """
@@ -337,15 +375,18 @@ def send_guardian_verification_email(
     guardian_name: str,
     child_name: str,
     verification_link: str,
+    alternative_links: list[str] | None = None,
 ) -> None:
     """Send email verification link to guardian for dossier completion."""
     app_name = _app_name()
+    alt_text, alt_html = _build_alternative_links_block(alternative_links)
     subject = f"[{app_name}] Vérifiez votre adresse e-mail"
     text_body = (
         f"Bonjour {guardian_name},\n\n"
         f"Dans le cadre du dossier médical de {child_name}, nous avons besoin de vérifier votre adresse e-mail.\n\n"
         f"Veuillez confirmer votre adresse e-mail en cliquant sur le lien suivant :\n"
         f"{verification_link}\n\n"
+        f"{alt_text}"
         f"Ce lien est valide pendant 24 heures.\n\n"
         f"La vérification de votre email permet d'activer la signature électronique à distance.\n\n"
         f"Si vous n'êtes pas à l'origine de cette demande, ignorez simplement ce message.\n\n"
@@ -365,6 +406,7 @@ def send_guardian_verification_email(
         Ou copiez ce lien dans votre navigateur :<br>
         <a href="{verification_link}">{verification_link}</a>
     </p>
+    {alt_html}
     <p><small>Ce lien est valide pendant 24 heures.</small></p>
     <p><small>✅ La vérification de votre email permet d'activer la signature électronique à distance.</small></p>
     <p style="margin-top: 30px; color: #666; font-size: 12px;">

@@ -65,12 +65,23 @@ const buildCaseForm = (procedure, patient) => {
 };
 
 const buildScheduleForm = (appointment) => ({
-  date: appointment?.date || '',
+  date: normalizeDateInput(appointment?.date),
   time: truncateTime(appointment?.time),
   appointment_type: appointment?.appointment_type || 'act',
   mode: appointment?.mode || '',
   status: appointment?.status || '',
 });
+
+function normalizeDateInput(value) {
+  if (!value || typeof value !== 'string') {
+    return '';
+  }
+  // Some API payloads can include an ISO datetime; date inputs need YYYY-MM-DD.
+  if (value.includes('T')) {
+    return value.split('T')[0];
+  }
+  return value;
+}
 
 const sanitizeCaseValues = (form) => {
   const nullable = (value) => {
@@ -142,7 +153,7 @@ const sanitizeScheduleValues = (form) => ({
 const summaryToScheduleForm = (summary) =>
   summary
     ? {
-        date: summary.date || '',
+        date: normalizeDateInput(summary.date),
         time: truncateTime(summary.time),
         appointment_type: summary.appointment_type,
         mode: summary.mode || '',

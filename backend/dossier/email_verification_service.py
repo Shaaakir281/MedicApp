@@ -43,7 +43,7 @@ def _latest_email_verification(db: Session, guardian_id: str) -> GuardianEmailVe
 
 
 def _build_verification_link(token: str, guardian_id: str) -> str:
-    """Build the email verification link."""
+    """Build email verification link."""
     base_url = get_settings().app_base_url.rstrip("/")
     return f"{base_url}/dossier/guardians/{guardian_id}/email-verification/verify?token={token}"
 

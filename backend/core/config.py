@@ -45,7 +45,9 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = Field(default=30, alias="REFRESH_TOKEN_EXPIRE_DAYS", ge=1)
     app_name: str = Field(default="MedicApp", alias="APP_NAME")
     app_base_url: str = Field(default="http://localhost:8000", alias="APP_BASE_URL")
+    app_base_urls_raw: str | List[str] | None = Field(default=None, alias="APP_BASE_URLS")
     frontend_base_url: str = Field(default="http://localhost:5173", alias="FRONTEND_BASE_URL")
+    frontend_base_urls_raw: str | List[str] | None = Field(default=None, alias="FRONTEND_BASE_URLS")
     applicationinsights_connection_string: Optional[str] = Field(
         default=None,
         alias="APPLICATIONINSIGHTS_CONNECTION_STRING",
@@ -119,6 +121,31 @@ class Settings(BaseSettings):
             use_ssl=self.smtp_use_ssl,
             sender=self.email_from,
         )
+
+    @staticmethod
+    def _normalize_url_list(raw: str | List[str] | None) -> List[str]:
+        if raw is None or raw == "":
+            return []
+        if isinstance(raw, str):
+            candidates = [item.strip() for item in raw.split(",")]
+        else:
+            candidates = [item.strip() for item in raw]
+        return [url.rstrip("/") for url in candidates if url]
+
+    @computed_field
+    def app_base_urls(self) -> List[str]:
+        """Return app base URLs (primary + optional aliases), normalized and deduplicated."""
+        values = [self.app_base_url.rstrip("/"), *self._normalize_url_list(self.app_base_urls_raw)]
+        return list(dict.fromkeys(url for url in values if url))
+
+    @computed_field
+    def frontend_base_urls(self) -> List[str]:
+        """Return frontend base URLs (primary + optional aliases), normalized and deduplicated."""
+        values = [
+            self.frontend_base_url.rstrip("/"),
+            *self._normalize_url_list(self.frontend_base_urls_raw),
+        ]
+        return list(dict.fromkeys(url for url in values if url))
 
     @computed_field
     def cors_allow_origins(self) -> List[str]:

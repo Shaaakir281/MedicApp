@@ -90,19 +90,18 @@ class MFAVerifyRequest(BaseModel):
 
 def _get_frontend_base_url() -> str:
     settings = get_settings()
-    base_url = settings.frontend_base_url or settings.app_base_url
-    return base_url.rstrip("/")
+    return (settings.frontend_base_url or settings.app_base_url).rstrip("/")
 
 
 def _build_verification_link(token: str) -> str:
-    base_url = _get_frontend_base_url()
     query = urlencode({"token": token})
+    base_url = _get_frontend_base_url()
     return f"{base_url}/auth/verify-email?{query}"
 
 
 def _build_password_reset_link(token: str) -> str:
-    base_url = _get_frontend_base_url()
     query = urlencode({"token": token})
+    base_url = _get_frontend_base_url()
     return f"{base_url}/auth/reset-password?{query}"
 
 
