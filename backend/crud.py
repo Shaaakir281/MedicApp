@@ -135,21 +135,21 @@ def create_appointment(
                 None,
             )
             if pre_appt:
-                earliest_act_date = pre_appt.date + datetime.timedelta(days=14)
+                earliest_act_date = pre_appt.date + datetime.timedelta(days=15)
                 if date < earliest_act_date:
                     raise ValueError(
-                        f"Acte disponible a partir du {earliest_act_date.isoformat()} (14 jours apres la pre-consultation)."
+                        f"Acte disponible a partir du {earliest_act_date.isoformat()} (15 jours apres la pre-consultation)."
                     )
         elif appointment_type == models.AppointmentType.preconsultation:
             act_appointments = [
                 appt for appt in procedure_case.appointments if appt.appointment_type == models.AppointmentType.act
             ]
             if act_appointments:
-                latest_allowed = min(appt.date for appt in act_appointments) - datetime.timedelta(days=14)
+                latest_allowed = min(appt.date for appt in act_appointments) - datetime.timedelta(days=15)
                 if date > latest_allowed:
                     raise ValueError(
                         f"La pre-consultation doit avoir lieu au plus tard le {latest_allowed.isoformat()} "
-                        "afin de respecter le delai de 14 jours avant l'acte."
+                        "afin de respecter le delai de 15 jours avant l'acte."
                     )
 
     appointment = models.Appointment(

@@ -161,22 +161,22 @@ export function usePatientAppointments({
       const diffDays = preDate
         ? (selectedDate.getTime() - preDate.getTime()) / (1000 * 60 * 60 * 24)
         : null;
-      if (diffDays !== null && diffDays < 14) {
+      if (diffDays !== null && diffDays < 15) {
         if (onShow14DayModal && preDate) {
           const preConsultDateFormatted = preDate.toLocaleDateString('fr-FR');
           const earliestActDate = new Date(preDate);
-          earliestActDate.setDate(earliestActDate.getDate() + 14);
+          earliestActDate.setDate(earliestActDate.getDate() + 15);
           const earliestActDateFormatted = earliestActDate.toLocaleDateString('fr-FR');
           onShow14DayModal({
-            title: 'Regle des 14 jours',
+            title: 'Regle des 15 jours',
             message:
-              "Pour des raisons medicales et legales, l'acte doit etre realise au minimum 14 jours apres la pre-consultation.\n\n" +
+              "Pour des raisons medicales et legales, l'acte doit etre realise au minimum 15 jours apres la pre-consultation.\n\n" +
               `Votre pre-consultation : ${preConsultDateFormatted}\n` +
               `Date la plus tot pour l'acte : ${earliestActDateFormatted}\n\n` +
               'Veuillez selectionner une date ulterieure.',
           });
         } else {
-          setScheduleError("L'acte doit etre au moins 14 jours apres la pre-consultation.");
+          setScheduleError("L'acte doit etre au moins 15 jours apres la pre-consultation.");
         }
         return;
       }
@@ -257,12 +257,28 @@ export function usePatientAppointments({
     async (appt) => {
       const apptId = getAppointmentId(appt);
       if (!apptId || !token || cancelingId) return;
+      const isPreconsultation = appt?.appointment_type === 'preconsultation';
+      const hasLinkedAct = Boolean(isPreconsultation && hasAct);
+      if (hasLinkedAct) {
+        const confirmed = window.confirm(
+          "Si vous annulez la pre-consultation, le rendez-vous d'acte ne peut pas etre conserve.\n\n" +
+            "Les deux rendez-vous seront annules. Vous pourrez reprendre rendez-vous si un creneau reste disponible et respecte la regle des 15 jours.\n\n" +
+            "Confirmer l'annulation ?",
+        );
+        if (!confirmed) return;
+      }
       setCancelingId(apptId);
       setError?.(null);
       setSuccessMessage?.(null);
       try {
-        await deleteAppointment(token, apptId, { cascadeAct: false });
-        setSuccessMessage?.('Rendez-vous annulé. Vous pouvez en planifier un nouveau.');
+        await deleteAppointment(token, apptId, { cascadeAct: isPreconsultation });
+        if (hasLinkedAct) {
+          setSuccessMessage?.(
+            "Rendez-vous pre-operatoire et rendez-vous d'acte annules. Vous pouvez reprendre rendez-vous dans le respect du delai legal de 15 jours.",
+          );
+        } else {
+          setSuccessMessage?.('Rendez-vous annule. Vous pouvez en planifier un nouveau.');
+        }
         await loadProcedureCase?.();
         await onReloadDashboard?.();
       } catch (err) {
@@ -275,7 +291,7 @@ export function usePatientAppointments({
         }
       }
     },
-    [cancelingId, editingAppointmentId, loadProcedureCase, onReloadDashboard, setError, setSuccessMessage, token],
+    [cancelingId, editingAppointmentId, hasAct, loadProcedureCase, onReloadDashboard, setError, setSuccessMessage, token],
   );
 
   const handleCloseEditModal = () => {

@@ -149,7 +149,7 @@ export function TabLegalDocs({
             <ul className="list-disc list-inside mt-1 space-y-1">
               <li>Commencez par un rendez-vous de consultation d'information.</li>
               <li>
-                La signature n'est disponible qu'après un <strong>délai de réflexion de 15 jours</strong>
+                La signature n'est disponible qu'après un <strong>délai de réflexion de 15 jours</strong>{' '}
                 suivant ce rendez-vous.
               </li>
               <li>Les 2 parents doivent signer chaque document.</li>
@@ -168,7 +168,7 @@ export function TabLegalDocs({
           <ul className="list-disc list-inside mt-1 space-y-1">
             <li>Les 2 parents doivent signer chaque document.</li>
             <li>
-              La signature n'est possible qu'après un délai de réflexion de <strong>15 jours</strong>
+              La signature n'est possible qu'après un délai de réflexion de <strong>15 jours</strong>{' '}
               suivant la consultation d'information.
             </li>
             <li>

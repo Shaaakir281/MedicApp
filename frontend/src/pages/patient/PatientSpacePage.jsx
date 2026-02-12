@@ -29,7 +29,7 @@ export function PatientSpacePage({
   const procedureSelection = 'circumcision';
   const [fourteenDayModal, setFourteenDayModal] = useState({
     open: false,
-    title: 'Règle des 14 jours',
+    title: 'Règle des 15 jours',
     message: '',
   });
   const controller = usePatientSpaceController({
@@ -41,7 +41,7 @@ export function PatientSpacePage({
       if (!payload) return;
       setFourteenDayModal({
         open: true,
-        title: payload.title || 'Règle des 14 jours',
+        title: payload.title || 'Règle des 15 jours',
         message: payload.message || '',
       });
     },
