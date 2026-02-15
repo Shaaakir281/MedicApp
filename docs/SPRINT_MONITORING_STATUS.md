@@ -3,13 +3,13 @@
 Date: 2026-02-15
 
 ## M1 - Alertes techniques (Azure)
-- MON-01 Action Group email: `A faire`
-- MON-02 Alerte HTTP 5xx: `A faire`
-- MON-03 Alerte temps de reponse: `A faire`
-- MON-04 Alerte exceptions backend: `A faire`
-- MON-05 Alertes CPU/Memoire: `A faire`
-- MON-06 Alertes PostgreSQL: `A faire`
-- MON-07 Test de bout en bout: `A faire`
+- MON-01 Action Group email: `Fait` (`medicapp-alerts-email`)
+- MON-02 Alerte HTTP 5xx: `Fait` (`MedicApp - Erreurs 5xx`)
+- MON-03 Alerte temps de reponse: `Fait` (`MedicApp - Temps de reponse degrade`)
+- MON-04 Alerte exceptions backend: `Fait` (`MedicApp - Exceptions backend`)
+- MON-05 Alertes CPU/Memoire: `Fait` (`MedicApp - CPU eleve`, `MedicApp - Memoire elevee`)
+- MON-06 Alertes PostgreSQL: `Fait` (`MedicApp - Connexions DB elevees`, `MedicApp - Stockage DB eleve`)
+- MON-07 Test de bout en bout: `Partiel` (test-notification Azure envoye, reception email a confirmer)
 
 ## M2 - Logging metier (backend)
 - LOG-10 EventTracker singleton + injection app: `Fait`
@@ -54,4 +54,3 @@ Date: 2026-02-15
   - `GET /internal/check-abandoned-journeys`
 - Header requis: `X-Internal-Key`
 - Variable d'env: `INTERNAL_JOBS_KEY`
-
