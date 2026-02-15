@@ -9,7 +9,7 @@ Date: 2026-02-15
 - MON-04 Alerte exceptions backend: `Fait` (`MedicApp - Exceptions backend`)
 - MON-05 Alertes CPU/Memoire: `Fait` (`MedicApp - CPU eleve`, `MedicApp - Memoire elevee`)
 - MON-06 Alertes PostgreSQL: `Fait` (`MedicApp - Connexions DB elevees`, `MedicApp - Stockage DB eleve`)
-- MON-07 Test de bout en bout: `Partiel` (test-notification Azure envoye, reception email a confirmer)
+- MON-07 Test de bout en bout: `Fait` (email recu + jobs internes executes avec succes)
 
 ## M2 - Logging metier (backend)
 - LOG-10 EventTracker singleton + injection app: `Fait`
@@ -38,7 +38,8 @@ Date: 2026-02-15
   - `patient_journey_abandoned`: `Fait` (job interne)
 
 ## M3 - Dashboards KQL
-- DASH-01 a DASH-06: `A faire` (portal Azure / KQL / workbook)
+- DASH-01 a DASH-04: `Pret` (requetes KQL disponibles dans `docs/M3_KQL_QUERIES.md`)
+- DASH-05 a DASH-06: `A faire` (dashboard/workbook + envoi hebdo)
 
 ## M4 - Alertes metier
 - ALERT-01 nouvelle inscription: `A faire`
