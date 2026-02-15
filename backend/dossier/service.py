@@ -15,6 +15,7 @@ import models
 from core.config import get_settings
 from dossier import schemas
 from dossier.models import Child, Guardian, GuardianPhoneVerification, GuardianEmailVerification, GuardianRole, VerificationStatus
+from services.event_tracker import get_event_tracker
 from services import sms
 
 try:
@@ -25,6 +26,7 @@ except Exception:  # pragma: no cover - optional dependency
     NumberParseException = Exception
 
 logger = logging.getLogger("uvicorn.error")
+event_tracker = get_event_tracker()
 
 CODE_LENGTH = 6  # Code à 6 chiffres (aligné avec ancien système)
 TTL_SECONDS = 600  # 10 minutes (aligné avec ancien système, marge pour délai SMS)
@@ -62,6 +64,28 @@ def _guardian_name_missing(guardian: Guardian | None) -> bool:
     first = (guardian.first_name or "").strip()
     last = (guardian.last_name or "").strip()
     return not first or not last or _is_placeholder(first) or _is_placeholder(last)
+
+
+def _guardian_by_role(guardians: List[Guardian], role: GuardianRole) -> Guardian | None:
+    expected = role.value
+    for guardian in guardians:
+        if guardian.role == expected:
+            return guardian
+    return None
+
+
+def _is_dossier_minimum_ready(child: Child, guardians: List[Guardian]) -> bool:
+    if not (child.first_name or "").strip():
+        return False
+    if not (child.last_name or "").strip():
+        return False
+    if child.birth_date is None:
+        return False
+
+    parent1 = _guardian_by_role(guardians, GuardianRole.parent1)
+    if _guardian_name_missing(parent1):
+        return False
+    return True
 
 
 class InvalidPhoneNumber(ValueError):
@@ -365,14 +389,15 @@ def save_dossier(db: Session, child_id: str, payload: schemas.DossierPayload, cu
         child = Child(id=child_id, patient_id=current_user.id if current_user.role == models.UserRole.patient else None)
         db.add(child)
 
+    existing_guardians = {g.role: g for g in db.scalars(select(Guardian).where(Guardian.child_id == child.id))}
+    was_ready = _is_dossier_minimum_ready(child, list(existing_guardians.values()))
+
     child.first_name = payload.child.first_name.strip()
     child.last_name = payload.child.last_name.strip()
     child.birth_date = payload.child.birth_date
     child.weight_kg = payload.child.weight_kg
     child.medical_notes = payload.child.medical_notes
     child.updated_at = dt.datetime.now(tz=dt.timezone.utc)
-
-    existing_guardians = {g.role: g for g in db.scalars(select(Guardian).where(Guardian.child_id == child.id))}
     updated: List[Guardian] = []
     for g in payload.guardians:
         role = GuardianRole(g.role).value
@@ -396,6 +421,17 @@ def save_dossier(db: Session, child_id: str, payload: schemas.DossierPayload, cu
     if current_user.role == models.UserRole.patient:
         all_guardians = list(db.scalars(select(Guardian).where(Guardian.child_id == child.id)))
         _sync_to_procedure_case(db, current_user.id, all_guardians)
+        now_ready = _is_dossier_minimum_ready(child, all_guardians)
+        if not was_ready and now_ready:
+            parent2 = _guardian_by_role(all_guardians, GuardianRole.parent2)
+            has_parent2 = parent2 is not None and not _guardian_name_missing(parent2)
+            phone_verified = any(guardian.phone_verified_at is not None for guardian in all_guardians)
+            event_tracker.track_patient_event(
+                "patient_dossier_completed",
+                current_user.id,
+                has_parent2=has_parent2,
+                phone_verified=phone_verified,
+            )
 
     return get_dossier(db, child_id, current_user)
 
@@ -505,5 +541,11 @@ def verify_code(db: Session, guardian_id: str, current_user, code: str) -> Guard
     # Propagate verified phone to legacy procedure_case for compatibility
     if current_user.role == models.UserRole.patient:
         _sync_to_procedure_case(db, current_user.id, [guardian])
+        event_tracker.track_patient_event(
+            "patient_phone_verified",
+            current_user.id,
+            attempts_count=latest.attempt_count,
+            guardian_role=guardian.role,
+        )
 
     return latest

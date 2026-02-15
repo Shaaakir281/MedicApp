@@ -9,6 +9,8 @@ Architecture:
 
 from __future__ import annotations
 
+import datetime as dt
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -19,9 +21,26 @@ from database import get_db
 from dependencies.auth import get_current_user, get_optional_user, require_practitioner
 from services import consent_pdf, document_signature_service, legal_documents_pdf
 from services import legal as legal_service
+from services.event_tracker import get_event_tracker
 from services.storage import StorageError, get_storage_backend
 
 router = APIRouter(prefix="/signature", tags=["document_signature"])
+event_tracker = get_event_tracker()
+
+
+def _signature_mode(doc_sig: models.DocumentSignature) -> str:
+    methods = {
+        method
+        for method in (doc_sig.parent1_method, doc_sig.parent2_method)
+        if method
+    }
+    if methods == {"yousign"}:
+        return "yousign"
+    if methods == {"cabinet"}:
+        return "cabinet"
+    if methods:
+        return "mixed"
+    return "unknown"
 
 
 @router.get("/mock/{procedure_id}/{signer_id}", response_class=HTMLResponse)
@@ -224,6 +243,20 @@ def start_document_signature(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Lien de signature indisponible pour le signataire."
         )
+
+    role_value = signer_role.value if hasattr(signer_role, "value") else str(signer_role)
+    event_name = "signature_cabinet_initiated" if in_person else "signature_yousign_initiated"
+    properties = {
+        "procedure_id": procedure_case_id,
+        "document_type": doc_sig.document_type,
+        "parent_role": role_value,
+    }
+    if current_user is not None:
+        properties["user_id"] = current_user.id
+        properties["user_role"] = getattr(current_user.role, "value", current_user.role)
+    if appointment_id is not None:
+        properties["appointment_id"] = appointment_id
+    event_tracker.track_event(event_name, properties=properties)
 
     return schemas.DocumentSignatureStartResponse(
         document_signature_id=doc_sig.id,
@@ -451,6 +484,20 @@ def handle_yousign_document_webhook(
     if "signature_request" in event_type and any(token in event_type for token in ("done", "completed")):
         doc_sig = document_signature_service.poll_and_fetch_document_signature(db, doc_sig)
         document_signature_service.ensure_final_document(db, doc_sig)
+        if doc_sig.parent1_status == "signed" and doc_sig.parent2_status == "signed":
+            start_points = [value for value in (doc_sig.parent1_sent_at, doc_sig.parent2_sent_at) if value]
+            total_time_days = None
+            if start_points:
+                total_time_days = (dt.datetime.utcnow() - min(start_points)).total_seconds() / 86400
+            event_tracker.track_event(
+                "signature_all_completed",
+                properties={
+                    "procedure_id": doc_sig.procedure_case_id,
+                    "document_type": doc_sig.document_type,
+                    "mode": _signature_mode(doc_sig),
+                },
+                measurements={"total_time_days": total_time_days} if total_time_days is not None else None,
+            )
         return {"status": "processed", "document_signature_id": doc_sig.id}
 
     if "signer" in event_type and any(token in event_type for token in ("signed", "done", "completed")):
@@ -470,6 +517,8 @@ def handle_yousign_document_webhook(
             logger.warning("Unknown signer_id: %s for DocumentSignature %d", signer_id, doc_sig.id)
             return {"status": "ignored", "reason": "unknown_signer"}
 
+        sent_at = getattr(doc_sig, f"{parent_label}_sent_at", None)
+
         # Extraire URLs artefacts (si disponibles)
         signed_file_url = signature_request.get("signed_file_url")
         evidence_url = signature_request.get("evidence_url")
@@ -487,6 +536,35 @@ def handle_yousign_document_webhook(
         )
         if doc_sig.parent1_status == "signed" and doc_sig.parent2_status == "signed":
             document_signature_service.ensure_final_document(db, doc_sig)
+
+        signed_at = getattr(doc_sig, f"{parent_label}_signed_at", None) or dt.datetime.utcnow()
+        time_to_sign_hours = None
+        if sent_at:
+            time_to_sign_hours = max(0.0, (signed_at - sent_at).total_seconds() / 3600)
+        event_tracker.track_event(
+            "signature_yousign_completed",
+            properties={
+                "procedure_id": doc_sig.procedure_case_id,
+                "document_type": doc_sig.document_type,
+                "parent_role": parent_label,
+            },
+            measurements={"time_to_sign_hours": time_to_sign_hours} if time_to_sign_hours is not None else None,
+        )
+
+        if doc_sig.parent1_status == "signed" and doc_sig.parent2_status == "signed":
+            start_points = [value for value in (doc_sig.parent1_sent_at, doc_sig.parent2_sent_at) if value]
+            total_time_days = None
+            if start_points:
+                total_time_days = (dt.datetime.utcnow() - min(start_points)).total_seconds() / 86400
+            event_tracker.track_event(
+                "signature_all_completed",
+                properties={
+                    "procedure_id": doc_sig.procedure_case_id,
+                    "document_type": doc_sig.document_type,
+                    "mode": _signature_mode(doc_sig),
+                },
+                measurements={"total_time_days": total_time_days} if total_time_days is not None else None,
+            )
 
         logger.info(
             "DocumentSignature %d (%s) updated: %s signed",
@@ -552,7 +630,17 @@ def practitioner_send_document_signature(
         document_type=document_type,
         in_person=False,  # Remote par défaut pour praticien
     )
-
+    event_tracker.track_event(
+        "signature_yousign_initiated",
+        properties={
+            "procedure_id": case_id,
+            "document_type": doc_sig.document_type,
+            "parent_role": "parent1_parent2",
+            "initiated_by": "practitioner",
+        },
+    )
     logger.info(f"Praticien a créé une nouvelle signature pour case {case_id}, document {document_type}")
 
     return schemas.DocumentSignatureDetail.model_validate(doc_sig)
+
+

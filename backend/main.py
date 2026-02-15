@@ -14,6 +14,7 @@ from core.logging_config import configure_application_insights
 from middleware.audit_logging import audit_logging_middleware
 from middleware.rate_limiter import configure_rate_limiter
 from routes import all_routers
+from services.event_tracker import get_event_tracker
 
 
 def create_application() -> FastAPI:
@@ -21,6 +22,7 @@ def create_application() -> FastAPI:
     app = FastAPI(title="MedicApp Backend", version="0.1.0")
     settings = get_settings()
     configure_application_insights(settings.applicationinsights_connection_string)
+    app.state.event_tracker = get_event_tracker()
     app.middleware("http")(audit_logging_middleware)
     configure_rate_limiter(app)
 

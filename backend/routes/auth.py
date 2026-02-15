@@ -24,6 +24,7 @@ from services.email import (
     send_password_reset_email,
     send_account_locked_email,
 )
+from services.event_tracker import get_event_tracker
 from services.mfa_service import mfa_service
 from dependencies.auth import get_current_user_allow_mfa
 from middleware.rate_limiter import limiter, user_key_func
@@ -31,6 +32,7 @@ from middleware.rate_limiter import limiter, user_key_func
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger("audit")
+event_tracker = get_event_tracker()
 
 
 class LoginRequest(BaseModel):
@@ -91,6 +93,12 @@ class MFAVerifyRequest(BaseModel):
 def _get_frontend_base_url() -> str:
     settings = get_settings()
     return (settings.frontend_base_url or settings.app_base_url).rstrip("/")
+
+
+def _email_domain(email: str | None) -> str | None:
+    if not email or "@" not in email:
+        return None
+    return email.split("@", 1)[1].lower()
 
 
 def _build_verification_link(token: str) -> str:
@@ -198,6 +206,12 @@ def login(
                     user.email,
                     retry_after_minutes=int(_LOCK_DURATION.total_seconds() / 60),
                 )
+                event_tracker.track_security_event(
+                    "auth_account_locked",
+                    ip_address=request.client.host if request.client else None,
+                    user_id=user.id,
+                    role=getattr(user.role, "value", user.role),
+                )
         logger.info(
             json.dumps(
                 {
@@ -208,6 +222,12 @@ def login(
                     "user_agent": request.headers.get("user-agent"),
                 }
             )
+        )
+        event_tracker.track_security_event(
+            "auth_login_failure",
+            ip_address=request.client.host if request.client else None,
+            email_domain=_email_domain(str(payload.email)),
+            reason="invalid_credentials",
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -233,6 +253,13 @@ def login(
                 }
             )
         )
+        event_tracker.track_security_event(
+            "auth_login_blocked",
+            ip_address=request.client.host if request.client else None,
+            user_id=user.id,
+            role=getattr(user.role, "value", user.role),
+            reason="email_not_verified",
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email address not verified",
@@ -249,6 +276,12 @@ def login(
         sms_sent = False
         if payload.phone:
             sms_sent = mfa_service.send_mfa_code(db, user.id, payload.phone)
+            if sms_sent:
+                event_tracker.track_security_event(
+                    "auth_mfa_sent",
+                    ip_address=request.client.host if request.client else None,
+                    user_id=user.id,
+                )
         return schemas.LoginResponse(
             requires_mfa=True,
             temp_token=temp_token,
@@ -268,6 +301,12 @@ def login(
                 "user_agent": request.headers.get("user-agent"),
             }
         )
+    )
+    event_tracker.track_security_event(
+        "auth_login_success",
+        ip_address=request.client.host if request.client else None,
+        user_id=user.id,
+        role=getattr(user.role, "value", user.role),
     )
     return schemas.LoginResponse(
         access_token=tokens.access_token,
@@ -299,10 +338,22 @@ def send_mfa_code(
 
     sent = mfa_service.send_mfa_code(db, current_user.id, phone)
     if not sent:
+        event_tracker.track_security_event(
+            "auth_mfa_failure",
+            ip_address=request.client.host if request.client else None,
+            user_id=current_user.id,
+            reason="sms_unavailable",
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Envoi SMS indisponible.",
         )
+
+    event_tracker.track_security_event(
+        "auth_mfa_sent",
+        ip_address=request.client.host if request.client else None,
+        user_id=current_user.id,
+    )
 
     return schemas.MFASendResponse(message="Code envoye", expires_in=300)
 
@@ -322,6 +373,12 @@ def verify_mfa_code(
         )
 
     if not mfa_service.verify_code(db, current_user.id, payload.code):
+        event_tracker.track_security_event(
+            "auth_mfa_failure",
+            ip_address=request.client.host if request.client else None,
+            user_id=current_user.id,
+            reason="invalid_or_expired_code",
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Code MFA invalide ou expire.",
@@ -331,6 +388,11 @@ def verify_mfa_code(
         current_user.id,
         access_claims={"mfa_verified": True},
         refresh_claims={"mfa_verified": True},
+    )
+    event_tracker.track_security_event(
+        "auth_mfa_success",
+        ip_address=request.client.host if request.client else None,
+        user_id=current_user.id,
     )
     return schemas.Token(access_token=tokens.access_token, refresh_token=tokens.refresh_token)
 
@@ -368,6 +430,18 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> schemas
         token = auth_service.create_email_verification_token(db, user)
         verification_link = _build_verification_link(token.token)
         send_verification_email(user.email, verification_link)
+        event_tracker.track_patient_event(
+            "patient_registered",
+            user.id,
+            email_domain=_email_domain(user.email),
+            source="register_api",
+        )
+        event_tracker.track_patient_event(
+            "patient_journey_transition",
+            user.id,
+            from_step="none",
+            to_step="created",
+        )
 
     return schemas.User.from_orm(user)
 
@@ -389,12 +463,30 @@ def resend_verification_email(
 
 
 @router.get("/verify-email", response_model=schemas.Message)
-def verify_email(token: str = Query(..., description="Token received by email"), db: Session = Depends(get_db)) -> schemas.Message:
+def verify_email(
+    token: str = Query(..., description="Token received by email"),
+    db: Session = Depends(get_db),
+) -> schemas.Message:
     """Verify a user's email address."""
+    token_row = (
+        db.query(models.EmailVerificationToken)
+        .filter(models.EmailVerificationToken.token == token)
+        .first()
+    )
     try:
-        auth_service.verify_email_token(db, token)
+        user = auth_service.verify_email_token(db, token)
     except auth_service.InvalidVerificationTokenError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    time_to_verify_seconds = None
+    if token_row and token_row.created_at:
+        time_to_verify_seconds = int((datetime.utcnow() - token_row.created_at).total_seconds())
+
+    event_tracker.track_patient_event(
+        "patient_email_verified",
+        user.id,
+        time_to_verify_seconds=time_to_verify_seconds,
+    )
 
     return schemas.Message(detail="Adresse e-mail verifiee avec succes.")
 

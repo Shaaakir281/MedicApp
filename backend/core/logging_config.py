@@ -33,7 +33,6 @@ def configure_application_insights(connection_string: Optional[str]) -> None:
     )
 
     root_logger.addHandler(handler)
-    root_logger.addHandler(handler)
     if root_logger.level > logging.INFO:
         root_logger.setLevel(logging.INFO)
 

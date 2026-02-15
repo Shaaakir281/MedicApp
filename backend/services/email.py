@@ -171,35 +171,6 @@ def send_legal_document_download_email(
     send_email(subject, recipient, text_body, html_body=html_body)
 
 
-def send_legal_document_download_email(
-    recipient: str,
-    *,
-    child_name: str,
-    document_title: str,
-    download_url: str,
-    is_final: bool = False,
-) -> None:
-    """Send a legal document download link (base or final)."""
-    app_name = _app_name()
-    status_label = "document signe" if is_final else "document"
-    subject = f"[{app_name}] Lien de telechargement - {document_title}"
-    text_body = (
-        f"Bonjour,\n\n"
-        f"Le {status_label} pour {child_name} est disponible :\n"
-        f"{document_title}\n"
-        f"{download_url}\n\n"
-        f"L'equipe {app_name}\n"
-    )
-    html_body = f"""
-    <p>Bonjour,</p>
-    <p>Le {status_label} pour <strong>{child_name}</strong> est disponible :</p>
-    <p><strong>{document_title}</strong></p>
-    <p><a href="{download_url}">{download_url}</a></p>
-    <p>L'equipe {app_name}</p>
-    """
-    send_email(subject, recipient, text_body, html_body=html_body)
-
-
 def send_signature_request_email(
     recipient: str,
     *,

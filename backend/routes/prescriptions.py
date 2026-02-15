@@ -21,6 +21,7 @@ from services.email import send_prescription_signed_email
 from services.storage import StorageError, get_storage_backend
 from services import download_links, qr_codes
 from services.ordonnances import build_ordonnance_context
+from services.event_tracker import get_event_tracker
 from core.config import get_settings
 from pydantic import BaseModel, Field
 from dependencies.auth import get_current_user, require_practitioner
@@ -28,6 +29,7 @@ from dependencies.auth import get_current_user, require_practitioner
 
 router = APIRouter(prefix="/prescriptions", tags=["prescriptions"])
 settings = get_settings()
+event_tracker = get_event_tracker()
 
 
 def _build_prescription_access_path(*, prescription_id: int, actor: str, channel: str) -> str:
@@ -200,6 +202,15 @@ def _serve_prescription_file(
     )
     db.commit()
     _log_download(db, version, actor, channel)
+    event_tracker.track_event(
+        "prescription_downloaded",
+        properties={
+            "prescription_id": pres.id,
+            "actor": actor,
+            "channel": channel,
+        },
+        measurements={"download_count": pres.download_count},
+    )
 
     if storage.supports_presigned_urls:
         try:
@@ -243,6 +254,17 @@ def _serve_prescription_version_file(
         db.add(parent)
     db.commit()
     _log_download(db, version, actor, channel)
+    if parent:
+        event_tracker.track_event(
+            "prescription_downloaded",
+            properties={
+                "prescription_id": parent.id,
+                "version_id": version.id,
+                "actor": actor,
+                "channel": channel,
+            },
+            measurements={"download_count": parent.download_count},
+        )
 
     if storage.supports_presigned_urls:
         try:
@@ -354,7 +376,7 @@ def _ensure_prescription(db: Session, appointment: models.Appointment) -> models
 @router.post("/{appointment_id}")
 def create_prescription(
     appointment_id: int,
-    _: models.User = Depends(require_practitioner),
+    current_user: models.User = Depends(require_practitioner),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     # Verify appointment existence
@@ -363,6 +385,13 @@ def create_prescription(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
 
     pres = _ensure_prescription(db, appt)
+    event_tracker.track_practitioner_event(
+        "prescription_generated",
+        current_user.id,
+        prescription_type=appt.appointment_type.value if hasattr(appt.appointment_type, "value") else appt.appointment_type,
+        procedure_id=appt.procedure_id,
+        prescription_id=pres.id,
+    )
     return {
         "id": pres.id,
         "appointment_id": pres.appointment_id,
@@ -459,6 +488,13 @@ def sign_prescription(
     db.add(prescription)
     db.commit()
     db.refresh(prescription)
+    event_tracker.track_practitioner_event(
+        "prescription_generated",
+        current_user.id,
+        prescription_type=appointment.appointment_type.value if hasattr(appointment.appointment_type, "value") else appointment.appointment_type,
+        procedure_id=appointment.procedure_id,
+        prescription_id=prescription.id,
+    )
 
     return schemas.PrescriptionSignatureResponse(
         prescription_id=prescription.id,

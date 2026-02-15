@@ -8,7 +8,7 @@ prevents double booking of the same date/time.
 from __future__ import annotations
 
 import logging
-from datetime import date, time as dtime
+from datetime import date, datetime, time as dtime
 from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,10 +21,12 @@ import schemas
 from database import get_db
 from dependencies.auth import get_current_user
 from services.email import send_appointment_confirmation_email
-from datetime import datetime
+from services.event_tracker import get_event_tracker
 
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
+event_tracker = get_event_tracker()
+_DEFAULT_DAILY_SLOTS = 10
 
 
 class AppointmentCreateRequest(BaseModel):
@@ -32,6 +34,24 @@ class AppointmentCreateRequest(BaseModel):
     time: dtime
     appointment_type: str = Field(default="preconsultation")
     procedure_id: int | None = None
+
+
+def _track_slot_utilization(db: Session, slot_date: date) -> None:
+    slots_booked = (
+        db.query(models.Appointment)
+        .filter(models.Appointment.date == slot_date)
+        .count()
+    )
+    utilization = (slots_booked / _DEFAULT_DAILY_SLOTS) if _DEFAULT_DAILY_SLOTS else 0
+    event_tracker.track_event(
+        "appointment_slot_utilization",
+        properties={"slot_date": slot_date.isoformat()},
+        measurements={
+            "slots_booked": slots_booked,
+            "slots_total": _DEFAULT_DAILY_SLOTS,
+            "utilization_rate": utilization,
+        },
+    )
 
 
 @router.get("/slots", response_model=Dict[str, List[str]])
@@ -75,6 +95,55 @@ def create_appointment(
         # Do not fail the request if email sending raises
         logging.getLogger(__name__).exception("Failed to send confirmation email: %s", exc)
 
+    appointment_type = (
+        appointment.appointment_type.value
+        if hasattr(appointment.appointment_type, "value")
+        else appointment.appointment_type
+    )
+    days_until_appointment = (appointment.date - date.today()).days
+    event_tracker.track_patient_event(
+        "appointment_booked",
+        current_user.id,
+        appointment_type=appointment_type,
+        slot_date=appointment.date.isoformat(),
+        days_until_appointment=days_until_appointment,
+        user_role=getattr(current_user.role, "value", current_user.role),
+    )
+    journey_from = None
+    journey_to = None
+    time_in_previous_step_hours = None
+    procedure_case = appointment.procedure_case
+    if appointment.appointment_type == models.AppointmentType.preconsultation:
+        journey_from = "created"
+        journey_to = "booked"
+        if procedure_case and procedure_case.created_at:
+            time_in_previous_step_hours = (
+                datetime.utcnow() - procedure_case.created_at
+            ).total_seconds() / 3600
+    elif appointment.appointment_type == models.AppointmentType.act:
+        journey_from = "waiting"
+        journey_to = "booked"
+        if procedure_case and procedure_case.preconsultation_date:
+            preconsultation_dt = datetime.combine(procedure_case.preconsultation_date, dtime.min)
+            time_in_previous_step_hours = (
+                datetime.utcnow() - preconsultation_dt
+            ).total_seconds() / 3600
+
+    if journey_from and journey_to:
+        event_tracker.track_patient_event(
+            "patient_journey_transition",
+            current_user.id,
+            procedure_id=appointment.procedure_id,
+            from_step=journey_from,
+            to_step=journey_to,
+            time_in_previous_step_hours=(
+                max(0.0, time_in_previous_step_hours)
+                if time_in_previous_step_hours is not None
+                else None
+            ),
+        )
+    _track_slot_utilization(db, appointment.date)
+
     return schemas.Appointment.from_orm(appointment)
 
 
@@ -91,6 +160,13 @@ def cancel_appointment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rendez-vous introuvable.")
 
     linked_act_deleted = False
+    appointment_type = (
+        appointment.appointment_type.value
+        if hasattr(appointment.appointment_type, "value")
+        else appointment.appointment_type
+    )
+    days_before_appointment = (appointment.date - date.today()).days
+
     # Legal/business rule: if preconsultation is cancelled, linked act cannot be kept.
     if appointment.appointment_type == models.AppointmentType.preconsultation and appointment.procedure_id:
         if not cascade_act:
@@ -110,6 +186,17 @@ def cancel_appointment(
 
     db.delete(appointment)
     db.commit()
+
+    event_tracker.track_patient_event(
+        "appointment_cancelled",
+        current_user.id,
+        appointment_type=appointment_type,
+        reason="user_cancelled",
+        days_before_appointment=days_before_appointment,
+        linked_act_deleted=linked_act_deleted,
+    )
+    _track_slot_utilization(db, appointment.date)
+
     if linked_act_deleted:
         return schemas.Message(detail="Rendez-vous annulé. Le rendez-vous d'acte associé a également été annulé.")
     return schemas.Message(detail="Rendez-vous annulé.")

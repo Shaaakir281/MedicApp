@@ -18,10 +18,12 @@ from database import get_db
 from dependencies.auth import require_practitioner
 from services import consent_pdf, legal_documents_pdf, document_signature_service
 from services import pdf_signature_cabinet
+from services.event_tracker import get_event_tracker
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/cabinet-signatures", tags=["cabinet-signatures"])
+event_tracker = get_event_tracker()
 
 _MAX_SIGNATURE_BYTES = 500 * 1024
 
@@ -95,6 +97,14 @@ def initiate_cabinet_signature(
     settings = get_settings()
     base_url = (settings.frontend_base_url or settings.app_base_url).rstrip("/")
     sign_url = f"{base_url}/sign/{token}"
+    role_value = payload.parent_role.value if hasattr(payload.parent_role, "value") else str(payload.parent_role)
+    event_tracker.track_practitioner_event(
+        "signature_cabinet_initiated",
+        current_user.id,
+        procedure_id=doc_sig.procedure_case_id,
+        document_type=doc_sig.document_type,
+        parent_role=role_value,
+    )
 
     return schemas.CabinetSignatureInitiateResponse(
         session_id=session.id,
@@ -260,6 +270,34 @@ def upload_cabinet_signature(
 
     if both_signed:
         document_signature_service.ensure_final_document(db, doc_sig)
+
+    session_duration = None
+    if session.created_at:
+        session_duration = max(0.0, (now - session.created_at).total_seconds())
+
+    event_tracker.track_event(
+        "signature_cabinet_completed",
+        properties={
+            "procedure_id": doc_sig.procedure_case_id,
+            "document_type": doc_sig.document_type,
+            "parent_role": role_value,
+        },
+        measurements={"session_duration_seconds": session_duration} if session_duration is not None else None,
+    )
+    if both_signed:
+        start_points = [value for value in (doc_sig.parent1_sent_at, doc_sig.parent2_sent_at) if value]
+        total_time_days = None
+        if start_points:
+            total_time_days = (dt.datetime.utcnow() - min(start_points)).total_seconds() / 86400
+        event_tracker.track_event(
+            "signature_all_completed",
+            properties={
+                "procedure_id": doc_sig.procedure_case_id,
+                "document_type": doc_sig.document_type,
+                "mode": "cabinet",
+            },
+            measurements={"total_time_days": total_time_days} if total_time_days is not None else None,
+        )
 
     logger.info(
         "Cabinet signature captured document_signature_id=%s parent_role=%s",
