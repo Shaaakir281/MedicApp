@@ -38,8 +38,8 @@ Date: 2026-02-15
   - `patient_journey_abandoned`: `Fait` (job interne)
 
 ## M3 - Dashboards KQL
-- DASH-01 a DASH-04: `Pret` (requetes KQL disponibles dans `docs/M3_KQL_QUERIES.md`)
-- DASH-05: `Partiel` (dashboard cree: `medicapp-monitoring-dashboard`; pinning tuiles a finaliser)
+- DASH-01 a DASH-04: `Configure` (tuiles dashboard ajoutees; KQL dans `docs/M3_KQL_QUERIES.md`)
+- DASH-05: `Partiel` (dashboard cree: `medicapp-monitoring-dashboard`; mise en forme fine a finaliser)
 - DASH-06: `Pret a configurer` (guide + KQL dans `docs/DASH06_WEEKLY_REPORT_SETUP.md`)
 
 ## M4 - Alertes metier

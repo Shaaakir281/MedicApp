@@ -19,6 +19,23 @@ Fichiers versionnes:
 5. Choisir `medicapp-monitoring-dashboard`.
 6. Refaire pour chaque requete prioritaire.
 
+## Ajout automatique DASH-3 / DASH-4 (sans copier-coller)
+
+Script disponible:
+- `scripts/setup_dash34_tiles.ps1`
+
+Commande:
+```powershell
+.\scripts\setup_dash34_tiles.ps1 -Apply
+```
+
+Effet:
+- Ajoute automatiquement 8 tuiles:
+  - 4 tuiles `[RDV] ...` (DASH-3)
+  - 4 tuiles `[Securite] ...` (DASH-4)
+- Ne duplique pas les tuiles si elles existent deja (idempotent).
+- Genere aussi `docs/azure_dashboard_dash34_generated_properties.json`.
+
 ## Ordre recommande des tuiles
 
 Section Activite patient:
@@ -46,4 +63,3 @@ Section Securite:
 - Le dashboard charge sans erreur.
 - Chaque tuile affiche des donnees sur 24h/7j selon la requete.
 - Les tuiles securite montrent bien les events `auth_*`.
-
