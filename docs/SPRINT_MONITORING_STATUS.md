@@ -40,15 +40,22 @@ Date: 2026-02-15
 ## M3 - Dashboards KQL
 - DASH-01 a DASH-04: `Configure` (tuiles dashboard ajoutees; KQL dans `docs/M3_KQL_QUERIES.md`)
 - DASH-05: `Partiel` (dashboard cree: `medicapp-monitoring-dashboard`; mise en forme fine a finaliser)
-- DASH-06: `Pret a configurer` (guide + KQL dans `docs/DASH06_WEEKLY_REPORT_SETUP.md`)
+- DASH-06: `Fait` (Logic App hebdomadaire configuree + email de synthese recu)
 
 ## M4 - Alertes metier
 - ALERT-01 nouvelle inscription: `A faire`
 - ALERT-02 signatures completes: `A faire`
-- ALERT-03 fin delai de reflexion: `Code fait` / `planification Azure a faire`
+- ALERT-03 fin delai de reflexion: `Partiel` (code fait + planification job Azure faite; alerte metier finalisee a faire)
 - ALERT-04 taux d'erreur anormal: `A faire`
 - ALERT-05 brute-force: `A faire`
-- ALERT-06 parcours abandonne: `Code fait` / `planification Azure a faire`
+- ALERT-06 parcours abandonne: `Partiel` (code fait + planification job Azure faite; alerte metier finalisee a faire)
+
+## Ajustements anti-bruit (production)
+- 2026-02-19 - Alerte `MedicApp - Temps de reponse degrade` ajustee:
+  - seuil `HttpResponseTime`: `> 5s` (avant `> 3s`)
+  - fenetre d'agregation: `PT15M` (avant `PT5M`)
+  - frequence d'evaluation: `PT5M` (avant `PT1M`)
+  - severite: `Sev3` (avant `Sev2`)
 
 ## Changements backend ajoutes pour M4
 - Endpoint interne securise:

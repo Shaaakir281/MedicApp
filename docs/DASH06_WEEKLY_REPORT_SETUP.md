@@ -1,20 +1,31 @@
 # DASH-06 - Rapport email hebdomadaire (Logic App)
 
-Objectif: recevoir chaque lundi matin un email de synthese sur l'activite MedicApp.
+Objectif: recevoir chaque lundi matin un email de synthese sur l'activite MedicApp, sans refaire du copier/coller a chaque fois.
 
 ## Prerequis
 - Application Insights: `medicapp-appinsights`
+- Resource Group: `medicapp-rg`
 - Action Group email deja operationnel (OK)
-- Logic App (Consumption) autorisee dans `medicapp-rg`
+- Logic App (Consumption) autorisee
 
-## Option retenue
-- Azure Logic App (recurrence hebdomadaire)
-- Requetes KQL sur Application Insights
-- Email texte/HTML de synthese
+## 1) Creer la Logic App
+- Nom: `medicapp-weekly-monitoring-report`
+- Type: `Consumption`
+- Region: `westeurope`
 
-## Requetes KQL (7 derniers jours)
+## 2) Declencheur (Recurrence)
+- Frequency: `Week`
+- Interval: `1`
+- Time zone: `Europe/Paris`
+- On these days: `Monday`
+- At these hours: `08`
+- At these minutes: `00`
 
-### A) Inscriptions semaine
+## 3) Ajouter 5 actions "Run query and list results"
+
+Important: nomme exactement les actions ci-dessous pour pouvoir reutiliser les expressions email.
+
+### Action 1 - `KQL_Registered`
 ```kusto
 let events = materialize(
     union isfuzzy=true
@@ -26,7 +37,7 @@ events
 | summarize value=count()
 ```
 
-### B) Signatures completes semaine
+### Action 2 - `KQL_Signed`
 ```kusto
 let events = materialize(
     union isfuzzy=true
@@ -38,7 +49,7 @@ events
 | summarize value=count()
 ```
 
-### C) RDV pris semaine
+### Action 3 - `KQL_Booked`
 ```kusto
 let events = materialize(
     union isfuzzy=true
@@ -50,7 +61,7 @@ events
 | summarize value=count()
 ```
 
-### D) Erreurs backend 5xx semaine
+### Action 4 - `KQL_Backend5xx`
 ```kusto
 requests
 | where timestamp > ago(7d)
@@ -58,7 +69,7 @@ requests
 | summarize value=count()
 ```
 
-### E) Alertes securite semaine
+### Action 5 - `KQL_Security`
 ```kusto
 let events = materialize(
     union isfuzzy=true
@@ -71,44 +82,38 @@ events
 | summarize value=count()
 ```
 
-## Configuration Logic App (portail)
-
-1. Creer une Logic App Consumption
-- Nom: `medicapp-weekly-monitoring-report`
-- Resource Group: `medicapp-rg`
-- Region: `westeurope`
-
-2. Declencheur
-- `Recurrence`
-- Frequence: `Week`
-- Intervalle: `1`
-- Jour: `Monday`
-- Heure: `08:00`
-- Fuseau: `Europe/Paris`
-
-3. Actions KQL
-- Ajouter 5 actions `Azure Monitor Logs - Run query and list results`
-- Workspace/Resource: `medicapp-appinsights`
+Parametres communs de chaque action:
+- Resource: `medicapp-appinsights`
 - Time range: `Set in query`
-- Coller les requetes A a E
+- Visualization: `Table`
 
-4. Construire le mail
-- Action `Office 365 Outlook - Send an email (V2)` (ou connecteur SMTP/SendGrid selon ton setup)
-- Sujet: `MedicApp - Rapport hebdomadaire monitoring`
-- Corps (HTML) exemple:
-  - Inscriptions: valeur A
-  - Signatures completes: valeur B
-  - RDV pris: valeur C
-  - Erreurs 5xx: valeur D
-  - Alertes securite: valeur E
+## 4) Ajouter l'action email
 
-5. Tester
+Action recommandee:
+- `Office 365 Outlook - Send an email (V2)` (ou SMTP/SendGrid si besoin)
+
+Sujet:
+`MedicApp - Rapport hebdomadaire monitoring`
+
+Corps HTML:
+```html
+<h2>MedicApp - Rapport hebdomadaire</h2>
+<p>Periode: 7 derniers jours</p>
+<ul>
+  <li>Inscriptions: @{coalesce(first(body('KQL_Registered')?['value'])?['value'], 0)}</li>
+  <li>Signatures completes: @{coalesce(first(body('KQL_Signed')?['value'])?['value'], 0)}</li>
+  <li>RDV pris: @{coalesce(first(body('KQL_Booked')?['value'])?['value'], 0)}</li>
+  <li>Erreurs backend 5xx: @{coalesce(first(body('KQL_Backend5xx')?['value'])?['value'], 0)}</li>
+  <li>Alertes securite (lock/mfa fail): @{coalesce(first(body('KQL_Security')?['value'])?['value'], 0)}</li>
+</ul>
+```
+
+## 5) Test
 - `Run trigger` -> `Run now`
-- Verifier reception email
-- Verifier les valeurs correspondent aux Logs
+- Verifier que chaque action KQL est en `Succeeded`
+- Verifier la reception de l'email et les valeurs
 
-## Conseils
-- Commencer avec email texte simple, puis passer en HTML.
-- Ajouter ensuite des seuils (ex: 5xx > 20) avec couleur rouge/orange.
-- Conserver cette Logic App dans `medicapp-rg` pour centraliser l'ops.
-
+## 6) Exploitation
+- Garde cette Logic App dans `medicapp-rg` pour centraliser les ops.
+- Si besoin, ajoute ensuite une couleur/alerte visuelle dans le mail (ex: 5xx > 20).
+- Si une expression ne passe pas, ouvre la sortie brute d'une action KQL et adapte `body('ActionName')`.
