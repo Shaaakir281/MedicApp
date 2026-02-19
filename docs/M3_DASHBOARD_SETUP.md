@@ -63,3 +63,8 @@ Section Securite:
 - Le dashboard charge sans erreur.
 - Chaque tuile affiche des donnees sur 24h/7j selon la requete.
 - Les tuiles securite montrent bien les events `auth_*`.
+- En-tete markdown operationnel present (sections + cadence de revue).
+
+## Exploitation
+
+- Routine de suivi: `docs/MONITORING_RUNBOOK.md`

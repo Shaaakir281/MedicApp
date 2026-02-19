@@ -39,7 +39,7 @@ Date: 2026-02-19
 
 ## M3 - Dashboards KQL
 - DASH-01 a DASH-04: `Configure` (tuiles dashboard ajoutees; KQL dans `docs/M3_KQL_QUERIES.md`)
-- DASH-05: `Partiel` (dashboard cree: `medicapp-monitoring-dashboard`; mise en forme fine a finaliser)
+- DASH-05: `Fait` (dashboard structure et en-tete operationnel finalises)
 - DASH-06: `Fait` (Logic App hebdomadaire configuree + email de synthese recu)
 
 ## M4 - Alertes metier
@@ -70,3 +70,6 @@ Date: 2026-02-19
   - `GET /internal/check-abandoned-journeys`
 - Header requis: `X-Internal-Key`
 - Variable d'env: `INTERNAL_JOBS_KEY`
+
+## Exploitation monitoring
+- Runbook operationnel: `docs/MONITORING_RUNBOOK.md`
