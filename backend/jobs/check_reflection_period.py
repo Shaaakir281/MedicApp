@@ -41,6 +41,16 @@ def run(db: Session, *, target_date: dt.date | None = None) -> dict[str, int | s
                 "days_since_preconsultation": 15,
             },
         )
+        event_tracker.track_event(
+            "patient_journey_transition",
+            properties={
+                "procedure_id": case.id,
+                "patient_id": str(case.patient_id) if case.patient_id is not None else None,
+                "from_step": "waiting",
+                "to_step": "booked",
+                "time_in_previous_step_hours": 15 * 24,
+            },
+        )
         emitted_events += 1
 
     return {
@@ -49,4 +59,3 @@ def run(db: Session, *, target_date: dt.date | None = None) -> dict[str, int | s
         "matching_cases": matching_cases,
         "events_emitted": emitted_events,
     }
-

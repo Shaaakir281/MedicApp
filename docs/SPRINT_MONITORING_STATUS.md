@@ -33,7 +33,7 @@ Date: 2026-02-19
   - `auth_mfa_sent/success/failure`: `Fait`
   - `auth_account_locked`: `Fait`
 - LOG-16 Parcours patient:
-  - `patient_journey_transition` (base): `Partiel`
+  - `patient_journey_transition` (base): `Fait`
   - `reflection_period_ended`: `Fait` (job interne)
   - `patient_journey_abandoned`: `Fait` (job interne)
 

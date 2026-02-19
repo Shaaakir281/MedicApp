@@ -498,6 +498,18 @@ def handle_yousign_document_webhook(
                 },
                 measurements={"total_time_days": total_time_days} if total_time_days is not None else None,
             )
+            transition_properties = {
+                "procedure_id": doc_sig.procedure_case_id,
+                "from_step": "signing",
+                "to_step": "complete",
+                "time_in_previous_step_hours": (total_time_days * 24) if total_time_days is not None else None,
+            }
+            if doc_sig.procedure_case and doc_sig.procedure_case.patient_id is not None:
+                transition_properties["patient_id"] = str(doc_sig.procedure_case.patient_id)
+            event_tracker.track_event(
+                "patient_journey_transition",
+                properties=transition_properties,
+            )
         return {"status": "processed", "document_signature_id": doc_sig.id}
 
     if "signer" in event_type and any(token in event_type for token in ("signed", "done", "completed")):
@@ -564,6 +576,18 @@ def handle_yousign_document_webhook(
                     "mode": _signature_mode(doc_sig),
                 },
                 measurements={"total_time_days": total_time_days} if total_time_days is not None else None,
+            )
+            transition_properties = {
+                "procedure_id": doc_sig.procedure_case_id,
+                "from_step": "signing",
+                "to_step": "complete",
+                "time_in_previous_step_hours": (total_time_days * 24) if total_time_days is not None else None,
+            }
+            if doc_sig.procedure_case and doc_sig.procedure_case.patient_id is not None:
+                transition_properties["patient_id"] = str(doc_sig.procedure_case.patient_id)
+            event_tracker.track_event(
+                "patient_journey_transition",
+                properties=transition_properties,
             )
 
         logger.info(

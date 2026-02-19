@@ -426,11 +426,31 @@ def save_dossier(db: Session, child_id: str, payload: schemas.DossierPayload, cu
             parent2 = _guardian_by_role(all_guardians, GuardianRole.parent2)
             has_parent2 = parent2 is not None and not _guardian_name_missing(parent2)
             phone_verified = any(guardian.phone_verified_at is not None for guardian in all_guardians)
+            latest_case = (
+                db.query(models.ProcedureCase)
+                .filter(models.ProcedureCase.patient_id == current_user.id)
+                .order_by(models.ProcedureCase.created_at.desc())
+                .first()
+            )
+            time_in_previous_step_hours = None
+            if latest_case and latest_case.created_at:
+                time_in_previous_step_hours = max(
+                    0.0,
+                    (dt.datetime.utcnow() - latest_case.created_at).total_seconds() / 3600,
+                )
             event_tracker.track_patient_event(
                 "patient_dossier_completed",
                 current_user.id,
                 has_parent2=has_parent2,
                 phone_verified=phone_verified,
+            )
+            event_tracker.track_patient_event(
+                "patient_journey_transition",
+                current_user.id,
+                procedure_id=latest_case.id if latest_case else None,
+                from_step="created",
+                to_step="dossier_completed",
+                time_in_previous_step_hours=time_in_previous_step_hours,
             )
 
     return get_dossier(db, child_id, current_user)
