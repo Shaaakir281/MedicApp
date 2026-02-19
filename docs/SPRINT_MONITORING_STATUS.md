@@ -73,3 +73,4 @@ Date: 2026-02-19
 
 ## Exploitation monitoring
 - Runbook operationnel: `docs/MONITORING_RUNBOOK.md`
+- Smoke check CLI: `scripts/monitoring_smoke_check.ps1`

@@ -86,3 +86,21 @@ Scope: production (`medicapp-rg`)
 - Faire un test controle apres chaque changement.
 - Conserver les noms d'alertes stables (historique lisible).
 - Mettre a jour `docs/SPRINT_MONITORING_STATUS.md` apres chaque evolution.
+
+## 8. Smoke check CLI (rapide)
+Commande:
+```powershell
+.\scripts\monitoring_smoke_check.ps1
+```
+
+Options utiles:
+```powershell
+.\scripts\monitoring_smoke_check.ps1 -Days 30
+.\scripts\monitoring_smoke_check.ps1 -ResourceGroup medicapp-rg -AppInsights medicapp-appinsights -Days 14
+```
+
+Le script affiche:
+- volume des events metier clefs (`patient_registered`, `appointment_booked`, `signature_all_completed`, etc.)
+- volume `patient_journey_transition`
+- volume `requests` en 5xx
+- top transitions `from_step -> to_step`
