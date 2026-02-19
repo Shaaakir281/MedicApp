@@ -1,6 +1,6 @@
 # Sprint Monitoring - Etat d'avancement
 
-Date: 2026-02-15
+Date: 2026-02-19
 
 ## M1 - Alertes techniques (Azure)
 - MON-01 Action Group email: `Fait` (`medicapp-alerts-email`)
@@ -43,12 +43,12 @@ Date: 2026-02-15
 - DASH-06: `Fait` (Logic App hebdomadaire configuree + email de synthese recu)
 
 ## M4 - Alertes metier
-- ALERT-01 nouvelle inscription: `A faire`
-- ALERT-02 signatures completes: `A faire`
-- ALERT-03 fin delai de reflexion: `Partiel` (code fait + planification job Azure faite; alerte metier finalisee a faire)
-- ALERT-04 taux d'erreur anormal: `A faire`
-- ALERT-05 brute-force: `A faire`
-- ALERT-06 parcours abandonne: `Partiel` (code fait + planification job Azure faite; alerte metier finalisee a faire)
+- ALERT-01 nouvelle inscription: `Fait` (`MedicApp - Nouvelle inscription`)
+- ALERT-02 signatures completes: `Fait` (`MedicApp - Signature completee`)
+- ALERT-03 fin delai de reflexion: `Fait` (`MedicApp - Delai reflexion termine`)
+- ALERT-04 taux d'erreur anormal: `Fait` (`MedicApp - Taux erreurs anormal`)
+- ALERT-05 brute-force: `Fait` (`MedicApp - Brute force suspecte`)
+- ALERT-06 parcours abandonne: `Fait` (`MedicApp - Parcours abandonne detecte`)
 
 ## Ajustements anti-bruit (production)
 - 2026-02-19 - Alerte `MedicApp - Temps de reponse degrade` ajustee:
@@ -56,6 +56,13 @@ Date: 2026-02-15
   - fenetre d'agregation: `PT15M` (avant `PT5M`)
   - frequence d'evaluation: `PT5M` (avant `PT1M`)
   - severite: `Sev3` (avant `Sev2`)
+- 2026-02-19 - Alertes metier M4 configurees en production (scheduled query rules):
+  - `MedicApp - Nouvelle inscription` (Sev4)
+  - `MedicApp - Signature completee` (Sev4)
+  - `MedicApp - Delai reflexion termine` (Sev3)
+  - `MedicApp - Parcours abandonne detecte` (Sev3)
+  - `MedicApp - Taux erreurs anormal` (Sev2, requete anti-bruit: trafic >= 20 et taux 5xx > 5% / 15m)
+  - `MedicApp - Brute force suspecte` (Sev1, >= 10 echecs login/IP / 15m)
 
 ## Changements backend ajoutes pour M4
 - Endpoint interne securise:
