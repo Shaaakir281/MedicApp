@@ -183,7 +183,6 @@ def cancel_appointment(
         else appointment.appointment_type
     )
     days_before_appointment = (appointment.date - date.today()).days
-    deleted_dates = {appointment.date}
     appointments_to_delete = [appointment]
 
     # Legal/business rule: if preconsultation is cancelled, linked act cannot be kept.
@@ -203,7 +202,6 @@ def cancel_appointment(
         )
         linked_act_deleted = len(linked_acts) > 0
         appointments_to_delete.extend(linked_acts)
-        deleted_dates.update(appt.date for appt in linked_acts)
 
     appointment_ids = [appt.id for appt in appointments_to_delete]
     _delete_appointment_dependencies(db, appointment_ids)
