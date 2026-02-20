@@ -59,6 +59,14 @@ async function apiRequest(path, options = {}) {
       }
     }
 
+    // If we still receive 401 after refresh attempt (or no refresh available),
+    // force local logout to avoid infinite 401->refresh loops.
+    if (response.status === 401 && !skipAuth) {
+      authSessionManager?.handleAuthError?.(
+        new Error('Session invalide ou expirée. Veuillez vous reconnecter.'),
+      );
+    }
+
     let message = response.statusText;
     if (payload && payload.detail) {
       message = typeof payload.detail === 'string' ? payload.detail : JSON.stringify(payload.detail);

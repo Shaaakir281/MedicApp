@@ -91,7 +91,7 @@ def issue_tokens(
     return TokenPair(access_token=access_token, refresh_token=refresh_token)
 
 
-def refresh_access_token(refresh_token: str) -> str:
+def refresh_access_token(refresh_token: str, db: Session | None = None) -> str:
     try:
         claims = security.decode_token(refresh_token)
     except security.TokenDecodeError as exc:
@@ -102,6 +102,16 @@ def refresh_access_token(refresh_token: str) -> str:
     subject = claims.get("sub")
     if not subject:
         raise InvalidRefreshTokenError("Refresh token missing subject")
+    if db is not None:
+        try:
+            user_id = int(subject)
+        except (TypeError, ValueError) as exc:
+            raise InvalidRefreshTokenError("Invalid refresh token subject") from exc
+        user = get_user_by_id(db, user_id)
+        if user is None:
+            raise InvalidRefreshTokenError("User not found")
+        if user.email and user.email.startswith("deleted+"):
+            raise InvalidRefreshTokenError("Account deleted")
     access_claims = {}
     if claims.get("mfa_verified") is True:
         access_claims["mfa_verified"] = True

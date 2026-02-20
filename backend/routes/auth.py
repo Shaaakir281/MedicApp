@@ -401,7 +401,7 @@ def verify_mfa_code(
 def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)) -> schemas.TokenRefresh:
     """Refresh an access token using a valid refresh token."""
     try:
-        new_access_token = auth_service.refresh_access_token(payload.refresh_token)
+        new_access_token = auth_service.refresh_access_token(payload.refresh_token, db=db)
     except auth_service.InvalidRefreshTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -476,6 +476,14 @@ def verify_email(
     try:
         user = auth_service.verify_email_token(db, token)
     except auth_service.InvalidVerificationTokenError as exc:
+        if (
+            str(exc) == "Verification token already used"
+            and token_row is not None
+            and token_row.consumed_at is not None
+            and token_row.user is not None
+            and token_row.user.email_verified
+        ):
+            return schemas.Message(detail="Adresse e-mail deja verifiee.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     time_to_verify_seconds = None

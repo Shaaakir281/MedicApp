@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 
 import { Card, SectionHeading, Button } from '../components/ui';
@@ -85,12 +85,17 @@ export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') || '';
   const [status, setStatus] = useState({ type: 'idle', message: 'Verification en cours...' });
+  const hasRequestedRef = useRef(false);
 
   useEffect(() => {
+    if (hasRequestedRef.current) {
+      return;
+    }
     if (!token) {
       setStatus({ type: 'error', message: 'Token manquant.' });
       return;
     }
+    hasRequestedRef.current = true;
     verifyEmailToken(token)
       .then(() => {
         setStatus({ type: 'success', message: 'Adresse email validee.' });
