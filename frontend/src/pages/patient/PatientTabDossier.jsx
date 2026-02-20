@@ -195,6 +195,8 @@ export function PatientTabDossierView({ dossier, currentUser, journeyStatus }) {
               verifying={verifyingRole === 'PARENT_1'}
               isUserAccount
               userEmailVerified={userEmailVerified}
+              onSendEmailVerification={() => handleSendEmailVerification('PARENT_1')}
+              sendingEmail={sendingEmailRole === 'PARENT_1'}
               disabled={false}
             />
             <GuardianForm

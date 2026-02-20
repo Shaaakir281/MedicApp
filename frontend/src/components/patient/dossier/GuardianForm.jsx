@@ -27,7 +27,8 @@ export function GuardianForm({
   const [countdown, setCountdown] = useState(0);
 
   const isPhoneVerified = guardianData?.phoneVerifiedAt || verificationState?.step === 'verified';
-  const isEmailVerified = guardianData?.emailVerifiedAt || (isUserAccount && userEmailVerified);
+  const accountEmailVerified = Boolean(isUserAccount && userEmailVerified);
+  const isEmailVerified = guardianData?.emailVerifiedAt || accountEmailVerified;
   const canSendCode = formState[`${prefix}Phone`] && !sending;
   const showCodeInput = verificationState?.step === 'sent' && !isPhoneVerified;
   const hasValue = (value) => Boolean(String(value || '').trim());
@@ -53,7 +54,6 @@ export function GuardianForm({
   // Email verification states
   const emailSentPending = guardianData?.emailSentAt && !guardianData?.emailVerifiedAt;
   const showEmailVerificationButton =
-    !isUserAccount &&
     onSendEmailVerification &&
     formState[`${prefix}Email`] &&
     (!isEmailVerified || emailChanged) &&
@@ -166,7 +166,7 @@ export function GuardianForm({
       </div>
 
       {/* Vérification Email intégrée */}
-      {!disabled && isUserAccount && isEmailVerified && (
+      {!disabled && isUserAccount && accountEmailVerified && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-2">
           <p className="text-xs text-green-800 flex items-center gap-1">
             <svg

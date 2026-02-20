@@ -14,7 +14,6 @@ export function SignatureActions({
   parentVerified,
   parentEmail,
   parentPhone,
-  otherParentEmail,
   onReloadCase,
   onReloadDashboard,
   setError,
@@ -76,7 +75,7 @@ export function SignatureActions({
       setError?.(LABELS_FR.patientSpace.documents.reasons.missingAppointment);
       return;
     }
-    const popupRef = mode === 'remote' ? window.open('about:blank', '_blank', 'noopener') : null;
+    const popupRef = mode === 'remote' ? window.open('', '_blank') : null;
     setError?.(null);
     setSuccessMessage?.(null);
     setSigning(true);
@@ -91,12 +90,12 @@ export function SignatureActions({
       });
       const link = response?.signature_link;
       if (link) {
-        if (popupRef) {
-          popupRef.location.href = link;
+        if (popupRef && !popupRef.closed) {
+          popupRef.location.replace(link);
         } else {
-          const opened = window.open(link, '_blank', 'noopener');
+          const opened = window.open(link, '_blank');
           if (!opened) {
-            window.location.assign(link);
+            setError?.("Fenetre bloquee par le navigateur. Autorisez les popups puis reessayez.");
           }
         }
         onReloadCase?.();
