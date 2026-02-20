@@ -406,10 +406,17 @@ def save_dossier(db: Session, child_id: str, payload: schemas.DossierPayload, cu
         if current is None:
             current = Guardian(child_id=child.id, role=role)
             db.add(current)
+        previous_email = (current.email or "").strip().lower() or None
+        next_email = (g.email or "").strip().lower() or None
+        previous_phone = current.phone_e164
         current.first_name = g.first_name.strip()
         current.last_name = g.last_name.strip()
         current.email = g.email
         current.phone_e164 = phone
+        if previous_email != next_email:
+            current.email_verified_at = None
+        if previous_phone != phone:
+            current.phone_verified_at = None
         current.updated_at = dt.datetime.now(tz=dt.timezone.utc)
         updated.append(current)
 

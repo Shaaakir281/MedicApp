@@ -35,8 +35,8 @@ export function GuardianForm({
   const requiredMark = required ? ' *' : '';
 
   // Check if email changed compared to verified/sent email
-  const currentEmail = formState[`${prefix}Email`] || '';
-  const verifiedEmail = guardianData?.email || '';
+  const currentEmail = String(formState[`${prefix}Email`] || '').trim().toLowerCase();
+  const verifiedEmail = String(guardianData?.email || '').trim().toLowerCase();
   const emailChanged = currentEmail !== verifiedEmail;
   const hasGuardianId = Boolean(guardianData?.id);
   const missingForEmailVerification = [];
@@ -52,7 +52,12 @@ export function GuardianForm({
 
   // Email verification states
   const emailSentPending = guardianData?.emailSentAt && !guardianData?.emailVerifiedAt;
-  const showEmailVerificationButton = !isUserAccount && onSendEmailVerification && formState[`${prefix}Email`] && (!emailSentPending || emailChanged);
+  const showEmailVerificationButton =
+    !isUserAccount &&
+    onSendEmailVerification &&
+    formState[`${prefix}Email`] &&
+    (!isEmailVerified || emailChanged) &&
+    (!emailSentPending || emailChanged);
 
   // Gérer le compte à rebours
   useEffect(() => {
@@ -277,7 +282,7 @@ export function GuardianForm({
                 clipRule="evenodd"
               />
             </svg>
-            Email vérifié - Signature électronique activée
+            Email vérifié
           </p>
         </div>
       )}

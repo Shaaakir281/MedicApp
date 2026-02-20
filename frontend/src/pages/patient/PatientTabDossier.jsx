@@ -11,7 +11,14 @@ export function PatientTabDossierView({ dossier, currentUser, journeyStatus }) {
   const [verifyingRole, setVerifyingRole] = useState(null);
   const [sendingEmailRole, setSendingEmailRole] = useState(null);
   const autoFilledEmailRef = useRef(false);
-  const userEmailVerified = Boolean(currentUser?.email_verified && currentUser?.email);
+  const normalizedUserEmail = String(currentUser?.email || '').trim().toLowerCase();
+  const normalizedParent1Email = String(dossier.formState?.parent1Email || '').trim().toLowerCase();
+  const userEmailVerified = Boolean(
+    currentUser?.email_verified &&
+      normalizedUserEmail &&
+      normalizedParent1Email &&
+      normalizedParent1Email === normalizedUserEmail,
+  );
   const parent1EmailVerified = Boolean(
     dossier.vm?.guardians?.PARENT_1?.emailVerifiedAt || userEmailVerified,
   );
