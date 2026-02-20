@@ -177,7 +177,7 @@ export function usePatientAppointments({
     );
     if (appointmentType === 'act') {
       if (!preconsultationAppt) {
-        setScheduleError("Planifiez d'abord la consultation pré-opératoire avant l'acte.");
+        setScheduleError("Planifiez d'abord la consultation pre-operatoire avant l'acte.");
         return;
       }
       const preDate = preconsultationAppt.date ? parseISODateLocal(preconsultationAppt.date) : null;
@@ -191,15 +191,15 @@ export function usePatientAppointments({
           earliestActDate.setDate(earliestActDate.getDate() + 15);
           const earliestActDateFormatted = earliestActDate.toLocaleDateString('fr-FR');
           onShow14DayModal({
-            title: 'Règle des 15 jours',
+            title: 'Regle des 15 jours',
             message:
-              "Pour des raisons médicales et légales, l'acte doit être réalisé au minimum 15 jours après la pré-consultation.\n\n" +
-              `Votre pré-consultation : ${preConsultDateFormatted}\n` +
-              `Date la plus tôt pour l'acte : ${earliestActDateFormatted}\n\n` +
-              'Veuillez sélectionner une date ultérieure.',
+              "Pour des raisons medicales et legales, l'acte doit etre realise au minimum 15 jours apres la pre-consultation.\n\n" +
+              `Votre pre-consultation : ${preConsultDateFormatted}\n` +
+              `Date la plus tot pour l'acte : ${earliestActDateFormatted}\n\n` +
+              'Veuillez selectionner une date ulterieure.',
           });
         } else {
-          setScheduleError("L'acte doit être au moins 15 jours après la pré-consultation.");
+          setScheduleError("L'acte doit etre au moins 15 jours apres la pre-consultation.");
         }
         return;
       }
@@ -210,7 +210,7 @@ export function usePatientAppointments({
       hasPreconsultation &&
       !editingAppointmentId
     ) {
-      setScheduleError('Une consultation pré-opératoire est déjà planifiée.');
+      setScheduleError('Une consultation pre-operatoire est deja planifiee.');
       return;
     }
 
@@ -226,9 +226,9 @@ export function usePatientAppointments({
         mode: appointmentType === 'act' ? 'presentiel' : appointmentMode,
       };
       await createAppointment(token, payload);
-      const modeLabel = payload.mode === 'visio' ? 'en visio' : 'en présentiel';
+      const modeLabel = payload.mode === 'visio' ? 'en visio' : 'en presentiel';
       setSuccessMessage?.(
-        `Rendez-vous confirmé le ${payload.date} à ${selectedSlot} (${modeLabel}). Un e-mail de confirmation a été envoyé.`,
+        `Rendez-vous confirme le ${payload.date} a ${selectedSlot} (${modeLabel}). Un e-mail de confirmation a ete envoye.`,
       );
       setSelectedSlot(null);
       setAvailableSlots((prev) => prev.filter((slot) => slot !== selectedSlot));
@@ -284,8 +284,8 @@ export function usePatientAppointments({
       const hasLinkedAct = Boolean(isPreconsultation && hasAct);
       if (hasLinkedAct) {
         const confirmed = window.confirm(
-          "Si vous annulez la pré-consultation, le rendez-vous d'acte ne peut pas être conservé.\n\n" +
-            "Les deux rendez-vous seront annulés. Vous pourrez reprendre rendez-vous si un créneau reste disponible et respecte la règle des 15 jours.\n\n" +
+          "Si vous annulez la pre-consultation, le rendez-vous d'acte ne peut pas etre conserve.\n\n" +
+            "Les deux rendez-vous seront annules. Vous pourrez reprendre rendez-vous si un creneau reste disponible et respecte la regle des 15 jours.\n\n" +
             "Confirmer l'annulation ?",
         );
         if (!confirmed) return;
@@ -297,10 +297,10 @@ export function usePatientAppointments({
         await deleteAppointment(token, apptId, { cascadeAct: isPreconsultation });
         if (hasLinkedAct) {
           setSuccessMessage?.(
-            "Rendez-vous pré-opératoire et rendez-vous d'acte annulés. Vous pouvez reprendre rendez-vous dans le respect du délai légal de 15 jours.",
+            "Rendez-vous pre-operatoire et rendez-vous d'acte annules. Vous pouvez reprendre rendez-vous dans le respect du delai legal de 15 jours.",
           );
         } else {
-          setSuccessMessage?.('Rendez-vous annulé. Vous pouvez en planifier un nouveau.');
+          setSuccessMessage?.('Rendez-vous annule. Vous pouvez en planifier un nouveau.');
         }
         await loadProcedureCase?.();
         await onReloadDashboard?.();
