@@ -19,7 +19,7 @@ const VideoRassurance = () => {
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-semibold text-slate-800">Préparer le jour de l'intervention</h1>
         <p className="text-slate-600 mt-2">
-          Cette vidéo vous explique les ?tapes importantes et vous aide ? préparer votre enfant sereinement.
+          Cette vidéo vous explique les étapes importantes et vous aide à préparer votre enfant sereinement.
         </p>
       </div>
 
@@ -28,7 +28,7 @@ const VideoRassurance = () => {
           <div className="aspect-video w-full rounded-xl overflow-hidden bg-slate-100">
             {isYouTube ? (
               <iframe
-                title="Video rassurance"
+                title="Vidéo rassurance"
                 src={embedUrl}
                 className="w-full h-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -47,7 +47,7 @@ const VideoRassurance = () => {
         <div className="mt-6">
           <h2 className="text-lg font-semibold text-slate-800">Transcription</h2>
           <p className="text-slate-600 mt-2 leading-relaxed">
-            Cette section contient la transcription de la vidéo pour faciliter l'accessibilit?. Vous pourrez
+            Cette section contient la transcription de la vidéo pour faciliter l'accessibilité. Vous pourrez
             la compléter avec le texte officiel une fois la vidéo finalisée.
           </p>
         </div>
@@ -58,7 +58,7 @@ const VideoRassurance = () => {
           Consulter le guide FAQ
         </Link>
         <Link to="/patient" className="btn btn-primary btn-sm">
-          Retour ? mon espace patient
+          Retour à mon espace patient
         </Link>
       </div>
     </div>
