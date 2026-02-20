@@ -54,6 +54,23 @@ def _track_slot_utilization(db: Session, slot_date: date) -> None:
     )
 
 
+def _delete_appointment_dependencies(db: Session, appointment_ids: List[int]) -> None:
+    """Delete rows that FK-reference appointments before deleting appointments."""
+    if not appointment_ids:
+        return
+
+    (
+        db.query(models.LegalAcknowledgement)
+        .filter(models.LegalAcknowledgement.appointment_id.in_(appointment_ids))
+        .delete(synchronize_session=False)
+    )
+    (
+        db.query(models.SignatureCabinetSession)
+        .filter(models.SignatureCabinetSession.appointment_id.in_(appointment_ids))
+        .delete(synchronize_session=False)
+    )
+
+
 @router.get("/slots", response_model=Dict[str, List[str]])
 def get_available_slots(
     *, db: Session = Depends(get_db), date: date = Query(..., description="YYYY-MM-DD")
@@ -166,6 +183,8 @@ def cancel_appointment(
         else appointment.appointment_type
     )
     days_before_appointment = (appointment.date - date.today()).days
+    deleted_dates = {appointment.date}
+    appointments_to_delete = [appointment]
 
     # Legal/business rule: if preconsultation is cancelled, linked act cannot be kept.
     if appointment.appointment_type == models.AppointmentType.preconsultation and appointment.procedure_id:
@@ -174,17 +193,22 @@ def cancel_appointment(
                 "Ignoring cascade_act=false for preconsultation cancellation (appointment_id=%s).",
                 appointment_id,
             )
-        deleted_rows = (
+        linked_acts = (
             db.query(models.Appointment)
             .filter(
                 models.Appointment.procedure_id == appointment.procedure_id,
                 models.Appointment.appointment_type == models.AppointmentType.act,
             )
-            .delete(synchronize_session=False)
+            .all()
         )
-        linked_act_deleted = deleted_rows > 0
+        linked_act_deleted = len(linked_acts) > 0
+        appointments_to_delete.extend(linked_acts)
+        deleted_dates.update(appt.date for appt in linked_acts)
 
-    db.delete(appointment)
+    appointment_ids = [appt.id for appt in appointments_to_delete]
+    _delete_appointment_dependencies(db, appointment_ids)
+    for appt in appointments_to_delete:
+        db.delete(appt)
     db.commit()
 
     event_tracker.track_patient_event(
