@@ -76,6 +76,7 @@ export function SignatureActions({
       setError?.(LABELS_FR.patientSpace.documents.reasons.missingAppointment);
       return;
     }
+    const popupRef = mode === 'remote' ? window.open('about:blank', '_blank', 'noopener') : null;
     setError?.(null);
     setSuccessMessage?.(null);
     setSigning(true);
@@ -88,15 +89,28 @@ export function SignatureActions({
         token,
         docType: doc?.docType,
       });
-      await onReloadCase?.();
-      await onReloadDashboard?.();
       const link = response?.signature_link;
       if (link) {
-        window.open(link, '_blank', 'noopener');
+        if (popupRef) {
+          popupRef.location.href = link;
+        } else {
+          const opened = window.open(link, '_blank', 'noopener');
+          if (!opened) {
+            window.location.assign(link);
+          }
+        }
+        onReloadCase?.();
+        onReloadDashboard?.();
       } else {
+        if (popupRef && !popupRef.closed) {
+          popupRef.close();
+        }
         setError?.('Lien de signature indisponible.');
       }
     } catch (err) {
+      if (popupRef && !popupRef.closed) {
+        popupRef.close();
+      }
       setError?.(err?.message || 'Erreur de signature.');
     } finally {
       setSigning(false);
