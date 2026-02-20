@@ -71,6 +71,8 @@ JWT_SECRET_KEY=change_me
 APP_BASE_URL=http://localhost:5173
 SMTP_HOST=...
 EMAIL_FROM=...
+EMAIL_FROM_NAME=MedicApp
+EMAIL_REPLY_TO=support@medicapp.sethostscope.dev
 ```
 
 `frontend/.env.local` (optionnel) :
@@ -170,7 +172,9 @@ SMTP_USERNAME=***
 SMTP_PASSWORD=***
 SMTP_USE_TLS=true
 SMTP_USE_SSL=false
-EMAIL_FROM=fathimetalsi@gmail.com
+EMAIL_FROM=no-reply@medicapp.sethostscope.dev
+EMAIL_FROM_NAME=MedicApp
+EMAIL_REPLY_TO=support@medicapp.sethostscope.dev
 DOCKER_REGISTRY_SERVER_URL=https://medicappregistry.azurecr.io
 DOCKER_REGISTRY_SERVER_USERNAME=medicappregistry
 DOCKER_REGISTRY_SERVER_PASSWORD=<az acr credential show ...>

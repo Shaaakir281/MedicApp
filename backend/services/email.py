@@ -6,6 +6,7 @@ import logging
 import smtplib
 import ssl
 from email.message import EmailMessage
+from email.utils import formataddr, make_msgid
 
 from core.config import SMTPSettings, get_settings
 
@@ -58,8 +59,17 @@ def send_email(subject: str, recipient: str, text_body: str, html_body: str | No
 
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = smtp.sender
+    sender_name = (smtp.sender_name or "").strip()
+    sender_email = (smtp.sender or "").strip()
+    msg["From"] = formataddr((sender_name, sender_email)) if sender_name else sender_email
     msg["To"] = recipient
+    if smtp.reply_to:
+        msg["Reply-To"] = smtp.reply_to
+    if sender_email and "@" in sender_email:
+        sender_domain = sender_email.split("@", 1)[1]
+        msg["Message-ID"] = make_msgid(domain=sender_domain)
+    msg["X-Auto-Response-Suppress"] = "OOF, AutoReply"
+    msg["Auto-Submitted"] = "auto-generated"
     msg.set_content(text_body)
     if html_body:
         msg.add_alternative(html_body, subtype="html")

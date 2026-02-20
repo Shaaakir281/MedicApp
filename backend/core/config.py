@@ -26,6 +26,8 @@ class SMTPSettings(BaseModel):
     use_tls: bool = True
     use_ssl: bool = False
     sender: Optional[str] = None
+    sender_name: Optional[str] = None
+    reply_to: Optional[str] = None
 
     @property
     def is_configured(self) -> bool:
@@ -61,6 +63,8 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = Field(default=True, alias="SMTP_USE_TLS")
     smtp_use_ssl: bool = Field(default=False, alias="SMTP_USE_SSL")
     email_from: Optional[str] = Field(default=None, alias="EMAIL_FROM")
+    email_from_name: Optional[str] = Field(default=None, alias="EMAIL_FROM_NAME")
+    email_reply_to: Optional[str] = Field(default=None, alias="EMAIL_REPLY_TO")
     reminder_lookahead_days: int = Field(default=7, alias="REMINDER_LOOKAHEAD_DAYS", ge=1, le=30)
     storage_backend: Literal["local", "azure"] = Field(default="local", alias="STORAGE_BACKEND")
     storage_local_path: Optional[str] = Field(default=None, alias="STORAGE_LOCAL_PATH")
@@ -117,6 +121,8 @@ class Settings(BaseSettings):
             use_tls=self.smtp_use_tls,
             use_ssl=self.smtp_use_ssl,
             sender=self.email_from,
+            sender_name=self.email_from_name,
+            reply_to=self.email_reply_to,
         )
 
     @staticmethod
