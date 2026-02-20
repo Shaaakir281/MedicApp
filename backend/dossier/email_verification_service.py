@@ -6,6 +6,7 @@ import datetime as dt
 import hashlib
 import logging
 import secrets
+from urllib.parse import urlencode
 from typing import Tuple
 
 from fastapi import HTTPException, status
@@ -42,10 +43,11 @@ def _latest_email_verification(db: Session, guardian_id: str) -> GuardianEmailVe
     return db.scalars(stmt).first()
 
 
-def _build_verification_link(token: str, guardian_id: str) -> str:
+def _build_verification_link(token: str, guardian_id: str, base_url: str | None = None) -> str:
     """Build email verification link."""
-    base_url = get_settings().app_base_url.rstrip("/")
-    return f"{base_url}/dossier/guardians/{guardian_id}/email-verification/verify?token={token}"
+    frontend_url = (base_url or get_settings().frontend_base_url).rstrip("/")
+    query = urlencode({"guardian_id": guardian_id, "token": token})
+    return f"{frontend_url}/auth/verify-guardian-email?{query}"
 
 
 def send_email_verification(
@@ -102,7 +104,13 @@ def send_email_verification(
 
     # Send email
     try:
-        verification_link = _build_verification_link(token, guardian.id)
+        settings = get_settings()
+        verification_link = _build_verification_link(token, guardian.id, settings.frontend_base_url)
+        alternative_links = []
+        for candidate_base_url in settings.frontend_base_urls:
+            if candidate_base_url.rstrip("/") == settings.frontend_base_url.rstrip("/"):
+                continue
+            alternative_links.append(_build_verification_link(token, guardian.id, candidate_base_url))
         guardian_name = f"{guardian.first_name} {guardian.last_name}".strip()
         child_name = f"{child.first_name} {child.last_name}".strip()
 
@@ -111,6 +119,7 @@ def send_email_verification(
             guardian_name=guardian_name,
             child_name=child_name,
             verification_link=verification_link,
+            alternative_links=alternative_links,
         )
     except Exception as exc:  # pragma: no cover - external
         logger.warning("Email non envoye (guardian=%s): %s", guardian.id, exc)
@@ -145,6 +154,9 @@ def verify_email_token(
     now = dt.datetime.now(tz=dt.timezone.utc)
 
     if verification.consumed_at is not None:
+        same_email = (guardian.email or "").strip().lower() == (verification.email or "").strip().lower()
+        if guardian.email_verified_at is not None and same_email:
+            return verification
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token deja utilise.")
 
     if verification.expires_at < now:

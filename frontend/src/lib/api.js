@@ -295,6 +295,17 @@ export async function verifyEmailToken(token) {
   });
 }
 
+export async function verifyGuardianEmailToken({ guardianId, token }) {
+  return apiRequest(
+    `/dossier/guardians/${encodeURIComponent(guardianId)}/email-verification/verify?token=${encodeURIComponent(token)}`,
+    {
+      method: 'GET',
+      skipAuth: true,
+      retryOnAuth: false,
+    },
+  );
+}
+
 export async function resendVerificationEmail(email) {
   return apiRequest('/auth/verify-email/resend', {
     method: 'POST',

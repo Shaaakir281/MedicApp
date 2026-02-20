@@ -8,6 +8,7 @@ import CabinetSignaturePage from './pages/practitioner/CabinetSignaturePage.jsx'
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import VerifyEmail from './pages/VerifyEmail.jsx';
+import VerifyGuardianEmail from './pages/VerifyGuardianEmail.jsx';
 import TabletSession from './pages/TabletSession.jsx';
 import CabinetSignature from './pages/CabinetSignature.jsx';
 import { MentionsLegales } from './pages/legal/MentionsLegales.jsx';
@@ -52,6 +53,7 @@ function AppShell() {
           <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />
           <Route path="/auth/reset-password" element={<ResetPassword />} />
           <Route path="/auth/verify-email" element={<VerifyEmail />} />
+          <Route path="/auth/verify-guardian-email" element={<VerifyGuardianEmail />} />
           <Route path="/mentions-legales" element={<MentionsLegales />} />
           <Route path="/confidentialite" element={<PolitiqueConfidentialite />} />
           <Route path="/video-rassurance" element={<VideoRassurance />} />
