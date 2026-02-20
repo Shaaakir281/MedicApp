@@ -218,7 +218,11 @@ export function useDossier({ token }) {
   };
 
   const sendOtp = async (role) => {
-    const guardianId = vm?.guardians?.[role]?.id;
+    let guardianId = vm?.guardians?.[role]?.id;
+    if (!guardianId) {
+      const nextVm = await autoSaveForVerification();
+      guardianId = nextVm?.guardians?.[role]?.id;
+    }
     if (!guardianId) {
       setError('Identifiant parent manquant.');
       return;
