@@ -104,15 +104,24 @@ def send_verification_email(
         f"Bonjour,\n\n"
         f"Merci de vous être inscrit sur {app_name}.\n"
         f"Veuillez confirmer votre adresse e-mail en cliquant sur le lien suivant :\n"
-        f"{verification_link}\n\n"
+        f"Confirmer mon adresse e-mail : {verification_link}\n\n"
         f"{alt_text}"
         f"Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement ce message.\n"
     )
     html_body = f"""
     <p>Bonjour,</p>
     <p>Merci de vous être inscrit sur <strong>{app_name}</strong>.</p>
-    <p>Veuillez confirmer votre adresse e-mail en cliquant sur le lien suivant :</p>
-    <p><a href="{verification_link}">{verification_link}</a></p>
+    <p>Veuillez confirmer votre adresse e-mail en cliquant sur le bouton ci-dessous :</p>
+    <p style="text-align: center; margin: 24px 0;">
+      <a href="{verification_link}"
+         style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">
+        Confirmer mon adresse e-mail
+      </a>
+    </p>
+    <p style="font-size: 12px; color: #666;">
+      Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>
+      <a href="{verification_link}">Copier le lien de verification</a>
+    </p>
     {alt_html}
     <p>Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement ce message.</p>
     """
@@ -303,15 +312,24 @@ def send_password_reset_email(
     text_body = (
         f"Bonjour,\n\n"
         f"Un lien de reinitialisation de mot de passe a ete genere pour votre compte {app_name} :\n"
-        f"{reset_link}\n\n"
+        f"Reinitialiser mon mot de passe : {reset_link}\n\n"
         f"{alt_text}"
         f"Ce lien expire dans 60 minutes. {spam_hint}\n"
         f"Si vous n'etes pas a l'origine de cette demande, ignorez simplement ce message.\n"
     )
     html_body = f"""
     <p>Bonjour,</p>
-    <p>Un lien de r&eacute;initialisation de mot de passe a &eacute;t&eacute; g&eacute;n&eacute;r&eacute; pour votre compte <strong>{app_name}</strong> :</p>
-    <p><a href="{reset_link}">{reset_link}</a></p>
+    <p>Un lien de r&eacute;initialisation de mot de passe a &eacute;t&eacute; g&eacute;n&eacute;r&eacute; pour votre compte <strong>{app_name}</strong>.</p>
+    <p style="text-align: center; margin: 24px 0;">
+      <a href="{reset_link}"
+         style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">
+        R&eacute;initialiser mon mot de passe
+      </a>
+    </p>
+    <p style="font-size: 12px; color: #666;">
+      Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>
+      <a href="{reset_link}">Copier le lien de r&eacute;initialisation</a>
+    </p>
     {alt_html}
     <p>Ce lien expire dans 60 minutes. {spam_hint}</p>
     <p>Si vous n'&ecirc;tes pas &agrave; l'origine de cette demande, ignorez ce message.</p>
