@@ -5,7 +5,7 @@ import sqlalchemy as sa  # noqa: F401
 
 # revision identifiers, used by Alembic.
 revision = "20241223_merge_heads"
-down_revision = ("20241221_add_guardian_email_verification", "20241222_add_document_signatures")
+down_revision = ("20241221_guardian_email_verify", "20241222_add_document_signatures")
 branch_labels = None
 depends_on = None
 

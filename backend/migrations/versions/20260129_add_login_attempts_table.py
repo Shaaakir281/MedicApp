@@ -1,6 +1,6 @@
 """add_login_attempts_table
 
-Revision ID: 20260129_add_login_attempts_table
+Revision ID: 20260129_login_attempts
 Revises: 20260129_add_mfa_codes_table
 Create Date: 2026-01-29
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "20260129_add_login_attempts_table"
+revision = "20260129_login_attempts"
 down_revision = "20260129_add_mfa_codes_table"
 branch_labels = None
 depends_on = None

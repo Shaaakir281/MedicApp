@@ -1,6 +1,6 @@
 """Add guardian email verification
 
-Revision ID: 20241221_add_guardian_email_verification
+Revision ID: 20241221_guardian_email_verify
 Revises: 20241222_add_dossier_tables
 Create Date: 2024-12-21 16:00:00.000000
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '20241221_add_guardian_email_verification'
+revision = '20241221_guardian_email_verify'
 down_revision = '20241222_add_dossier_tables'
 branch_labels = None
 depends_on = None

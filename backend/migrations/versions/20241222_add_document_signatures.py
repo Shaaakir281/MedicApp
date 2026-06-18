@@ -159,8 +159,6 @@ def upgrade():
         WHERE yousign_procedure_id IS NOT NULL
     """))
 
-    connection.commit()
-
 
 def downgrade():
     # Rollback: supprimer les données migrées et la table

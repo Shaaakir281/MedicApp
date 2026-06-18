@@ -1,15 +1,15 @@
 """add_document_download_token
 
-Revision ID: 20260127_add_document_download_token
-Revises: 20260104_drop_legacy_consent_fields
+Revision ID: 20260127_doc_download_token
+Revises: 20260104_drop_legacy_consent
 Create Date: 2026-01-27
 """
 from alembic import op
 import sqlalchemy as sa
 
 
-revision = "20260127_add_document_download_token"
-down_revision = "20260104_drop_legacy_consent_fields"
+revision = "20260127_doc_download_token"
+down_revision = "20260104_drop_legacy_consent"
 branch_labels = None
 depends_on = None
 

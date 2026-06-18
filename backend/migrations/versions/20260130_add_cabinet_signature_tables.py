@@ -1,7 +1,7 @@
 """add_cabinet_signature_tables
 
-Revision ID: 20260130_add_cabinet_signature_tables
-Revises: 20260129_add_login_attempts_table
+Revision ID: 20260130_cabinet_signatures
+Revises: 20260129_login_attempts
 Create Date: 2026-01-30
 """
 
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision = "20260130_add_cabinet_signature_tables"
-down_revision = "20260129_add_login_attempts_table"
+revision = "20260130_cabinet_signatures"
+down_revision = "20260129_login_attempts"
 branch_labels = None
 depends_on = None
 

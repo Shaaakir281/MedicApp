@@ -1,7 +1,7 @@
 """add_mfa_codes_table
 
 Revision ID: 20260129_add_mfa_codes_table
-Revises: 20260127_add_document_download_token
+Revises: 20260127_doc_download_token
 Create Date: 2026-01-29
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 revision = "20260129_add_mfa_codes_table"
-down_revision = "20260127_add_document_download_token"
+down_revision = "20260127_doc_download_token"
 branch_labels = None
 depends_on = None
 

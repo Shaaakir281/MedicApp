@@ -32,7 +32,8 @@ docker compose exec backend alembic upgrade head
 ```
 
 - API : `http://localhost:8000/docs`
-- Adminer : `http://localhost:8080`
+- Adminer : `http://localhost:18080`
+- PostgreSQL local Docker : `localhost:55433`
 
 ### Backend sans Docker
 

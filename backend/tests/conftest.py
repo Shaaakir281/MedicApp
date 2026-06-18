@@ -22,7 +22,7 @@ from core.config import reset_settings_cache
 
 # Ensure deterministic configuration for tests before importing app/database modules.
 TEST_DB_PATH = Path(__file__).parent / "test.db"
-os.environ.setdefault("DATABASE_URL", f"sqlite+pysqlite:///{TEST_DB_PATH}")
+os.environ["DATABASE_URL"] = f"sqlite+pysqlite:///{TEST_DB_PATH}"
 os.environ.setdefault("JWT_SECRET_KEY", "tests_secret_key_which_is_long_enough_123456")
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "15")
 os.environ.setdefault("REFRESH_TOKEN_EXPIRE_DAYS", "30")
