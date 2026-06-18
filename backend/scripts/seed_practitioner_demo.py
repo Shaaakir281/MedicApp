@@ -19,9 +19,6 @@ import models
 from database import SessionLocal, engine
 
 DEMO_TAG = "[demo]"
-DEFAULT_PASSWORD_HASH = (
-    "$2b$12$F0iUOJ6Q0iog8EPb28u16uJNmZQ7M1pJ2B8MblU5ZLsBLAiNrLyZu"  # "password"
-)
 DEMO_DOMAIN = "demo.medicapp"
 DEFAULT_START_DATE = dt.date.today()
 DEFAULT_DAYS = 28
@@ -193,7 +190,7 @@ def create_patient(db: Session, index: int) -> models.User:
 
     patient = models.User(
         email=email,
-        hashed_password=DEFAULT_PASSWORD_HASH,
+        hashed_password=security.hash_password("password"),
         role=models.UserRole.patient,
         email_verified=True,
         created_at=dt.datetime.utcnow(),
