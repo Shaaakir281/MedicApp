@@ -27,5 +27,11 @@ backend/migrations/__pycache__/
 backend/storage/
 *.pdf
 
+# Local/generated working files
+.tmp_*
+docs/azure_dashboard_live*.json
+docs/azure_dashboard_dash*_generated_properties.json
+MedicApp_Sprint_Monitoring.docx
+
 MedicApp_Sprints_HDS.docx
 

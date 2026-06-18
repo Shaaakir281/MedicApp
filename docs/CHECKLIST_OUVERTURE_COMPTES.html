@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checklist — Ouverture des comptes</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #1e293b; --ink-light: #475569; --ink-muted: #94a3b8;
+  --bg: #ffffff; --bg-warm: #f8fafc;
+  --p1: #2563eb; --p1-bg: #eff6ff; --p1-border: #bfdbfe;
+  --p2: #059669; --p2-bg: #ecfdf5; --p2-border: #a7f3d0;
+  --p3: #9333ea; --p3-bg: #faf5ff; --p3-border: #d8b4fe;
+  --p4: #64748b; --p4-bg: #f1f5f9; --p4-border: #cbd5e1;
+  --orange: #ea580c; --orange-bg: #fff7ed; --orange-border: #fed7aa;
+  --border: #e2e8f0;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', -apple-system, sans-serif; font-size: 15px; line-height: 1.65; color: var(--ink); background: var(--bg); }
+.page { max-width: 840px; margin: 0 auto; padding: 48px 40px; }
+
+header { text-align: center; margin-bottom: 28px; }
+header h1 { font-family: 'DM Serif Display', serif; font-size: 30px; font-weight: 400; margin-bottom: 6px; }
+header .sub { font-size: 14px; color: var(--ink-light); }
+header .date { font-size: 12px; color: var(--ink-muted); margin-top: 4px; }
+
+.domain-bar { display: flex; align-items: center; gap: 10px; justify-content: center; background: var(--bg-warm); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 18px; flex-wrap: wrap; }
+.domain-bar label { font-size: 13px; color: var(--ink-light); font-weight: 600; }
+.domain-bar input { font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; width: 240px; color: var(--ink); }
+.domain-bar .hint { font-size: 12px; color: var(--ink-muted); width: 100%; text-align: center; }
+.dom { font-weight: 600; }
+
+.progress-wrap { margin-bottom: 32px; }
+.progress-track { height: 8px; background: var(--p4-bg); border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; width: 0; background: var(--p2); border-radius: 4px; transition: width .3s; }
+.progress-label { font-size: 12px; color: var(--ink-light); text-align: right; margin-top: 4px; }
+
+.principle { background: var(--p1-bg); border: 1px solid var(--p1-border); border-radius: 8px; padding: 16px 20px; font-size: 13.5px; margin-bottom: 28px; }
+.principle strong { color: var(--p1); }
+
+.phase { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 22px; overflow: hidden; break-inside: avoid; }
+.phase-head { display: flex; align-items: center; gap: 14px; padding: 14px 18px; }
+.phase-num { width: 36px; height: 36px; min-width: 36px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; }
+.phase-titles { flex: 1; }
+.phase-titles h2 { font-size: 17px; font-weight: 700; }
+.phase-titles .st { font-size: 13px; color: var(--ink-light); }
+.phase-meta { text-align: right; font-size: 12px; color: var(--ink-light); white-space: nowrap; }
+.phase-meta b { display: block; font-size: 13px; color: var(--ink); }
+.ph1 .phase-head { background: var(--p1-bg); } .ph1 .phase-num { background: var(--p1); }
+.ph2 .phase-head { background: var(--p2-bg); } .ph2 .phase-num { background: var(--p2); }
+.ph3 .phase-head { background: var(--p3-bg); } .ph3 .phase-num { background: var(--p3); }
+.ph4 .phase-head { background: var(--p4-bg); } .ph4 .phase-num { background: var(--p4); }
+.ph5 .phase-head { background: var(--orange-bg); } .ph5 .phase-num { background: var(--orange); }
+
+.tasks { padding: 8px 18px 14px; }
+.task { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px dashed var(--border); align-items: flex-start; }
+.task:last-child { border-bottom: none; }
+.task input[type=checkbox] { width: 19px; height: 19px; min-width: 19px; margin-top: 3px; accent-color: var(--p2); cursor: pointer; }
+.task label { cursor: pointer; flex: 1; }
+.task .note { display: block; font-size: 13px; color: var(--ink-light); margin-top: 2px; }
+.task.done label { color: var(--ink-muted); text-decoration: line-through; }
+.task.done .note { text-decoration: none; }
+
+.warn { background: var(--orange-bg); border: 1px solid var(--orange-border); border-radius: 10px; padding: 18px 22px; margin: 30px 0; break-inside: avoid; }
+.warn h3 { font-size: 15px; color: var(--orange); margin-bottom: 10px; }
+.warn ul { list-style: none; }
+.warn li { font-size: 13.5px; padding: 5px 0 5px 22px; position: relative; }
+.warn li::before { content: "⚠"; position: absolute; left: 0; color: var(--orange); }
+
+.budget { margin: 30px 0; break-inside: avoid; }
+.budget h3 { font-family: 'DM Serif Display', serif; font-size: 20px; font-weight: 400; margin-bottom: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-light); padding: 8px 10px; border-bottom: 2px solid var(--ink); }
+td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+td.r, th.r { text-align: right; white-space: nowrap; }
+tr.total td { border-top: 2px solid var(--ink); border-bottom: none; font-weight: 700; font-size: 15px; }
+
+footer { text-align: center; font-size: 12px; color: var(--ink-muted); margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--border); }
+
+@media print {
+  .page { padding: 24px; max-width: none; }
+  .domain-bar input { border: none; }
+  .phase { page-break-inside: avoid; }
+}
+@media (max-width: 640px) {
+  .page { padding: 24px 16px; }
+  .phase-head { flex-wrap: wrap; }
+  .phase-meta { text-align: left; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>Ouverture des comptes &amp; lancement</h1>
+  <div class="sub">Plateforme de téléconsultation — parcours ordonné : domaine → email → Azure → Twilio → Mailjet → passation</div>
+  <div class="date">Juin 2026 — document de travail interne</div>
+</header>
+
+<div class="domain-bar">
+  <label for="domInput">Nom de domaine retenu :</label>
+  <input id="domInput" type="text" placeholder="ex. cabinet-exemple.fr" autocomplete="off">
+  <span class="hint">Renseigné ici, il s'affiche automatiquement dans toute la checklist. Progression et domaine sont mémorisés dans ce navigateur.</span>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-track"><div class="progress-fill" id="pfill"></div></div>
+  <div class="progress-label" id="plabel">0 / 0 étapes</div>
+</div>
+
+<div class="principle">
+  <strong>Principe directeur :</strong> tous les comptes sont créés avec l'adresse <span class="dom">admin@<span data-dom>votre-domaine.fr</span></span> — une identité neutre liée au projet, pas à une personne. La passation future se résume alors à deux gestes : remettre cette boîte mail au praticien et basculer les moyens de paiement. Ta CB sert au démarrage (refacturation courte), le profil de facturation est au nom du cabinet dès l'ouverture.
+</div>
+
+<!-- PHASE 0 -->
+<div class="phase ph4">
+  <div class="phase-head">
+    <div class="phase-num">0</div>
+    <div class="phase-titles"><h2>Préparation</h2><div class="st">Avant tout achat — seule étape qui dépend du praticien</div></div>
+    <div class="phase-meta"><b>~1 h</b>0 €</div>
+  </div>
+  <div class="tasks">
+    <div class="task"><input type="checkbox" id="t01"><label for="t01">Valider le nom de domaine avec le praticien (2-3 propositions, disponibilité vérifiée sur ovh.com)
+      <span class="note">Critères : court et lisible — les SMS d'orientation contiendront l'URL complète, les raccourcisseurs (bit.ly…) étant interdits en France. Nom du cabinet ou du praticien, extension .fr.</span></label></div>
+    <div class="task"><input type="checkbox" id="t02"><label for="t02">Décider le titulaire du domaine : le praticien (recommandé) ou toi avec transfert ultérieur
+      <span class="note">Le titulaire (propriétaire légal) peut être le praticien dès l'achat même si tu paies et administres. Sinon, le changement de titulaire d'un .fr est gratuit chez OVH, à faire à la passation. Prévoir ses coordonnées exactes : nom, adresse du cabinet, email, téléphone.</span></label></div>
+    <div class="task"><input type="checkbox" id="t03"><label for="t03">Installer un gestionnaire de mots de passe (KeePassXC ou Bitwarden)
+      <span class="note">Chaque compte créé ci-dessous y entre immédiatement avec un mot de passe unique généré. Le document Word de passation ne contient aucun mot de passe en clair tant qu'il est stocké sur OneDrive.</span></label></div>
+  </div>
+</div>
+
+<!-- PHASE 1 -->
+<div class="phase ph1">
+  <div class="phase-head">
+    <div class="phase-num">1</div>
+    <div class="phase-titles"><h2>Domaine + boîte email — OVH</h2><div class="st">L'identité du projet ; tout le reste en découle</div></div>
+    <div class="phase-meta"><b>J1 · ~1 h</b>~10-15 € HT/an</div>
+  </div>
+  <div class="tasks">
+    <div class="task"><input type="checkbox" id="t11"><label for="t11">Créer le compte OVH avec ton email personnel (l'adresse du domaine n'existe pas encore) et activer la double authentification (2FA)</label></div>
+    <div class="task"><input type="checkbox" id="t12"><label for="t12">Acheter le domaine <span class="dom" data-dom>votre-domaine.fr</span> (~7-12 € HT/an), titulaire selon la décision de la phase 0</label></div>
+    <div class="task"><input type="checkbox" id="t13"><label for="t13">Créer la boîte <span class="dom">admin@<span data-dom>votre-domaine.fr</span></span> (MX Plan inclus avec le domaine ; Email Pro ~1 € HT/mois si besoin de plus de confort)</label></div>
+    <div class="task"><input type="checkbox" id="t14"><label for="t14">Créer l'alias public <span class="dom">contact@<span data-dom>votre-domaine.fr</span></span> (adresse affichée sur le site)</label></div>
+    <div class="task"><input type="checkbox" id="t15"><label for="t15">Configurer admin@ sur ton téléphone et ton PC (webmail ou IMAP)
+      <span class="note">Cette boîte va recevoir toutes les validations des étapes suivantes — elle doit être consultable en continu.</span></label></div>
+    <div class="task"><input type="checkbox" id="t16"><label for="t16">Remplacer l'email de contact du compte OVH par admin@<span data-dom>votre-domaine.fr</span>
+      <span class="note">La boucle est bouclée : le compte OVH lui-même est désormais rattaché au domaine, plus à ton adresse personnelle.</span></label></div>
+    <div class="task"><input type="checkbox" id="t17"><label for="t17">Consigner identifiants OVH + codes de secours 2FA dans le gestionnaire de mots de passe et référencer le compte dans le doc de passation</label></div>
+  </div>
+</div>
+
+<!-- PHASE 2 -->
+<div class="phase ph2">
+  <div class="phase-head">
+    <div class="phase-num">2</div>
+    <div class="phase-titles"><h2>Azure — compte neuf</h2><div class="st">Le chemin critique : les clauses HDS partent d'ici</div></div>
+    <div class="phase-meta"><b>J2 · ~2 h</b>conso (alerte à régler)</div>
+  </div>
+  <div class="tasks">
+    <div class="task"><input type="checkbox" id="t21"><label for="t21">Créer un compte Microsoft neuf avec admin@<span data-dom>votre-domaine.fr</span> — ne pas réutiliser ton tenant de tests</label></div>
+    <div class="task"><input type="checkbox" id="t22"><label for="t22">Souscrire l'abonnement « Paiement à l'utilisation » : ta CB, mais profil de facturation au nom et à l'adresse du cabinet
+      <span class="note">Le moyen de paiement et l'identité de facturation sont indépendants : les factures sortent au nom de sa structure dès le premier jour, seule la CB sera basculée à la passation.</span></label></div>
+    <div class="task"><input type="checkbox" id="t23"><label for="t23">Activer MFA (Microsoft Authenticator) + noter les codes de secours</label></div>
+    <div class="task"><input type="checkbox" id="t24"><label for="t24">Inviter ton compte de travail comme utilisateur Entra ID avec rôle Owner sur l'abonnement
+      <span class="note">Tu travailles au quotidien avec ton compte ; admin@ reste le compte propriétaire « coffre-fort », utilisé uniquement pour l'administration sensible.</span></label></div>
+    <div class="task"><input type="checkbox" id="t25"><label for="t25">Initier les clauses HDS Microsoft (amendement contractuel) — dès la semaine 1
+      <span class="note">Délai administratif le plus incertain du projet. Procédure : learn.microsoft.com, rechercher « HDS France ». À lancer même si la reconstruction de l'infra attend.</span></label></div>
+    <div class="task"><input type="checkbox" id="t26"><label for="t26">Créer un budget Azure avec alerte (ex. 50 €/mois) pour la phase de développement</label></div>
+    <div class="task"><input type="checkbox" id="t27"><label for="t27">Consigner tenant ID, subscription ID, identifiants et 2FA</label></div>
+    <div class="task"><input type="checkbox" id="t28"><label for="t28">Plus tard, lot du devis (1,5 j) : reconstruction France Central avec nommage définitif — ACR, App Service, PostgreSQL, journalisation et monitoring configurés une seule fois, au bon endroit
+      <span class="note">Données fictives uniquement jusqu'à la fin du durcissement HDS.</span></label></div>
+  </div>
+</div>
+
+<!-- PHASE 3 -->
+<div class="phase ph3">
+  <div class="phase-head">
+    <div class="phase-num">3</div>
+    <div class="phase-titles"><h2>Twilio — SMS</h2><div class="st">SMS d'orientation post-appel et confirmations</div></div>
+    <div class="phase-meta"><b>J2-J3 · ~30 min</b>~20 € de crédit</div>
+  </div>
+  <div class="tasks">
+    <div class="task"><input type="checkbox" id="t31"><label for="t31">Créer le compte avec admin@<span data-dom>votre-domaine.fr</span> + 2FA</label></div>
+    <div class="task"><input type="checkbox" id="t32"><label for="t32">Passer en compte payant (CB + crédit ~20 €)
+      <span class="note">L'expéditeur alphanumérique ne fonctionne pas en compte d'essai — le passage en payant n'est pas optionnel.</span></label></div>
+    <div class="task"><input type="checkbox" id="t33"><label for="t33">Configurer l'expéditeur alphanumérique au nom du cabinet (11 caractères max, sans caractères spéciaux)
+      <span class="note">Pas de pré-enregistrement obligatoire en France. Les opérateurs peuvent demander une lettre d'autorisation pour les noms sensibles — anticiper si le nom évoque la santé.</span></label></div>
+    <div class="task"><input type="checkbox" id="t34"><label for="t34">Intégrer les règles France dans les gabarits de SMS
+      <span class="note">URL complète obligatoire (raccourcisseurs interdits), aucun envoi vers les fixes (erreur 21614), le créneau 8h-22h ne concerne que le marketing — les SMS de service passent à toute heure.</span></label></div>
+    <div class="task"><input type="checkbox" id="t35"><label for="t35">Tester l'envoi d'un SMS vers ton mobile avec l'expéditeur définitif</label></div>
+    <div class="task"><input type="checkbox" id="t36"><label for="t36">Consigner Account SID, Auth Token, identifiants et 2FA</label></div>
+  </div>
+</div>
+
+<!-- PHASE 4 -->
+<div class="phase ph1">
+  <div class="phase-head">
+    <div class="phase-num">4</div>
+    <div class="phase-titles"><h2>Mailjet — emails transactionnels</h2><div class="st">Gratuit pour le pilote, dépend de la zone DNS OVH</div></div>
+    <div class="phase-meta"><b>J3 · ~30 min</b>0 €</div>
+  </div>
+  <div class="tasks">
+    <div class="task"><input type="checkbox" id="t41"><label for="t41">Créer le compte avec admin@<span data-dom>votre-domaine.fr</span> + 2FA
+      <span class="note">Plan gratuit : 6 000 emails/mois, 200/jour, sans CB — suffisant pour le pilote. Passage payant (~17 €/mois) après la bascule, à la charge du praticien.</span></label></div>
+    <div class="task"><input type="checkbox" id="t42"><label for="t42">Valider le domaine d'envoi : ajouter les enregistrements SPF et DKIM dans la zone DNS OVH</label></div>
+    <div class="task"><input type="checkbox" id="t43"><label for="t43">Tester la délivrabilité vers Gmail et Outlook (contrôler le dossier spam)</label></div>
+    <div class="task"><input type="checkbox" id="t44"><label for="t44">Créer la clé API ; consigner identifiants, clés et 2FA</label></div>
+  </div>
+</div>
+
+<!-- PHASE 5 -->
+<div class="phase ph5">
+  <div class="phase-head">
+    <div class="phase-num">5</div>
+    <div class="phase-titles"><h2>Passation</h2><div class="st">Au moment choisi avec le praticien — ~1 h ensemble</div></div>
+    <div class="phase-meta"><b>Date à fixer</b>0 €</div>
+  </div>
+  <div class="tasks">
+    <div class="task"><input type="checkbox" id="t51"><label for="t51">Compléter le document de passation (PASSATION_ACCES_PLATEFORME.docx) — l'annexe mots de passe se remplit à la main le jour même, jamais avant</label></div>
+    <div class="task"><input type="checkbox" id="t52"><label for="t52">Basculer les CB : OVH, Azure, Twilio (et Mailjet si passé en payant)</label></div>
+    <div class="task"><input type="checkbox" id="t53"><label for="t53">Changement de titulaire du domaine si encore à ton nom (gratuit pour un .fr)</label></div>
+    <div class="task"><input type="checkbox" id="t54"><label for="t54">Remettre la boîte admin@ : changer le mot de passe ensemble, transférer la 2FA sur son téléphone, remettre les codes de secours</label></div>
+    <div class="task"><input type="checkbox" id="t55"><label for="t55">Changer ensemble les mots de passe de tous les comptes — il devient propriétaire, toi en accès délégué (invité Entra ID, délégation OVH)</label></div>
+    <div class="task"><input type="checkbox" id="t56"><label for="t56">Vérifier le profil de facturation Azure au nom de sa structure et le statut des clauses HDS</label></div>
+    <div class="task"><input type="checkbox" id="t57"><label for="t57">Faire signer les deux exemplaires du document de passation</label></div>
+  </div>
+</div>
+
+<div class="warn">
+  <h3>Points de vigilance</h3>
+  <ul>
+    <li><b>Clauses HDS Microsoft :</b> à initier dès la semaine 1 (étape 2.5) — c'est le délai le plus incertain de tout le projet.</li>
+    <li><b>Consentement du parent 2</b> absent le jour de l'acte : à trancher avec l'avocate avant le retrait de Yousign.</li>
+    <li><b>Mots de passe :</b> jamais en clair dans un fichier stocké sur OneDrive. Gestionnaire de mots de passe pendant le projet, annexe papier remplie à la main le jour de la remise.</li>
+    <li><b>Données réelles :</b> si des patients ont déjà des données sur la plateforme (pas seulement au cabinet), le durcissement HDS passe en priorité absolue.</li>
+  </ul>
+</div>
+
+<div class="budget">
+  <h3>Ce que tu avances avant la bascule</h3>
+  <table>
+    <thead><tr><th>Poste</th><th>Périodicité</th><th class="r">Montant</th></tr></thead>
+    <tbody>
+      <tr><td>Domaine .fr (email MX Plan inclus)</td><td>Annuel</td><td class="r">~7-12 € HT</td></tr>
+      <tr><td>Twilio — crédit initial</td><td>Une fois</td><td class="r">~20 €</td></tr>
+      <tr><td>Mailjet — plan gratuit</td><td>—</td><td class="r">0 €</td></tr>
+      <tr><td>Azure — phase de développement (données fictives)</td><td>Mensuel</td><td class="r">0-50 €</td></tr>
+      <tr><td>Azure — pilote durci HDS (référence devis)</td><td>Annuel</td><td class="r">~1 000 €</td></tr>
+      <tr class="total"><td>Avance personnelle avant bascule (hors conso Azure)</td><td></td><td class="r">~30-35 €</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<footer>Document de travail — projet téléconsultation · La progression de cette checklist est enregistrée localement dans le navigateur.</footer>
+
+</div>
+
+<script>
+(function () {
+  var KEY = 'medicapp_checklist_v1';
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { state = {}; }
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  // Domaine
+  var domInput = document.getElementById('domInput');
+  function applyDomain(v) {
+    var slots = document.querySelectorAll('[data-dom]');
+    var val = (v && v.trim()) ? v.trim() : 'votre-domaine.fr';
+    slots.forEach(function (s) { s.textContent = val; });
+  }
+  if (state.domain) { domInput.value = state.domain; }
+  applyDomain(state.domain);
+  domInput.addEventListener('input', function () {
+    state.domain = domInput.value;
+    applyDomain(domInput.value);
+    save();
+  });
+
+  // Cases à cocher
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.task input[type=checkbox]'));
+  var pfill = document.getElementById('pfill');
+  var plabel = document.getElementById('plabel');
+
+  function refresh() {
+    var done = 0;
+    boxes.forEach(function (b) {
+      b.closest('.task').classList.toggle('done', b.checked);
+      if (b.checked) done++;
+    });
+    var pct = boxes.length ? Math.round(100 * done / boxes.length) : 0;
+    pfill.style.width = pct + '%';
+    plabel.textContent = done + ' / ' + boxes.length + ' étapes (' + pct + ' %)';
+  }
+
+  boxes.forEach(function (b) {
+    if (state[b.id]) b.checked = true;
+    b.addEventListener('change', function () {
+      state[b.id] = b.checked;
+      save();
+      refresh();
+    });
+  });
+  refresh();
+})();
+</script>
+</body>
+</html>
