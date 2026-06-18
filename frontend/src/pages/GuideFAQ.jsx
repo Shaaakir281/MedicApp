@@ -59,7 +59,10 @@ const slugify = (text) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '');
 
-const buildQuestionId = (category, question) => `${slugify(category)}-${slugify(question)}`;
+const buildQuestionId = (category, question, index = 0) => {
+  const baseId = `${slugify(category)}-${slugify(question)}`;
+  return index === 0 ? baseId : `${baseId}-${index + 1}`;
+};
 
 const parseAnswer = (answer, bullets) => {
   if (bullets && bullets.length > 0) {
@@ -101,7 +104,7 @@ const resolveTopicTarget = (topic, faqData) => {
   }
   return {
     categoryRaw: category.category_raw,
-    questionId: buildQuestionId(category.category_raw, question.question),
+    questionId: question.question_id,
   };
 };
 
@@ -119,6 +122,10 @@ const GuideFAQ = () => {
       faqDataRaw.map((category) => ({
         ...category,
         label: CATEGORY_LABELS[category.category_raw] || category.category || category.category_raw,
+        questions: category.questions.map((question, index) => ({
+          ...question,
+          question_id: buildQuestionId(category.category_raw, question.question, index),
+        })),
       })),
     [],
   );
@@ -152,7 +159,7 @@ const GuideFAQ = () => {
     const ids = [];
     filteredFaq.forEach((category) => {
       category.questions.forEach((question) => {
-        ids.push(buildQuestionId(category.category_raw, question.question));
+        ids.push(question.question_id);
       });
     });
     return ids;
@@ -293,7 +300,7 @@ const GuideFAQ = () => {
 
               <div className="space-y-3">
                 {category.questions.map((question) => {
-                  const questionId = buildQuestionId(category.category_raw, question.question);
+                  const questionId = question.question_id;
                   const isOpen = openQuestions.has(questionId);
                   const { text, bullets } = parseAnswer(question.answer, question.bullets);
 

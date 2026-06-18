@@ -25,14 +25,17 @@ La procedure exacte de remise en route est dans `docs/REPRISE_PROJET.md`.
 | Domaine | Statut | Etat verifie |
 |---|---|---|
 | Depot et CI/CD | Realise, a reconnecter | Depot `Shaaakir281/MedicApp`, workflow backend present, secrets ACR a renouveler |
-| Frontend public | Realise | Homepage, FAQ, video, mentions legales, confidentialite |
+| Frontend public | Realise, a simplifier | Homepage et FAQ presentes; video explicative a masquer pour le pilote |
 | Espace patient | Realise | Inscription, verification email, dossier enfant/parents, OTP telephone |
-| Parcours patient | Realise | Timeline, pre-consultation, delai de 15 jours, acte, signatures |
-| Rendez-vous | Realise | Creneaux, reservation, annulation, cascade pre-consultation/acte |
-| Signature distante | Realise | Yousign, signatures par document, suivi des deux parents |
+| Parcours patient | Realise, a simplifier | Timeline, pre-consultation, delai de 15 jours, acte, signatures |
+| Rendez-vous | Realise, admin a enrichir | Creneaux, reservation, annulation, cascade pre-consultation/acte |
+| Signature distante | Realise techniquement, hors pilote pour l'instant | Yousign, signatures par document, suivi des deux parents |
 | Signature cabinet | Realise | Session tablette, QR code, signature manuscrite, audit PDF |
-| Ordonnances | Realise | Creation, modification, signature, versions, QR, diffusion |
-| Espace praticien | Realise | Agenda, patients, relances, ordonnances, statistiques maintenance |
+| Ordonnances | Realise techniquement, modele reel a integrer | Creation, modification, signature, versions, QR, diffusion |
+| Espace praticien | Realise, a simplifier | Agenda, patients, relances, ordonnances, statistiques maintenance |
+| Dashboard admin planning | Non developpe | Gestion des jours, plages horaires, types et durees de creneaux |
+| Teleconsultation | Non developpe | Le champ visio/presentiel existe, mais pas de salle ni lien gere dans le parcours |
+| Compte rendu pre-consultation | Non developpe | PDF reel a generer puis envoyer par lien securise |
 | RGPD | Realise techniquement | Export, rectification, suppression logique, purge complete |
 | Securite | Realise techniquement | Chiffrement, Key Vault, MFA praticien, rate limiting, verrouillage |
 | Monitoring | Realise, actuellement desactive en partie | App Insights, dashboard, alertes, jobs et rapport hebdomadaire |
@@ -55,7 +58,7 @@ La procedure exacte de remise en route est dans `docs/REPRISE_PROJET.md`.
 - respect du delai de reflexion de 15 jours;
 - affichage visuel de l'avancement;
 - acces aux documents, ordonnances et signatures;
-- pages FAQ, video de rassurance et contenus legaux.
+- pages FAQ et contenus legaux.
 
 References principales:
 
@@ -88,7 +91,7 @@ References principales:
 
 ### Documents et signatures
 
-- signatures Yousign par document;
+- signatures Yousign par document, realisees techniquement mais sorties du parcours actif pour le pilote;
 - signature distincte des deux parents;
 - suivi des statuts;
 - stockage des preuves et PDFs finaux;
@@ -169,7 +172,7 @@ Ces fonctions ont deja fonctionne mais doivent etre rejouees sur l'infrastructur
 4. OTP SMS des deux parents;
 5. reservation et annulation des deux types de rendez-vous;
 6. regle et affichage du delai de 15 jours;
-7. signature Yousign sans perte de la page MedicApp;
+7. absence de proposition Yousign dans le parcours pilote;
 8. signature cabinet;
 9. ordonnances et liens de telechargement;
 10. export, rectification et suppression RGPD;
@@ -193,6 +196,10 @@ Ces fonctions ont deja fonctionne mais doivent etre rejouees sur l'infrastructur
 
 - executer une recette complete patient et praticien;
 - corriger les regressions eventuelles une par une;
+- simplifier le parcours pilote: Yousign desactive, video explicative masquee;
+- ameliorer la page d'accueil avec une presentation claire du docteur;
+- creer le dashboard administrateur de gestion des creneaux;
+- remplacer les documents fictifs par les modeles reels d'ordonnance et de compte rendu;
 - completer les mentions legales et la politique de confidentialite;
 - valider les contenus metier avec le praticien;
 - verifier la delivrabilite email et SMS;
@@ -224,7 +231,7 @@ Etat au 2026-06-18:
 ### Priorite 3 - Ameliorations
 
 - traiter les micro-corrections UX remontees pendant la recette;
-- finaliser la video et sa transcription officielle;
+- remettre eventuellement la video explicative et sa transcription apres pilote;
 - uniformiser les textes et accents restants;
 - automatiser davantage la recette et la reprise d'infrastructure.
 
@@ -235,5 +242,9 @@ Etat au 2026-06-18:
 - le telephone permet l'activation de la signature par SMS;
 - le delai de reflexion est de 15 jours;
 - la signature cabinet reste disponible sans Yousign;
+- Yousign est sorti du parcours actif pour le pilote afin d'eviter le cout de 6 signatures par enfant;
+- la video explicative est masquee pour le pilote, mais pourra etre remise plus tard;
+- il n'y aura qu'un praticien dans le parcours cible: le docteur du cabinet;
+- la consultation prealable est une consultation d'information pouvant etre couplee a la teleconsultation et au paiement Stripe;
 - les donnees actuelles peuvent etre fictives et recreees;
 - les changements futurs doivent rester petits, testes et sans refactorisation large non demandee.

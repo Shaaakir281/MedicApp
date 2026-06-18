@@ -21,9 +21,12 @@ But: pouvoir developper et tester en local, sans toucher a Azure (Docker monte s
 
 ## 2. Commencer a travailler sur les modifications
 
-- [ ] creer une branche de travail : `git checkout -b paiement-stripe` ;
+- [ ] creer une branche de travail : `git checkout -b simplification-pilote` ;
 - [ ] rejouer une fois le parcours patient en local pour bien le re-decouvrir ;
 - [ ] noter au fil de l'eau les bugs/regressions rencontres ;
+- [ ] envoyer la liste de corrections FAQ a appliquer ;
+- [ ] fournir les exemples PDF reels d'ordonnance ;
+- [ ] fournir l'exemple de compte rendu de consultation prealable ;
 - [ ] commiter regulierement et pousser sur GitHub.
 
 ## 3. Comptes et services tiers
@@ -42,32 +45,43 @@ But: pouvoir developper et tester en local, sans toucher a Azure (Docker monte s
 - [ ] valider que **Stripe emet la facture** et que le comptable travaille sur l'**export mensuel** Stripe ;
 - [ ] confirmer l'absence de remboursement / feuille de soins (acte rituel non therapeutique).
 
-## 5. Module video : arbitrage (decision avant devis final)
+## 5. Simplification du parcours avant pilote
 
-Le module video n'est pas integre : le champ "visio/presentiel" est une etiquette sur le RDV, sans salle d'appel.
-Deux options a trancher avec le praticien :
+- [ ] ameliorer la page d'accueil pour presenter davantage le docteur et le cabinet ;
+- [ ] retirer Yousign du parcours actif pour le pilote ;
+- [ ] conserver la signature sur place/tablette comme mecanisme principal ;
+- [ ] masquer la video explicative dans l'interface publique et le parcours patient ;
+- [ ] simplifier l'espace praticien pour un seul docteur ;
+- [ ] creer le dashboard administrateur de gestion des creneaux ;
+- [ ] definir les types de creneaux: consultation prealable d'information, acte, indisponibilite, autre ;
+- [ ] definir les durees de creneaux par jour/plage horaire ;
+- [ ] prevoir l'ouverture ou l'envoi des signatures cabinet depuis le dashboard si utile.
 
-- **Option A - Lien externe** : le praticien colle un lien (Whereby, Zoom, etc.) dans le RDV ou par SMS. Zero dev, zero contrainte HDS supplementaire, solution immediate.
-- **Option B - Video integree native** : salle d'appel dans l'espace patient (WebRTC / Jitsi / Whereby embed). Complexite HDS a evaluer, a chiffrer comme phase independante.
+## 6. Teleconsultation et paiement
 
-- [ ] presenter les deux options au praticien et obtenir sa decision ;
-- [ ] si Option B retenue : chiffrer la phase video et l'ajouter au devis.
+Le module de teleconsultation n'est pas encore integre : le champ "visio/presentiel" est une etiquette sur le RDV, sans salle d'appel.
+Le paiement concerne la consultation prealable, pas l'acte.
 
-## 6. Module de paiement (developpement)
-
-A faire une fois le compte Stripe cree. Detail complet dans `ROADMAP.md` section RP.
-
+- [ ] cadrer la solution de teleconsultation: lien externe rapide ou salle integree ;
+- [ ] si salle integree retenue : chiffrer la complexite HDS et technique ;
 - [ ] integrer Stripe au backend (paiement + webhook de confirmation) ;
 - [ ] declencher le paiement de la consultation prealable dans le parcours ;
 - [ ] recuperer la facture Stripe, la stocker en HDS, exposer un lien de telechargement securise ;
 - [ ] gerer le cas du patient qui paie puis refuse l'acte ;
 - [ ] tester (paiement reussi, echoue, acces facture).
 
+## 7. Documents metier reels
+
+- [ ] remplacer le modele fictif d'ordonnance par le PDF reel du cabinet ;
+- [ ] generer un compte rendu de consultation prealable a partir du modele fourni ;
+- [ ] envoyer ce compte rendu aux parents par lien securise apres la consultation.
+
 ## Ordre conseille
 
 1. **Relancer le contrat HDS Microsoft** (section 3) -- a faire des maintenant, le delai admin est impredictible ;
 2. **Creer le compte Stripe** (section 3) -- rapide, debloque la phase RP ;
-3. **Arbitrage video** (section 5) -- presenter les options au praticien avant de finaliser le devis ;
+3. **Envoyer les corrections FAQ et les exemples PDF** (sections 2 et 7) -- debloque les contenus reels ;
 4. **Envoyer la question comptable a Miriam** (section 4) -- en parallele des etapes 2-3 ;
 5. **Mettre en route en local** (section 1) -- prerequis au developpement ;
-6. **Attaquer le developpement du paiement** (section 6) -- une fois Stripe ouvert et env local OK.
+6. **Simplifier le parcours pilote** (section 5) -- Yousign et video explicative hors parcours actif ;
+7. **Cadrer teleconsultation + paiement** (section 6) -- une fois Stripe ouvert et env local OK.

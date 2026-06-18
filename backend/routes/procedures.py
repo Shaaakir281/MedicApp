@@ -200,17 +200,14 @@ def _get_case_for_user(db: Session, user_id: int):
     return case
 
 
-@router.get("/current", response_model=schemas.ProcedureCase)
+@router.get("/current", response_model=schemas.ProcedureCase | None)
 def get_current_procedure(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
-) -> schemas.ProcedureCase:
+) -> schemas.ProcedureCase | None:
     case = crud.get_active_procedure_case(db, current_user.id)
     if case is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Aucune procedure en cours.",
-        )
+        return None
     serialized = _serialize_case(case)
     return serialized
 

@@ -16,6 +16,7 @@ Remettre MedicApp en service progressivement, confirmer les fonctions deja devel
 | R1 | Recreer l'infrastructure supprimee | A faire |
 | R2 | Redemarrer et verifier techniquement | A faire |
 | R3 | Recette fonctionnelle complete | A faire |
+| RS | Simplification produit avant pilote | A faire |
 | R4 | Finaliser contenus et conformite | A faire |
 | R5 | Preparer le pilote | A faire |
 | RP | Module de paiement en ligne (Stripe) | A faire (nouveau) |
@@ -78,7 +79,8 @@ Objectif: verifier les fondations avant les tests metier.
 - [ ] stockage et dechiffrement des documents;
 - [ ] SMTP Mailjet;
 - [ ] SMS Twilio;
-- [ ] Yousign;
+- [ ] signature cabinet et stockage des PDFs signes;
+- [ ] Yousign seulement si remis dans le perimetre actif;
 - [ ] Application Insights;
 - [ ] logs sans secrets ni donnees excessives;
 - [ ] domaine backend et SSL;
@@ -106,7 +108,7 @@ Objectif: rejouer un parcours complet avec donnees fictives.
 - [ ] prise de rendez-vous acte;
 - [ ] annulation et cascade;
 - [ ] affichage du delai de 15 jours;
-- [ ] documents et signatures;
+- [ ] documents et signatures cabinet;
 - [ ] ordonnance;
 - [ ] export, rectification et suppression RGPD.
 
@@ -128,6 +130,38 @@ Regle de travail:
 - un test cible;
 - un deploiement;
 - une validation avant de continuer.
+
+## RS - Simplification produit avant pilote
+
+Objectif: reduire le cout, les frictions et le perimetre avant le pilote, sans supprimer definitivement les briques deja codees.
+
+### Decisions produit
+
+- Yousign est sorti du parcours actif pour l'instant: 6 documents signes par enfant rendent le cout trop eleve;
+- les signatures se font prioritairement sur place, sur tablette, avec la signature cabinet deja developpee;
+- la video explicative n'est plus proposee dans le parcours ni mise en avant pour le pilote; elle reste une option future;
+- le cote praticien doit etre simplifie car il n'y aura qu'un praticien: le docteur du cabinet;
+- la consultation prealable est une consultation d'information, potentiellement en teleconsultation, avec paiement separe.
+
+### Taches fonctionnelles
+
+- [ ] ameliorer la page d'accueil pour presenter plus clairement le docteur, le cabinet et le parcours;
+- [ ] retirer les appels a Yousign du parcours patient et praticien actif, tout en conservant le code dormant si utile;
+- [ ] masquer la video explicative dans l'interface publique et le parcours patient;
+- [ ] appliquer la liste de corrections FAQ fournie par Fathi;
+- [ ] simplifier l'espace praticien pour un seul docteur;
+- [ ] creer un tableau de bord administrateur pour gerer les creneaux;
+- [ ] permettre de definir, par jour et par plage horaire, le type de creneau, la duree et les jours/plages indisponibles;
+- [ ] prevoir dans ce dashboard l'envoi ou l'ouverture des signatures cabinet cote patient si besoin;
+- [ ] remplacer le modele fictif d'ordonnance par les exemples PDF reels du cabinet;
+- [ ] generer le compte rendu de consultation prealable a partir du modele fourni;
+- [ ] envoyer le compte rendu au patient/parents par lien securise;
+- [ ] cadrer puis implementer le module de teleconsultation;
+- [ ] raccorder le paiement de la consultation prealable au parcours de teleconsultation.
+
+Condition de sortie:
+
+- le parcours pilote ne propose plus Yousign ni la video explicative, les creneaux sont gerables par l'administration, et les documents envoyes au patient utilisent les modeles reels.
 
 ## R4 - Contenus et conformite
 
@@ -201,7 +235,7 @@ Condition de sortie:
 - tests E2E automatises;
 - automatisation Infrastructure as Code;
 - ameliorations UX issues de la recette;
-- video et transcription finales;
+- video explicative et transcription, seulement si decidees apres pilote;
 - revue accessibilite;
 - revue de performance;
 - pentest ou audit externe selon le niveau de mise en production vise.
@@ -212,7 +246,7 @@ MedicApp pourra etre considere pret pour un pilote lorsque:
 
 1. l'infrastructure est recreee et documentee;
 2. la recette patient et praticien est passee;
-3. les integrations email, SMS et signature sont stables;
+3. les integrations email, SMS et signature cabinet sont stables;
 4. les documents legaux ne contiennent plus de placeholders;
 5. les sauvegardes, alertes et procedures incident sont testees;
 6. les risques HDS restants sont explicitement acceptes ou corriges.
