@@ -8,6 +8,7 @@ prevents double booking of the same date/time.
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import date, datetime, time as dtime
 from typing import Dict, List
 
@@ -18,10 +19,16 @@ from sqlalchemy.orm import Session
 import crud
 import models
 import schemas
+from core.config import get_settings
 from database import get_db
 from dependencies.auth import get_current_user
 from services.email import send_appointment_confirmation_email
 from services.event_tracker import get_event_tracker
+from services.payments import (
+    PaymentConfigurationError,
+    PaymentProviderError,
+    create_preconsultation_checkout_session,
+)
 
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
@@ -34,6 +41,7 @@ class AppointmentCreateRequest(BaseModel):
     time: dtime
     appointment_type: str = Field(default="preconsultation")
     procedure_id: int | None = None
+    mode: str | None = None
 
 
 def _track_slot_utilization(db: Session, slot_date: date) -> None:
@@ -80,6 +88,127 @@ def get_available_slots(
     return {"slots": slots}
 
 
+def _appointment_error_status(message: str) -> int:
+    lowered = message.lower()
+    if "booked" in lowered or "reserve" in lowered:
+        return status.HTTP_409_CONFLICT
+    return status.HTTP_400_BAD_REQUEST
+
+
+def _checkout_response(
+    appointment: models.Appointment,
+    payment: models.Payment,
+    *,
+    mock: bool,
+) -> schemas.PreconsultationCheckout:
+    return schemas.PreconsultationCheckout(
+        appointment=schemas.Appointment.from_orm(appointment),
+        payment_id=payment.id,
+        payment_status=payment.status.value if hasattr(payment.status, "value") else payment.status,
+        amount_cents=payment.amount_cents,
+        currency=payment.currency,
+        checkout_session_id=payment.stripe_checkout_session_id,
+        checkout_url=payment.checkout_url or "",
+        mock=mock,
+    )
+
+
+@router.post(
+    "/preconsultation",
+    response_model=schemas.PreconsultationCheckout,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_preconsultation_checkout(
+    payload: schemas.PreconsultationCheckoutCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    settings=Depends(get_settings),
+) -> schemas.PreconsultationCheckout:
+    """Reserve a preconsultation slot temporarily and open a payment checkout."""
+
+    if payload.idempotency_key:
+        existing_payment = (
+            db.query(models.Payment)
+            .filter(
+                models.Payment.idempotency_key == payload.idempotency_key,
+                models.Payment.user_id == current_user.id,
+            )
+            .first()
+        )
+        if existing_payment and existing_payment.checkout_url:
+            return _checkout_response(
+                existing_payment.appointment,
+                existing_payment,
+                mock=existing_payment.stripe_checkout_session_id.startswith("mock_"),
+            )
+
+    idempotency_key = payload.idempotency_key or f"preconsult-{current_user.id}-{uuid.uuid4()}"
+    try:
+        appointment = crud.create_appointment(
+            db,
+            current_user.id,
+            payload.date,
+            payload.time,
+            appointment_type=models.AppointmentType.preconsultation,
+            procedure_id=payload.procedure_id,
+            mode=payload.mode,
+            status=models.AppointmentStatus.awaiting_payment,
+        )
+    except ValueError as exc:
+        message = str(exc)
+        raise HTTPException(status_code=_appointment_error_status(message), detail=message)
+
+    payment = models.Payment(
+        appointment_id=appointment.id,
+        user_id=current_user.id,
+        amount_cents=settings.stripe_preconsultation_amount_cents,
+        currency=settings.stripe_currency.lower(),
+        status=models.PaymentStatus.requires_payment,
+        idempotency_key=idempotency_key,
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+
+    try:
+        checkout = create_preconsultation_checkout_session(
+            settings=settings,
+            payment=payment,
+            appointment=appointment,
+            user=current_user,
+        )
+    except PaymentConfigurationError as exc:
+        appointment.status = models.AppointmentStatus.cancelled
+        payment.status = models.PaymentStatus.failed
+        db.add_all([appointment, payment])
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except PaymentProviderError as exc:
+        appointment.status = models.AppointmentStatus.cancelled
+        payment.status = models.PaymentStatus.failed
+        db.add_all([appointment, payment])
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    payment.stripe_checkout_session_id = checkout.session_id
+    payment.checkout_url = checkout.url
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+    db.refresh(appointment)
+
+    event_tracker.track_patient_event(
+        "preconsultation_payment_checkout_created",
+        current_user.id,
+        appointment_id=appointment.id,
+        payment_id=payment.id,
+        slot_date=appointment.date.isoformat(),
+        mock_checkout=checkout.mock,
+    )
+
+    return _checkout_response(appointment, payment, mock=checkout.mock)
+
+
 @router.post("", response_model=schemas.Appointment, status_code=status.HTTP_201_CREATED)
 def create_appointment(
     payload: AppointmentCreateRequest,
@@ -95,11 +224,11 @@ def create_appointment(
             payload.time,
             appointment_type=payload.appointment_type,
             procedure_id=payload.procedure_id,
+            mode=payload.mode,
         )
     except ValueError as exc:
         message = str(exc)
-        status_code = status.HTTP_409_CONFLICT if "booked" in message.lower() else status.HTTP_400_BAD_REQUEST
-        raise HTTPException(status_code=status_code, detail=message)
+        raise HTTPException(status_code=_appointment_error_status(message), detail=message)
 
     # Send confirmation email (best-effort; log failure)
     try:

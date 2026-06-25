@@ -80,6 +80,23 @@ class Appointment(AppointmentBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PreconsultationCheckoutCreate(AppointmentBase):
+    procedure_id: Optional[int] = None
+    mode: str = Field(default="visio")
+    idempotency_key: Optional[str] = None
+
+
+class PreconsultationCheckout(BaseModel):
+    appointment: Appointment
+    payment_id: int
+    payment_status: str
+    amount_cents: int
+    currency: str
+    checkout_session_id: Optional[str] = None
+    checkout_url: str
+    mock: bool = False
+
+
 class QuestionnaireTemplate(BaseModel):
     template: Dict[str, Any]
 

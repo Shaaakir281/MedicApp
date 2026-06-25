@@ -82,6 +82,30 @@ class Settings(BaseSettings):
         default=False, alias="FEATURE_ENFORCE_LEGAL_CHECKLIST"
     )
     require_guardian_2: bool = Field(default=False, alias="REQUIRE_GUARDIAN_2")
+    feature_payment_enabled: bool = Field(default=False, alias="FEATURE_PAYMENT_ENABLED")
+    feature_teleconsultation_enabled: bool = Field(
+        default=False,
+        alias="FEATURE_TELECONSULTATION_ENABLED",
+    )
+    stripe_secret_key: Optional[str] = Field(default=None, alias="STRIPE_SECRET_KEY")
+    stripe_webhook_secret: Optional[str] = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")
+    stripe_price_preconsult: Optional[str] = Field(default=None, alias="STRIPE_PRICE_PRECONSULT")
+    stripe_preconsultation_amount_cents: int = Field(
+        default=5000,
+        alias="STRIPE_PRECONSULTATION_AMOUNT_CENTS",
+        ge=1,
+    )
+    stripe_currency: str = Field(default="eur", alias="STRIPE_CURRENCY")
+    stripe_mock_checkout: bool = Field(default=False, alias="STRIPE_MOCK_CHECKOUT")
+    payment_reservation_ttl_minutes: int = Field(
+        default=30,
+        alias="PAYMENT_RESERVATION_TTL_MINUTES",
+        ge=5,
+        le=240,
+    )
+    livekit_url: Optional[str] = Field(default=None, alias="LIVEKIT_URL")
+    livekit_api_key: Optional[str] = Field(default=None, alias="LIVEKIT_API_KEY")
+    livekit_api_secret: Optional[str] = Field(default=None, alias="LIVEKIT_API_SECRET")
     require_mfa_practitioner: bool = Field(default=False, alias="REQUIRE_MFA_PRACTITIONER")
     maintenance_alert_enabled: bool = Field(default=False, alias="MAINTENANCE_ALERT_ENABLED")
     maintenance_alert_recipient_email: Optional[str] = Field(

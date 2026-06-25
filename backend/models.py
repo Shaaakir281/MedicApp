@@ -41,6 +41,34 @@ class AppointmentStatus(str, enum.Enum):
 
     pending = "pending"
     validated = "validated"
+    awaiting_payment = "awaiting_payment"
+    cancelled = "cancelled"
+
+
+class PaymentStatus(str, enum.Enum):
+    """Lifecycle for online payments tied to appointments."""
+
+    requires_payment = "requires_payment"
+    processing = "processing"
+    succeeded = "succeeded"
+    failed = "failed"
+    refunded = "refunded"
+
+
+class StripeWebhookEventStatus(str, enum.Enum):
+    """Processing status for idempotent Stripe webhook events."""
+
+    received = "received"
+    processed = "processed"
+    ignored = "ignored"
+
+
+class TeleconsultationSessionStatus(str, enum.Enum):
+    """Lifecycle for teleconsultation room access."""
+
+    scheduled = "scheduled"
+    active = "active"
+    ended = "ended"
 
 
 class AppointmentType(str, enum.Enum):
@@ -78,6 +106,7 @@ class User(Base):
     )
 
     appointments = relationship("Appointment", back_populates="user", cascade="all,delete-orphan")
+    payments = relationship("Payment", back_populates="user", cascade="all,delete-orphan")
     email_tokens = relationship(
         "EmailVerificationToken", back_populates="user", cascade="all,delete-orphan"
     )
@@ -133,6 +162,92 @@ class Appointment(Base):
         cascade="all,delete-orphan",
     )
     procedure_case = relationship("ProcedureCase", back_populates="appointments")
+    payment = relationship(
+        "Payment",
+        back_populates="appointment",
+        uselist=False,
+        cascade="all,delete-orphan",
+    )
+    teleconsultation_session = relationship(
+        "TeleconsultationSession",
+        back_populates="appointment",
+        uselist=False,
+        cascade="all,delete-orphan",
+    )
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    appointment_id: int = Column(Integer, ForeignKey("appointments.id", ondelete="CASCADE"), nullable=False, unique=True)
+    user_id: int = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    amount_cents: int = Column(Integer, nullable=False)
+    currency: str = Column(String(3), nullable=False, default="eur")
+    status: PaymentStatus = Column(
+        Enum(PaymentStatus),
+        default=PaymentStatus.requires_payment,
+        nullable=False,
+        index=True,
+    )
+    stripe_checkout_session_id: str | None = Column(String(255), nullable=True, unique=True)
+    checkout_url: str | None = Column(String(1024), nullable=True)
+    stripe_payment_intent_id: str | None = Column(String(255), nullable=True, index=True)
+    stripe_invoice_id: str | None = Column(String(255), nullable=True)
+    invoice_hds_path: str | None = Column(String(512), nullable=True)
+    invoice_download_token: str | None = Column(String(128), nullable=True, unique=True)
+    idempotency_key: str = Column(String(128), nullable=False, unique=True)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+    updated_at: datetime.datetime = Column(
+        DateTime,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+        nullable=False,
+    )
+    paid_at: datetime.datetime | None = Column(DateTime, nullable=True)
+
+    appointment = relationship("Appointment", back_populates="payment")
+    user = relationship("User", back_populates="payments")
+
+
+class StripeWebhookEvent(Base):
+    __tablename__ = "stripe_webhook_events"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    stripe_event_id: str = Column(String(255), nullable=False, unique=True, index=True)
+    type: str = Column(String(128), nullable=False)
+    received_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+    processed_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    status: StripeWebhookEventStatus = Column(
+        Enum(StripeWebhookEventStatus),
+        default=StripeWebhookEventStatus.received,
+        nullable=False,
+    )
+
+
+class TeleconsultationSession(Base):
+    __tablename__ = "teleconsultation_sessions"
+
+    id: int = Column(Integer, primary_key=True, index=True)
+    appointment_id: int = Column(Integer, ForeignKey("appointments.id", ondelete="CASCADE"), nullable=False, unique=True)
+    livekit_room_name: str = Column(String(128), nullable=False, unique=True)
+    status: TeleconsultationSessionStatus = Column(
+        Enum(TeleconsultationSessionStatus),
+        default=TeleconsultationSessionStatus.scheduled,
+        nullable=False,
+    )
+    access_link_token: str | None = Column(String(128), nullable=True, unique=True)
+    access_link_expires_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    access_link_used_at: datetime.datetime | None = Column(DateTime, nullable=True)
+    created_at: datetime.datetime = Column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+
+    appointment = relationship("Appointment", back_populates="teleconsultation_session")
 
 
 class EmailVerificationToken(Base):

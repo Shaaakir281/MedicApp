@@ -47,7 +47,10 @@ def get_available_slots(db: Session, date: datetime.date) -> list[str]:
     all_slots = [f"{hour:02d}:00" for hour in range(8, 18)]
     booked_times = (
         db.query(models.Appointment.time)
-        .filter(models.Appointment.date == date)
+        .filter(
+            models.Appointment.date == date,
+            models.Appointment.status != models.AppointmentStatus.cancelled,
+        )
         .all()
     )
     booked_set = {t[0].strftime("%H:%M") for t in booked_times}
@@ -73,6 +76,8 @@ def create_appointment(
     appointment_type: str | models.AppointmentType = models.AppointmentType.general,
     procedure_id: int | None = None,
     mode: str | models.AppointmentMode | None = None,
+    status: str | models.AppointmentStatus = models.AppointmentStatus.pending,
+    commit: bool = True,
 ) -> models.Appointment:
     """Create a new appointment if the slot is free. Raises ValueError if invalid."""
     appointment_dt = datetime.datetime.combine(date, time)
@@ -81,6 +86,9 @@ def create_appointment(
 
     if isinstance(appointment_type, str):
         appointment_type = models.AppointmentType(appointment_type)
+
+    if isinstance(status, str):
+        status = models.AppointmentStatus(status)
 
     mode_enum = None
     if mode is not None:
@@ -94,7 +102,11 @@ def create_appointment(
 
     conflict = (
         db.query(models.Appointment)
-        .filter(models.Appointment.date == date, models.Appointment.time == time)
+        .filter(
+            models.Appointment.date == date,
+            models.Appointment.time == time,
+            models.Appointment.status != models.AppointmentStatus.cancelled,
+        )
         .first()
     )
     if conflict:
@@ -118,7 +130,9 @@ def create_appointment(
             raise ValueError("Veuillez confirmer l'autorite parentale avant de reserver")
 
         existing_types = {
-            appt.appointment_type for appt in procedure_case.appointments
+            appt.appointment_type
+            for appt in procedure_case.appointments
+            if appt.status != models.AppointmentStatus.cancelled
         }
         if appointment_type in existing_types:
             raise ValueError("Un rendez-vous de ce type est deja planifie")
@@ -131,6 +145,7 @@ def create_appointment(
                     appt
                     for appt in procedure_case.appointments
                     if appt.appointment_type == models.AppointmentType.preconsultation
+                    and appt.status != models.AppointmentStatus.cancelled
                 ),
                 None,
             )
@@ -142,7 +157,10 @@ def create_appointment(
                     )
         elif appointment_type == models.AppointmentType.preconsultation:
             act_appointments = [
-                appt for appt in procedure_case.appointments if appt.appointment_type == models.AppointmentType.act
+                appt
+                for appt in procedure_case.appointments
+                if appt.appointment_type == models.AppointmentType.act
+                and appt.status != models.AppointmentStatus.cancelled
             ]
             if act_appointments:
                 latest_allowed = min(appt.date for appt in act_appointments) - datetime.timedelta(days=15)
@@ -159,10 +177,14 @@ def create_appointment(
         appointment_type=appointment_type,
         procedure_id=procedure_case.id if procedure_case else None,
         mode=mode_enum,
+        status=status,
     )
     db.add(appointment)
-    db.commit()
-    db.refresh(appointment)
+    if commit:
+        db.commit()
+        db.refresh(appointment)
+    else:
+        db.flush()
 
     return appointment
 
