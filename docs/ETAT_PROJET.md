@@ -1,6 +1,6 @@
 # MedicApp - Etat actuel du projet
 
-Derniere verification: 2026-06-18
+Derniere verification: 2026-06-20
 
 Ce document est la source de verite pour savoir ce qui est realise, ce qui doit etre revalide et ce qui reste a faire.
 
@@ -8,17 +8,19 @@ Ce document est la source de verite pour savoir ce qui est realise, ce qui doit 
 
 MedicApp est fonctionnellement tres avance. Le coeur du parcours patient, le dashboard praticien, les signatures, les ordonnances, la securite, les droits RGPD et le monitoring ont ete implementes.
 
-Le projet est actuellement en pause technique:
+Le developpement se fait actuellement **en local** (Docker + PostgreSQL locale, donnees fictives). L'infrastructure Azure reste **volontairement eteinte** jusqu'au durcissement HDS : elle ne sera recreee qu'a ce moment-la (en France Central), pas avant.
+
+Etat Azure (eteint volontairement, ce n'est pas un incident):
 
 - backend Azure arrete;
 - App Service Plan en `F1` Free;
-- base PostgreSQL supprimee;
-- Azure Container Registry supprime;
+- base PostgreSQL non recreee;
+- Azure Container Registry non recree;
 - Logic Apps desactivees;
 - frontend Static Web App conserve;
 - monitoring, Key Vault, alertes et configuration applicative conserves.
 
-La procedure exacte de remise en route est dans `docs/REPRISE_PROJET.md`.
+La procedure exacte de remise en route Azure (a executer au moment du HDS) est dans `docs/REPRISE_PROJET.md`. Le cadrage du module teleconsultation + paiement est dans `docs/CADRAGE_TELECONSULTATION_PAIEMENT.md`.
 
 ## Etat par domaine
 
@@ -34,7 +36,7 @@ La procedure exacte de remise en route est dans `docs/REPRISE_PROJET.md`.
 | Ordonnances | Realise techniquement, modele reel a integrer | Creation, modification, signature, versions, QR, diffusion |
 | Espace praticien | Realise, a simplifier | Agenda, patients, relances, ordonnances, statistiques maintenance |
 | Dashboard admin planning | Non developpe | Gestion des jours, plages horaires, types et durees de creneaux |
-| Teleconsultation | Non developpe | Le champ visio/presentiel existe, mais pas de salle ni lien gere dans le parcours |
+| Teleconsultation | Non developpe, techno tranchee | Le champ visio/presentiel existe, mais pas de salle ni lien. Decide 2026-06-20 : LiveKit (Cloud UE pilote -> self-host HDS prod), salle integree, payer pour reserver, sans enregistrement. Brief : `CADRAGE_TELECONSULTATION_PAIEMENT.md` |
 | Compte rendu pre-consultation | Non developpe | PDF reel a generer puis envoyer par lien securise |
 | RGPD | Realise techniquement | Export, rectification, suppression logique, purge complete |
 | Securite | Realise techniquement | Chiffrement, Key Vault, MFA praticien, rate limiting, verrouillage |
@@ -42,7 +44,7 @@ La procedure exacte de remise en route est dans `docs/REPRISE_PROJET.md`.
 | Documentation legale | Brouillon avance | Textes presents, informations praticien/RPPS/SIRET/adresse a completer |
 | Infrastructure HDS finale | Non finalisee | Private Endpoints, restrictions reseau et validation contractuelle a arbitrer |
 | Tests automatises | Partiel | 28 tests backend detectes, aucun test frontend automatise |
-| Module de paiement | Non developpe (nouveau perimetre) | Decision: Stripe encaisse la consultation prealable + emet la facture, depot HDS et lien patient. Detail dans `ROADMAP.md` section RP |
+| Module de paiement | Non developpe (nouveau perimetre) | Decision: Stripe encaisse la consultation prealable + emet la facture, depot HDS et lien patient. Compte Stripe pas encore cree. Detail dans `ROADMAP.md` section RP et `CADRAGE_TELECONSULTATION_PAIEMENT.md` |
 
 ## Fonctionnalites realisees
 

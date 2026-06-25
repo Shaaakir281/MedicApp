@@ -8,6 +8,7 @@ import { TabPrescriptions } from '../../components/patient/tabs/TabPrescriptions
 import { TabLegalDocs } from '../../components/patient/tabs/TabLegalDocs.jsx';
 import { FourteenDayRuleModal } from '../../components/patient/FourteenDayRuleModal.jsx';
 import { LABELS_FR } from '../../constants/labels.fr.js';
+import { FEATURES } from '../../config/features.js';
 import { useDossier } from '../../hooks/useDossier.js';
 import { usePatientJourney } from '../../hooks/usePatientJourney.js';
 import { PatientTabDossierView } from './PatientTabDossier.jsx';
@@ -155,15 +156,17 @@ export function PatientSpacePage({
       />
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Link
-          to="/video-rassurance"
-          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
-        >
-          <h3 className="text-base font-semibold text-slate-800">Préparer l'intervention</h3>
-          <p className="text-sm text-slate-500 mt-2">
-            Regardez la vidéo explicative et retrouvez les points clés avant le jour J.
-          </p>
-        </Link>
+        {FEATURES.EXPLAINER_VIDEO_ENABLED && (
+          <Link
+            to="/video-rassurance"
+            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <h3 className="text-base font-semibold text-slate-800">Préparer l'intervention</h3>
+            <p className="text-sm text-slate-500 mt-2">
+              Regardez la vidéo explicative et retrouvez les points clés avant le jour J.
+            </p>
+          </Link>
+        )}
         <Link
           to="/guide"
           className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"

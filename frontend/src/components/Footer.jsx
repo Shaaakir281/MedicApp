@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { PRACTITIONER } from '../config/practitioner.js';
+import { FEATURES } from '../config/features.js';
 
 export function Footer() {
   const year = new Date().getFullYear();
@@ -26,9 +27,11 @@ export function Footer() {
             <Link to="/guide" className="text-slate-500 hover:text-slate-700 transition-colors">
               Guide & FAQ
             </Link>
-            <Link to="/video-rassurance" className="text-slate-500 hover:text-slate-700 transition-colors">
-              Preparation intervention
-            </Link>
+            {FEATURES.EXPLAINER_VIDEO_ENABLED && (
+              <Link to="/video-rassurance" className="text-slate-500 hover:text-slate-700 transition-colors">
+                Preparation intervention
+              </Link>
+            )}
           </div>
         </div>
 

@@ -2,6 +2,7 @@
 
 import { LABELS_FR } from '../../../constants/labels.fr.js';
 import { startDocumentSignature } from '../../../services/patientDashboard.api.js';
+import { FEATURES } from '../../../config/features.js';
 import { downloadDocumentSignatureFile } from '../../../services/documentSignature.api.js';
 import { SignedDocumentActions } from './SignedDocumentActions.jsx';
 
@@ -152,31 +153,35 @@ export function SignatureActions({
         )}
       </div>
 
-      {disabledReason && <div className="alert alert-warning text-sm">{disabledReason}</div>}
+      {FEATURES.REMOTE_SIGNATURE_ENABLED && (
+        <>
+          {disabledReason && <div className="alert alert-warning text-sm">{disabledReason}</div>}
 
-      <div className="flex gap-2 flex-wrap items-center">
-        <button
-          type="button"
-          className={`btn btn-sm ${canSignRemote ? 'btn-outline' : 'btn-disabled'}`}
-          onClick={() => handleStartSignature('remote')}
-          disabled={!canSignRemote || signing}
-        >
-          {signing ? 'Ouverture...' : LABELS_FR.patientSpace.documents.signature.signRemote}
-        </button>
-        {!parentVerified && signatureSupported && token && parentContactComplete && (
-          <span className="text-xs text-slate-500">{LABELS_FR.patientSpace.documents.reasons.phoneNotVerified}</span>
-        )}
-      </div>
-
-      {signatureSupported && token && !parentContactComplete && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          <p>Compléter votre dossier pour signer à distance.</p>
-          {onNavigateDossier && (
-            <button type="button" className="btn btn-xs btn-outline mt-2" onClick={onNavigateDossier}>
-              Compléter votre dossier
+          <div className="flex gap-2 flex-wrap items-center">
+            <button
+              type="button"
+              className={`btn btn-sm ${canSignRemote ? 'btn-outline' : 'btn-disabled'}`}
+              onClick={() => handleStartSignature('remote')}
+              disabled={!canSignRemote || signing}
+            >
+              {signing ? 'Ouverture...' : LABELS_FR.patientSpace.documents.signature.signRemote}
             </button>
+            {!parentVerified && signatureSupported && token && parentContactComplete && (
+              <span className="text-xs text-slate-500">{LABELS_FR.patientSpace.documents.reasons.phoneNotVerified}</span>
+            )}
+          </div>
+
+          {signatureSupported && token && !parentContactComplete && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <p>Compléter votre dossier pour signer à distance.</p>
+              {onNavigateDossier && (
+                <button type="button" className="btn btn-xs btn-outline mt-2" onClick={onNavigateDossier}>
+                  Compléter votre dossier
+                </button>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
 
       <div className="flex gap-3 flex-wrap text-sm">

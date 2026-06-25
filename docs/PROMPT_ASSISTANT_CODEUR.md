@@ -17,7 +17,7 @@ Tu es l'assistant technique du projet **MedicApp**, une plateforme de télécons
 
 ## État actuel du projet
 
-La plateforme est **fonctionnellement très avancée** et en **pause technique** (Azure vidé pour réduire les coûts).
+La plateforme est **fonctionnellement très avancée**. Le développement se fait **en local** (Docker + PostgreSQL locale), sur **données fictives**. L'infrastructure Azure reste **volontairement éteinte** : elle ne sera recréée qu'au moment du **durcissement HDS**, pas avant. Ne propose donc pas de redéployer sur Azure tant que le HDS n'est pas lancé — tout le travail en cours se fait en local.
 
 ### Ce qui est fait
 - Parcours patient complet : inscription, dossier enfant/parents, vérification email + SMS, prise de RDV, délai de réflexion 15 jours, signatures, ordonnances, espace patient
@@ -26,16 +26,16 @@ La plateforme est **fonctionnellement très avancée** et en **pause technique**
 - RGPD : export, rectification, suppression logique, purge complète
 - Monitoring : App Insights, alertes, rapport hebdomadaire, jobs internes
 
-### Ce qui est en pause côté Azure
-- PostgreSQL supprimée (sera recréée à la reprise)
-- Azure Container Registry supprimé
-- App Service Plan en F1 Free (pas de backend actif)
+### Infra Azure (éteinte volontairement jusqu'au HDS — pas un incident)
+- PostgreSQL et Azure Container Registry non recréés pour l'instant
+- App Service Plan en F1 Free (pas de backend Azure actif)
 - Logic Apps désactivées
-- Frontend Static Web App : **conservé et actif**
+- Frontend Static Web App : **conservé**
+- Le développement se fait **en local** ; l'infra Azure sera reconstruite (en France Central, durcie HDS) au moment du lot HDS. Procédure dans `REPRISE_PROJET.md`.
 
 ### Ce qui n'existe pas encore
-- **Module de paiement Stripe** (nouvelle phase RP) : paiement de la consultation préalable uniquement, Stripe émet la facture, dépôt HDS + lien sécurisé dans l'espace patient
-- **Module vidéo** : le champ "visio/présentiel" est une étiquette sur le RDV, pas une salle d'appel intégrée — décision en attente (lien externe vs natif)
+- **Module de paiement Stripe** (phase RP) : paiement de la consultation préalable uniquement, Stripe émet la facture, dépôt HDS + lien sécurisé dans l'espace patient. **Le compte Stripe n'est pas encore créé** (à faire avant d'intégrer).
+- **Module vidéo / téléconsultation** : aujourd'hui le champ "visio/présentiel" est une simple étiquette sur le RDV, sans salle d'appel. **Décision actée (2026-06-20) : LiveKit**, salle intégrée dans l'espace patient, flux **« payer pour réserver »**, **sans enregistrement**. Phasage : **LiveKit Cloud UE** en pilote (données fictives) → **self-host HDS** en production, même SDK. **Le cadrage technique complet est dans `CADRAGE_TELECONSULTATION_PAIEMENT.md` — c'est le brief de référence de ce chantier.**
 
 ### Contrainte HDS
 Le projet vise la conformité **Hébergement de Données de Santé (HDS)**. Le contrat Microsoft HDS est en cours d'obtention. Cela implique : données sur Azure France Central uniquement, Private Endpoints à finaliser, durées de rétention à définir, sous-traitants à contractualiser.
@@ -47,7 +47,8 @@ Le projet vise la conformité **Hébergement de Données de Santé (HDS)**. Le c
 | `ETAT_PROJET.md` | Source de vérité : ce qui est fait, à revalider, à faire ; état des comptes |
 | `ROADMAP.md` | Phases R0→R6 + phase RP (Stripe) avec leurs tâches |
 | `TODO_FATHI.md` | Checklist opérationnelle (lancer en local, comptes, dev paiement) |
-| `REPRISE_PROJET.md` | Procédure pas à pas pour recréer l'infra Azure |
+| `REPRISE_PROJET.md` | Procédure pas à pas pour recréer l'infra Azure (à exécuter au moment du HDS) |
+| `CADRAGE_TELECONSULTATION_PAIEMENT.md` | **Brief technique du module téléconsultation + paiement (LiveKit + Stripe) — lots 0→5, modèle de données, endpoints, fiabilité** |
 | `PERIMETRE_DEVIS.md` | Périmètre préparatoire au devis |
 
 ## Décisions verrouillées
@@ -56,11 +57,17 @@ Le projet vise la conformité **Hébergement de Données de Santé (HDS)**. Le c
 - **Facture = donnée de santé** : jamais par email — dépôt sur stockage HDS + lien sécurisé dans l'espace patient (même traitement que les ordonnances)
 - **Pas de remboursement / feuille de soins** (acte rituel non thérapeutique)
 - **Dev en local via Docker** jusqu'à la fin du durcissement HDS ; données fictives uniquement
+- **Visio = LiveKit** (Cloud UE en pilote → self-host HDS en prod), salle intégrée, lien d'accès à usage unique, **sans enregistrement**
+- **Paiement = « payer pour réserver »** : le créneau et l'accès visio ne sont délivrés qu'après paiement Stripe réussi ; webhook idempotent obligatoire
 - **Pas de refactorisation large non demandée** : les changements doivent rester petits, testés et ciblés
 
 ## Ce qu'on fait maintenant
 
-On vient de cloner le repo en local (`C:\dev\medicapp`). La prochaine étape est de **lancer l'environnement local** :
+L'environnement **local tourne déjà** (`C:\dev\medicapp`, Docker + frontend). Le chantier prioritaire est le **module téléconsultation + paiement**, en local, sur données fictives, en suivant `CADRAGE_TELECONSULTATION_PAIEMENT.md` (lots 0→5, dans l'ordre).
+
+Avant de coder l'intégration : **créer le compte Stripe** (clés test) et configurer **LiveKit Cloud UE** (clés API) — voir variables d'env du cadrage. Commence par le **Lot 0 (socle : dépendances, variables d'env, feature flag)**, puis le Lot 1.
+
+Rappel de lancement local si besoin :
 
 ```bash
 # Backend
@@ -75,12 +82,13 @@ npm install
 npm run dev
 ```
 
-Fichiers clés pour démarrer :
+Fichiers clés :
 - `backend/docker-compose.yml`
 - `backend/.env.example`
 - `frontend/src/App.jsx`
 - `backend/routes/` (routes FastAPI)
-- `backend/models/` (modèles SQLAlchemy)
+- `backend/models.py` (modèles SQLAlchemy — un seul fichier, pas un dossier)
+- `backend/jobs/` (tâches planifiées : utile pour l'expiration des réservations non payées)
 
 ## Consignes pour toi
 

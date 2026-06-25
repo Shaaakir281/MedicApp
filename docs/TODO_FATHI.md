@@ -1,23 +1,17 @@
 # MedicApp - Ma to-do list (Fathi)
 
-Derniere mise a jour: 2026-06-18 (revue post-reprise)
+Derniere mise a jour: 2026-06-20 (env local lance ; infra Azure differee au HDS ; Stripe reste a creer)
 
 Checklist personnelle pas-a-pas pour reprendre le travail sur la plateforme et preparer le module de paiement. Pour le detail technique de chaque phase, voir `ROADMAP.md` ; pour l'etat verifie, voir `ETAT_PROJET.md`.
 
-## 1. Mettre la plateforme en route sur mon ordinateur
+## 1. Mettre la plateforme en route sur mon ordinateur — FAIT
 
-But: pouvoir developper et tester en local, sans toucher a Azure (Docker monte sa propre base PostgreSQL locale).
+L'environnement local tourne (Docker + frontend), sur donnees fictives. On reste en local : on ne touche pas a Azure tant que le durcissement HDS n'est pas lance.
 
-- [ ] installer les prerequis: **Git**, **Docker Desktop**, **Node.js**, **Python** ;
-- [ ] cloner le depot : `git clone https://github.com/Shaaakir281/MedicApp.git` ;
-- [ ] ouvrir le dossier dans VS Code ;
-- [ ] backend : `cd backend`, puis `Copy-Item .env.example .env` ;
-- [ ] lancer le backend avec Docker : `docker compose up --build` ;
-- [ ] appliquer les migrations : `docker compose exec backend alembic upgrade head` ;
-- [ ] verifier l'API : ouvrir `http://localhost:8000/docs` ;
-- [ ] (optionnel) injecter des donnees fictives : `seed_practitioner_demo.py` ;
-- [ ] frontend : `cd frontend`, `npm install`, `npm run dev` ;
-- [ ] verifier le frontend : ouvrir `http://localhost:5173`.
+- [x] prerequis installes (Git, Docker Desktop, Node.js, Python) ;
+- [x] depot clone hors OneDrive (`C:\dev\medicapp`) et ouvert dans VS Code ;
+- [x] backend lance avec Docker + migrations appliquees ;
+- [x] frontend lance en local.
 
 ## 2. Commencer a travailler sur les modifications
 
@@ -62,6 +56,14 @@ But: pouvoir developper et tester en local, sans toucher a Azure (Docker monte s
 Le module de teleconsultation n'est pas encore integre : le champ "visio/presentiel" est une etiquette sur le RDV, sans salle d'appel.
 Le paiement concerne la consultation prealable, pas l'acte.
 
+Decisions actees (2026-06-20) :
+- flux paiement : **payer pour reserver** (creneau confirme et acces visio delivre seulement apres paiement Stripe reussi) ;
+- visio : **LiveKit**, salle integree dans l'espace patient ; phasage **Cloud UE (pilote, donnees fictives) -> self-host HDS (prod)**, meme SDK, pas de reecriture ;
+- contrainte visio medicale : hebergeable HDS ou presta certifie HDS, donnees UE + DPA, embarquable, lien d'acces a usage unique, **sans enregistrement** (seul artefact conserve = compte rendu ecrit).
+
+Tarifs (retour cabinet / Miriam, 2026-06-19) : consultation prealable = **50 EUR** (montant Stripe, remplace l'ancien 40 EUR) ; acte de circoncision desormais **tarife par tranche d'age** (grille a fournir par le cabinet). Tarifs non affiches sur la page d'accueil.
+
+- [ ] recuperer aupres du cabinet la grille de tarifs par tranche d'age ;
 - [ ] cadrer la solution de teleconsultation: lien externe rapide ou salle integree ;
 - [ ] si salle integree retenue : chiffrer la complexite HDS et technique ;
 - [ ] integrer Stripe au backend (paiement + webhook de confirmation) ;

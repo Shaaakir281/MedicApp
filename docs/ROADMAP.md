@@ -8,13 +8,15 @@ Cette roadmap remplace les anciens suivis de sprint comme document de pilotage a
 
 Remettre MedicApp en service progressivement, confirmer les fonctions deja developpees, corriger les derniers ecarts et preparer un pilote exploitable.
 
+> Note de sequencement (2026-06-20) : le developpement se fait **d'abord en local** (Docker, donnees fictives). L'infrastructure Azure (R1/R2) n'est **pas recreee tout de suite** : elle le sera **au moment du durcissement HDS**. Les chantiers actifs en local sont la simplification pilote (RS) et le module teleconsultation + paiement (cadre par `CADRAGE_TELECONSULTATION_PAIEMENT.md`).
+
 ## Vue d'ensemble
 
 | Phase | Objectif | Statut |
 |---|---|---|
 | R0 | Ranger et fiabiliser la documentation | En cours |
-| R1 | Recreer l'infrastructure supprimee | A faire |
-| R2 | Redemarrer et verifier techniquement | A faire |
+| R1 | Recreer l'infrastructure supprimee | A faire (au moment du HDS) |
+| R2 | Redemarrer et verifier techniquement | A faire (au moment du HDS) |
 | R3 | Recette fonctionnelle complete | A faire |
 | RS | Simplification produit avant pilote | A faire |
 | R4 | Finaliser contenus et conformite | A faire |
@@ -141,7 +143,10 @@ Objectif: reduire le cout, les frictions et le perimetre avant le pilote, sans s
 - les signatures se font prioritairement sur place, sur tablette, avec la signature cabinet deja developpee;
 - la video explicative n'est plus proposee dans le parcours ni mise en avant pour le pilote; elle reste une option future;
 - le cote praticien doit etre simplifie car il n'y aura qu'un praticien: le docteur du cabinet;
-- la consultation prealable est une consultation d'information, potentiellement en teleconsultation, avec paiement separe.
+- la consultation prealable est une consultation d'information, potentiellement en teleconsultation, avec paiement separe;
+- teleconsultation, flux paiement (decide 2026-06-20): **payer pour reserver** - le creneau de consultation prealable n'est confirme qu'apres paiement Stripe reussi, et l'acces visio n'est delivre qu'apres paiement;
+- teleconsultation, techno visio (decide 2026-06-20): **LiveKit**, salle integree dans l'espace patient; **phasage** - LiveKit Cloud region UE pour le pilote (donnees fictives), puis **LiveKit self-hosted** sur Azure France Central HDS en production (meme SDK, pas de reecriture); sans enregistrement, salles ephemeres, jetons courts signes par FastAPI, identite patient verifiee avant emission du token;
+- contrainte visio medicale: hebergeable HDS ou prestataire certifie HDS, donnees en UE + DPA, embarquable dans l'UI, lien d'acces a usage unique, **sans enregistrement** (seul artefact conserve = le compte rendu ecrit).
 
 ### Taches fonctionnelles
 
@@ -208,6 +213,12 @@ Objectif: encaisser en ligne la **consultation prealable** (l'acte lui-meme rest
 - la **facture/recu est emise automatiquement par Stripe** (numerotation incluse), pas par le logiciel comptable: on evite ainsi toute integration sur mesure entre le logiciel comptable et le serveur;
 - la facture etant une donnee renseignant sur la sante, elle n'est **pas envoyee par email**: elle est deposee sur le **stockage HDS** de la plateforme et le patient la telecharge via un **lien securise** depuis son espace (meme principe que les ordonnances et signatures);
 - le comptable du cabinet recupere simplement l'**export mensuel Stripe** pour tenir la comptabilite.
+
+### Tarifs (retour cabinet / Miriam, 2026-06-19)
+
+- consultation prealable: **50 EUR** (montant a encaisser via Stripe; ancien chiffre indicatif de 40 EUR a abandonner);
+- acte de circoncision: **tarification par tranche d'age** (alignement sur les autres cliniques), en remplacement du tarif unique de 400 EUR; grille d'age detaillee a fournir par le cabinet;
+- les tarifs ne sont **pas affiches sur la page d'accueil publique** (decision Miriam): ils apparaitront dans le parcours / apres creation de compte.
 
 ### Points a confirmer avec le cabinet (Miriam / comptable)
 

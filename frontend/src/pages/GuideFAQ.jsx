@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import faqDataRaw from '../data/faqData.json';
 import { BackToPatient } from '../components/BackToPatient.jsx';
+import { FEATURES } from '../config/features.js';
 
 const CATEGORY_LABELS = {
   "INSCRIPTION ET COMPTE": 'Inscription et compte',
@@ -378,9 +379,11 @@ const GuideFAQ = () => {
       </div>
 
       <div className="mt-8 flex flex-wrap gap-3">
-        <Link to="/video-rassurance" className="btn btn-outline btn-sm">
-          Voir la vidéo de préparation
-        </Link>
+        {FEATURES.EXPLAINER_VIDEO_ENABLED && (
+          <Link to="/video-rassurance" className="btn btn-outline btn-sm">
+            Voir la vidéo de préparation
+          </Link>
+        )}
         <Link to="/patient" className="btn btn-primary btn-sm">
           Retour à mon espace patient
         </Link>

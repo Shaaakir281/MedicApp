@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Page d'accueil — Cabinet Dr Talal Abdelkader</title>
+<style>
+  :root {
+    --blue: #2563eb;
+    --blue-dark: #1d4ed8;
+    --blue-100: #dbeafe;
+    --slate-900: #0f172a;
+    --slate-800: #1e293b;
+    --slate-600: #475569;
+    --slate-500: #64748b;
+    --slate-200: #e2e8f0;
+    --slate-100: #f1f5f9;
+    --slate-50: #f8fafc;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+    color: var(--slate-800);
+    background: var(--slate-50);
+    line-height: 1.55;
+  }
+  .btn-primary {
+    background: var(--blue); color: #fff; text-decoration: none;
+    padding: 11px 22px; border-radius: 9px; font-weight: 600; font-size: 0.95rem;
+    display: inline-block;
+  }
+  .btn-outline { background: #fff; color: var(--blue); border: 1px solid var(--blue); text-decoration: none; padding: 10px 20px; border-radius: 9px; font-weight: 600; display: inline-block; }
+
+  .header {
+    background: #fff; border-bottom: 1px solid var(--slate-200);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 28px; flex-wrap: wrap; gap: 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand .logo { width: 42px; height: 42px; border-radius: 9px; background: var(--blue); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 1.1rem; }
+  .brand h2 { margin: 0; font-size: 1.1rem; color: var(--slate-800); }
+  .brand .spec { margin: 0; font-size: 0.85rem; color: var(--slate-500); }
+
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+
+  .hero { padding: 48px 0 16px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 32px; align-items: center; }
+  .hero h1 { font-size: 2rem; color: var(--slate-900); margin: 0 0 14px; }
+  .hero p { color: var(--slate-600); margin: 0 0 22px; font-size: 1.05rem; }
+  .photo-ph {
+    border: 2px dashed var(--slate-200); background: #fff; border-radius: 12px;
+    min-height: 210px; display: flex; align-items: center; justify-content: center;
+    color: var(--slate-500); font-style: italic; text-align: center; padding: 16px;
+  }
+
+  .section { padding: 34px 0; }
+  .section h3.title { font-size: 1.3rem; color: var(--slate-800); margin: 0 0 20px; text-align: center; }
+
+  .choice { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .card { background: #fff; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; }
+  .card.alt { background: var(--slate-100); }
+  .card h4 { margin: 0 0 8px; font-size: 1.15rem; color: var(--slate-800); }
+  .card p { margin: 0 0 18px; color: var(--slate-500); font-size: 0.95rem; }
+  .pill { display: inline-block; background: var(--blue-100); color: var(--blue-dark); font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; margin-bottom: 12px; }
+
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .step { background: #fff; border: 1px solid var(--slate-200); border-radius: 12px; padding: 18px; }
+  .step .n { width: 30px; height: 30px; border-radius: 50%; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-bottom: 12px; }
+  .step h5 { margin: 0 0 5px; font-size: 1rem; color: var(--slate-800); }
+  .step p { margin: 0; font-size: 0.88rem; color: var(--slate-500); }
+
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .info-box { background: #fff; border: 1px solid var(--slate-200); border-left: 4px solid var(--blue); border-radius: 10px; padding: 20px; }
+  .info-box h4 { margin: 0 0 12px; color: var(--slate-800); font-size: 1.05rem; }
+  .info-box .row { display: flex; gap: 8px; margin-bottom: 8px; font-size: 0.95rem; color: var(--slate-600); }
+  .info-box .row b { color: var(--slate-800); min-width: 96px; display: inline-block; }
+
+  table.tarifs { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+  table.tarifs th, table.tarifs td { padding: 11px 14px; border: 1px solid var(--slate-200); text-align: left; }
+  table.tarifs th { background: var(--slate-100); color: var(--slate-800); }
+
+  .footer { background: var(--slate-900); color: #cbd5e1; text-align: center; padding: 30px 24px; margin-top: 20px; }
+  .footer a { color: #93c5fd; text-decoration: none; }
+  .footer .small { font-size: 0.82rem; opacity: 0.8; margin-top: 10px; }
+
+  @media (max-width: 780px) {
+    .hero, .choice, .info-grid { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">
+      <div class="logo">A</div>
+      <div>
+        <h2>Cabinet du Dr Talal Abdelkader</h2>
+        <p class="spec">Chirurgien urologue — Dreux</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- Hero -->
+    <div class="hero">
+      <div>
+        <h1>Circoncision rituelle pédiatrique à Dreux</h1>
+        <p>Prise de rendez-vous en ligne avec le Dr Talal Abdelkader, dans un cadre médical, encadré et rassurant.</p>
+      </div>
+      <div class="photo-ph">Photo du médecin<br/>ou vue du cabinet</div>
+    </div>
+
+    <!-- Choix -->
+    <div class="section">
+      <div class="choice">
+        <div class="card">
+          <span class="pill">Sur cette plateforme</span>
+          <h4>Circoncision rituelle</h4>
+          <p>Prendre rendez-vous pour une circoncision rituelle pédiatrique et suivre tout le parcours en ligne.</p>
+          <a class="btn-primary" href="#">Prendre rendez-vous</a>
+        </div>
+        <div class="card alt">
+          <h4>Autre motif médical</h4>
+          <p>Pour toute autre consultation ou intervention urologique.</p>
+          <a class="btn-outline" href="#">Contacter le cabinet</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Parcours en bref -->
+    <div class="section">
+      <h3 class="title">Le déroulé d'une circoncision rituelle</h3>
+      <div class="steps">
+        <div class="step"><div class="n">1</div><h5>Consultation préalable</h5><p>Rendez-vous d'information avec le médecin.</p></div>
+        <div class="step"><div class="n">2</div><h5>Délai de réflexion</h5><p>Un temps de réflexion avant de confirmer.</p></div>
+        <div class="step"><div class="n">3</div><h5>Rendez-vous pour l'acte</h5><p>Réalisation en cabinet, en toute sécurité.</p></div>
+        <div class="step"><div class="n">4</div><h5>Suivi</h5><p>Conseils et suivi post-opératoire.</p></div>
+      </div>
+    </div>
+
+    <!-- Infos pratiques -->
+    <div class="section">
+      <div class="info-box" style="max-width:520px;margin:0 auto;">
+        <h4>Infos pratiques</h4>
+        <div class="row"><b>Adresse</b><span>76 Rue de Moronval, Dreux</span></div>
+        <div class="row"><b>Téléphone</b><span>02 36 69 04 08</span></div>
+        <div class="row"><b>Langues</b><span>Français, Anglais, Arabe</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div>Cabinet du Dr Talal Abdelkader — Dreux · 76 Rue de Moronval · 02 36 69 04 08</div>
+    <div style="margin-top:10px;"><a href="#">Mentions légales</a> · <a href="#">Politique de confidentialité</a></div>
+    <div class="small">La prise de rendez-vous se fait après création de votre compte.</div>
+  </div>
+
+</body>
+</html>
