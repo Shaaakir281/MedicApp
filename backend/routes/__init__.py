@@ -17,6 +17,7 @@ from .dossier import router as dossier_router  # noqa: F401
 from .documents_dashboard import router as documents_dashboard_router  # noqa: F401
 from .rgpd import router as rgpd_router  # noqa: F401
 from .internal_jobs import router as internal_jobs_router  # noqa: F401
+from .webhooks import router as webhooks_router  # noqa: F401
 
 # A convenience list of routers that can be included in the main app.  You can
 # import this in ``main.py`` to loop over and include routers dynamically.
@@ -38,4 +39,5 @@ all_routers = [
     documents_dashboard_router,
     rgpd_router,
     internal_jobs_router,
+    webhooks_router,
 ]

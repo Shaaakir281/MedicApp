@@ -95,3 +95,73 @@ def test_create_preconsultation_checkout_uses_local_mock_without_stripe_keys(
     assert retry.status_code == 201
     assert retry.json()["payment_id"] == payment.id
     assert retry.json()["appointment"]["id"] == appointment.id
+
+
+def test_stripe_checkout_webhook_validates_appointment_once(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = _create_user(db_session, "webhook.patient@example.com")
+    case = _create_case(db_session, user.id)
+    headers = _auth_headers(user)
+
+    checkout_response = client.post(
+        "/appointments/preconsultation",
+        headers=headers,
+        json={
+            "date": (date.today() + timedelta(days=8)).isoformat(),
+            "time": "10:00:00",
+            "procedure_id": case.id,
+            "mode": "visio",
+            "idempotency_key": "webhook-checkout-key",
+        },
+    )
+    assert checkout_response.status_code == 201
+    checkout = checkout_response.json()
+    payment_id = checkout["payment_id"]
+    appointment_id = checkout["appointment"]["id"]
+
+    event = {
+        "id": "evt_checkout_completed_test",
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "id": checkout["checkout_session_id"],
+                "payment_intent": "pi_preconsult_test",
+                "invoice": "in_preconsult_test",
+                "payment_status": "paid",
+                "metadata": {
+                    "payment_id": str(payment_id),
+                    "appointment_id": str(appointment_id),
+                    "user_id": str(user.id),
+                },
+            },
+        },
+    }
+
+    response = client.post("/webhooks/stripe", json=event)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == models.StripeWebhookEventStatus.processed.value
+
+    db_session.expire_all()
+    payment = db_session.query(models.Payment).filter_by(id=payment_id).one()
+    appointment = db_session.query(models.Appointment).filter_by(id=appointment_id).one()
+    session = (
+        db_session.query(models.TeleconsultationSession)
+        .filter_by(appointment_id=appointment_id)
+        .one()
+    )
+    assert payment.status == models.PaymentStatus.succeeded
+    assert payment.stripe_payment_intent_id == "pi_preconsult_test"
+    assert payment.stripe_invoice_id == "in_preconsult_test"
+    assert appointment.status == models.AppointmentStatus.validated
+    assert session.livekit_room_name.startswith(f"precons-{appointment_id}-")
+    assert session.access_link_token
+
+    replay = client.post("/webhooks/stripe", json=event)
+
+    assert replay.status_code == 200
+    assert replay.json()["status"] == models.StripeWebhookEventStatus.ignored.value
+    assert db_session.query(models.StripeWebhookEvent).count() == 1
+    assert db_session.query(models.TeleconsultationSession).filter_by(appointment_id=appointment_id).count() == 1

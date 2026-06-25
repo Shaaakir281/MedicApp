@@ -97,6 +97,12 @@ class PreconsultationCheckout(BaseModel):
     mock: bool = False
 
 
+class StripeWebhookResult(BaseModel):
+    status: str
+    event_id: Optional[str] = None
+    event_type: Optional[str] = None
+
+
 class QuestionnaireTemplate(BaseModel):
     template: Dict[str, Any]
 
