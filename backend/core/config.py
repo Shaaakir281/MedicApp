@@ -106,6 +106,24 @@ class Settings(BaseSettings):
     livekit_url: Optional[str] = Field(default=None, alias="LIVEKIT_URL")
     livekit_api_key: Optional[str] = Field(default=None, alias="LIVEKIT_API_KEY")
     livekit_api_secret: Optional[str] = Field(default=None, alias="LIVEKIT_API_SECRET")
+    livekit_token_ttl_minutes: int = Field(
+        default=15,
+        alias="LIVEKIT_TOKEN_TTL_MINUTES",
+        ge=1,
+        le=120,
+    )
+    teleconsultation_access_before_minutes: int = Field(
+        default=15,
+        alias="TELECONSULTATION_ACCESS_BEFORE_MINUTES",
+        ge=0,
+        le=240,
+    )
+    teleconsultation_access_after_minutes: int = Field(
+        default=120,
+        alias="TELECONSULTATION_ACCESS_AFTER_MINUTES",
+        ge=15,
+        le=720,
+    )
     require_mfa_practitioner: bool = Field(default=False, alias="REQUIRE_MFA_PRACTITIONER")
     maintenance_alert_enabled: bool = Field(default=False, alias="MAINTENANCE_ALERT_ENABLED")
     maintenance_alert_recipient_email: Optional[str] = Field(

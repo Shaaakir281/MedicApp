@@ -103,6 +103,15 @@ class StripeWebhookResult(BaseModel):
     event_type: Optional[str] = None
 
 
+class TeleconsultationToken(BaseModel):
+    appointment_id: int
+    room_name: str
+    livekit_url: str
+    token: str
+    expires_in: int
+    mock: bool = False
+
+
 class QuestionnaireTemplate(BaseModel):
     template: Dict[str, Any]
 
