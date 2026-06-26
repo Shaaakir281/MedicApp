@@ -15,6 +15,8 @@ export function UpcomingAppointments({
   onSelectAppointmentId,
   activeAppointmentId,
   onViewPrescription,
+  onResumePayment,
+  onJoinTeleconsultation,
 }) {
   return (
     <section className="p-6 border rounded-xl bg-white shadow-sm space-y-4">
@@ -37,6 +39,8 @@ export function UpcomingAppointments({
         onSelect={onSelectAppointmentId}
         activeAppointmentId={activeAppointmentId}
         onViewPrescription={onViewPrescription}
+        onResumePayment={onResumePayment}
+        onJoinTeleconsultation={onJoinTeleconsultation}
       />
     </section>
   );

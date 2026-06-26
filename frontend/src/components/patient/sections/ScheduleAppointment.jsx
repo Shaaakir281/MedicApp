@@ -3,6 +3,7 @@ import React from 'react';
 import { SchedulingPanel } from '../SchedulingPanel.jsx';
 import { BlockingNotice, Button } from '../../ui';
 import { LABELS_FR } from '../../../constants/labels.fr.js';
+import { FEATURES } from '../../../config/features.js';
 
 export function ScheduleAppointment({
   appointments,
@@ -77,6 +78,14 @@ export function ScheduleAppointment({
           appointments.setSelectedSlot(slot === appointments.selectedSlot ? null : slot)
         }
         onConfirm={appointments.handleCreateAppointment}
+        confirmLabel={
+          FEATURES.PAYMENT_ENABLED && appointments.appointmentType === 'preconsultation'
+            ? appointments.paymentRedirecting
+              ? 'Ouverture du paiement...'
+              : 'Payer et reserver'
+            : 'Confirmer le rendez-vous'
+        }
+        disabledConfirm={appointments.paymentRedirecting}
         actionNotice={
           errorMessage ? (
             <BlockingNotice title="Rendez-vous indisponible" message={errorMessage} />

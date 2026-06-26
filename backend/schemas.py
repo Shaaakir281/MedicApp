@@ -76,6 +76,11 @@ class Appointment(AppointmentBase):
     prescription_url: Optional[str] = None
     prescription_signed_at: Optional[datetime] = None
     prescription_signed: Optional[bool] = None
+    payment_id: Optional[int] = None
+    payment_status: Optional[str] = None
+    checkout_url: Optional[str] = None
+    teleconsultation_access_token: Optional[str] = None
+    teleconsultation_access_used_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -351,6 +356,8 @@ class PractitionerAppointmentEntry(BaseModel):
     prescription_id: Optional[int] = None
     prescription_url: Optional[str] = None
     prescription_signed_at: Optional[datetime] = None
+    payment_status: Optional[str] = None
+    teleconsultation_room_name: Optional[str] = None
 
 
 class PractitionerAgendaDay(BaseModel):

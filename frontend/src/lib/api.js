@@ -107,6 +107,23 @@ export async function createAppointment(token, payload) {
   return apiRequest('/appointments', { method: 'POST', body: payload, token });
 }
 
+export async function createPreconsultationCheckout(token, payload) {
+  return apiRequest('/appointments/preconsultation', { method: 'POST', body: payload, token });
+}
+
+export async function confirmMockPayment(token, paymentId) {
+  return apiRequest(`/payments/${paymentId}/mock-confirm`, { method: 'POST', token });
+}
+
+export async function fetchPatientTeleconsultationToken(token, appointmentId, accessToken) {
+  const query = new URLSearchParams({ access_token: accessToken }).toString();
+  return apiRequest(`/teleconsultation/${appointmentId}/access?${query}`, { token });
+}
+
+export async function fetchPractitionerTeleconsultationToken(token, appointmentId) {
+  return apiRequest(`/teleconsultation/${appointmentId}/token`, { token });
+}
+
 export async function fetchCurrentProcedure(token) {
   try {
     return await apiRequest('/procedures/current', { token });

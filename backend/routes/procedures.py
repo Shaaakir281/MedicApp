@@ -90,6 +90,8 @@ def _serialize_case(case) -> schemas.ProcedureCase:
         pres_signed_at = prescription.signed_at if prescription else None
         pres_signed = bool(prescription and prescription.signed_at)
         pres_url = None
+        payment = getattr(appt, "payment", None)
+        teleconsultation = getattr(appt, "teleconsultation_session", None)
         if prescription:
             token = download_links.create_prescription_download_token(
                 prescription.id,
@@ -115,6 +117,15 @@ def _serialize_case(case) -> schemas.ProcedureCase:
                 prescription_url=pres_url,
                 prescription_signed_at=pres_signed_at,
                 prescription_signed=pres_signed,
+                payment_id=payment.id if payment else None,
+                payment_status=payment.status.value if payment else None,
+                checkout_url=payment.checkout_url if payment else None,
+                teleconsultation_access_token=(
+                    teleconsultation.access_link_token if teleconsultation else None
+                ),
+                teleconsultation_access_used_at=(
+                    teleconsultation.access_link_used_at if teleconsultation else None
+                ),
             )
         )
     appointments_entities = case.appointments or []

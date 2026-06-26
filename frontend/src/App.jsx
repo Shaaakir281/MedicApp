@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import HomePage from './pages/HomePage.jsx';
 import Patient from './pages/Patient.jsx';
@@ -17,16 +17,19 @@ import VideoRassurance from './pages/VideoRassurance.jsx';
 import GuideFAQ from './pages/GuideFAQ.jsx';
 import { Footer } from './components/Footer.jsx';
 
+const TeleconsultationPage = lazy(() => import('./pages/TeleconsultationPage.jsx'));
+
 function AppShell() {
   const location = useLocation();
   const isHome = location.pathname === '/';
   const isPractitionerRoute = location.pathname.startsWith('/praticien');
   const isTabletRoute = location.pathname.startsWith('/tablet') || location.pathname.startsWith('/sign');
-  const showFooter = !isPractitionerRoute && !isTabletRoute;
+  const isTeleconsultationRoute = location.pathname.startsWith('/teleconsultation');
+  const showFooter = !isPractitionerRoute && !isTabletRoute && !isTeleconsultationRoute;
 
   return (
     <div className="min-h-screen flex flex-col">
-      {!isHome && (
+      {!isHome && !isTeleconsultationRoute && (
         <nav className="navbar bg-base-200">
           <div className="flex-1">
             <Link to="/" className="btn btn-ghost normal-case text-xl">
@@ -54,6 +57,14 @@ function AppShell() {
           <Route path="/auth/reset-password" element={<ResetPassword />} />
           <Route path="/auth/verify-email" element={<VerifyEmail />} />
           <Route path="/auth/verify-guardian-email" element={<VerifyGuardianEmail />} />
+          <Route
+            path="/teleconsultation/:appointmentId"
+            element={
+              <Suspense fallback={<div className="p-8 text-slate-600">Chargement...</div>}>
+                <TeleconsultationPage />
+              </Suspense>
+            }
+          />
           <Route path="/mentions-legales" element={<MentionsLegales />} />
           <Route path="/confidentialite" element={<PolitiqueConfidentialite />} />
           <Route path="/video-rassurance" element={<VideoRassurance />} />

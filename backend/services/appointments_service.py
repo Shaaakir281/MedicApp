@@ -167,6 +167,8 @@ def build_appointment_entry(
 
     prescription = appointment.prescription
     prescription_url = None
+    payment = getattr(appointment, "payment", None)
+    teleconsultation = getattr(appointment, "teleconsultation_session", None)
     if prescription:
         token = download_links.create_prescription_download_token(
             prescription.id,
@@ -198,6 +200,10 @@ def build_appointment_entry(
         prescription_id=prescription.id if prescription else None,
         prescription_url=prescription_url,
         prescription_signed_at=prescription.signed_at if prescription else None,
+        payment_status=payment.status.value if payment else None,
+        teleconsultation_room_name=(
+            teleconsultation.livekit_room_name if teleconsultation else None
+        ),
     )
 
 
@@ -219,6 +225,8 @@ def get_agenda(
         .options(
             joinedload(models.Appointment.user),
             joinedload(models.Appointment.prescription),
+            joinedload(models.Appointment.payment),
+            joinedload(models.Appointment.teleconsultation_session),
             joinedload(models.Appointment.procedure_case)
             .joinedload(models.ProcedureCase.appointments)
             .joinedload(models.Appointment.prescription),

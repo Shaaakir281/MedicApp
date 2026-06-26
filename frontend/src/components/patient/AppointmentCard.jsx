@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { FEATURES } from '../../config/features.js';
 import { PrescriptionActions } from './PrescriptionActions.jsx';
 
 export const AppointmentCard = ({
@@ -12,6 +13,8 @@ export const AppointmentCard = ({
   onCancel,
   isCanceling,
   onViewPrescription,
+  onResumePayment,
+  onJoinTeleconsultation,
 }) => {
   const label = appt?.appointment_type === 'act' ? 'Acte' : 'Pré-consultation';
   const dateDisplay = appt?.date ? new Date(appt.date).toLocaleDateString('fr-FR') : '--';
@@ -22,6 +25,20 @@ export const AppointmentCard = ({
     variant === 'past'
       ? 'border rounded-lg p-3 space-y-1 bg-slate-50'
       : 'border rounded-lg p-3 space-y-1';
+  const paymentPending = Boolean(
+    FEATURES.PAYMENT_ENABLED &&
+      appt?.appointment_type === 'preconsultation' &&
+      appt?.payment_status &&
+      appt.payment_status !== 'succeeded',
+  );
+  const canJoinTeleconsultation = Boolean(
+    FEATURES.TELECONSULTATION_ENABLED &&
+      appt?.mode === 'visio' &&
+      appt?.status === 'validated' &&
+      appt?.payment_status === 'succeeded' &&
+      appt?.teleconsultation_access_token &&
+      !appt?.teleconsultation_access_used_at,
+  );
 
   return (
     <div className={containerClass}>
@@ -41,6 +58,24 @@ export const AppointmentCard = ({
       />
 
       <div className="flex flex-wrap gap-2 pt-1 border-t border-dashed border-slate-200 mt-2">
+        {paymentPending && (
+          <button
+            type="button"
+            className="btn btn-xs btn-primary"
+            onClick={() => onResumePayment?.(appt)}
+          >
+            Payer la consultation
+          </button>
+        )}
+        {canJoinTeleconsultation && (
+          <button
+            type="button"
+            className="btn btn-xs btn-primary"
+            onClick={() => onJoinTeleconsultation?.(appt)}
+          >
+            Rejoindre la téléconsultation
+          </button>
+        )}
         {prescription?.signed && onViewPrescription && (
           <button type="button" className="btn btn-xs btn-primary" onClick={onViewPrescription}>
             Voir l'ordonnance

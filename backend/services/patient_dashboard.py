@@ -32,6 +32,8 @@ def _load_appointment(db: Session, appointment_id: int) -> models.Appointment:
 
 def _serialize_appointment(appt: models.Appointment) -> dashboard_schemas.DashboardAppointment:
     prescription = getattr(appt, "prescription", None)
+    payment = getattr(appt, "payment", None)
+    teleconsultation = getattr(appt, "teleconsultation_session", None)
     return dashboard_schemas.DashboardAppointment(
         id=appt.id,
         date=appt.date,
@@ -43,6 +45,15 @@ def _serialize_appointment(appt: models.Appointment) -> dashboard_schemas.Dashbo
         prescription_id=prescription.id if prescription else None,
         prescription_signed_at=prescription.signed_at if prescription else None,
         prescription_signed=bool(prescription and prescription.signed_at),
+        payment_id=payment.id if payment else None,
+        payment_status=payment.status.value if payment else None,
+        checkout_url=payment.checkout_url if payment else None,
+        teleconsultation_access_token=(
+            teleconsultation.access_link_token if teleconsultation else None
+        ),
+        teleconsultation_access_used_at=(
+            teleconsultation.access_link_used_at if teleconsultation else None
+        ),
     )
 
 

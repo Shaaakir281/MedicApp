@@ -97,6 +97,51 @@ def test_create_preconsultation_checkout_uses_local_mock_without_stripe_keys(
     assert retry.json()["appointment"]["id"] == appointment.id
 
 
+def test_mock_payment_confirmation_validates_visio_preconsultation(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = _create_user(db_session, "mock.confirm.patient@example.com")
+    case = _create_case(db_session, user.id)
+    headers = _auth_headers(user)
+
+    checkout_response = client.post(
+        "/appointments/preconsultation",
+        headers=headers,
+        json={
+            "date": (date.today() + timedelta(days=7)).isoformat(),
+            "time": "11:00:00",
+            "procedure_id": case.id,
+            "mode": "visio",
+            "idempotency_key": "mock-confirm-checkout-key",
+        },
+    )
+    assert checkout_response.status_code == 201
+    checkout = checkout_response.json()
+
+    response = client.post(
+        f"/payments/{checkout['payment_id']}/mock-confirm",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["detail"] == "Paiement de test confirme."
+
+    db_session.expire_all()
+    payment = db_session.query(models.Payment).filter_by(id=checkout["payment_id"]).one()
+    appointment = db_session.query(models.Appointment).filter_by(id=checkout["appointment"]["id"]).one()
+    session = (
+        db_session.query(models.TeleconsultationSession)
+        .filter_by(appointment_id=appointment.id)
+        .one()
+    )
+    assert payment.status == models.PaymentStatus.succeeded
+    assert payment.stripe_payment_intent_id == f"mock_pi_{payment.id}"
+    assert appointment.status == models.AppointmentStatus.validated
+    assert session.livekit_room_name.startswith(f"precons-{appointment.id}-")
+    assert session.access_link_token
+
+
 def test_stripe_checkout_webhook_validates_appointment_once(
     client: TestClient,
     db_session: Session,

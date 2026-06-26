@@ -331,6 +331,15 @@ const Praticien = () => {
     handleRefresh();
   };
 
+  const handleJoinTeleconsultation = (appointment) => {
+    if (!appointment?.appointment_id) return;
+    window.open(
+      `/teleconsultation/${appointment.appointment_id}?role=practitioner`,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="max-w-6xl mx-auto py-10">
@@ -396,6 +405,7 @@ const Praticien = () => {
           onSendPrescription={handleSendPrescription}
           onSelectPatient={handleSelectPatient}
           onEditPrescription={handleOpenEditor}
+          onJoinTeleconsultation={handleJoinTeleconsultation}
           previewingId={previewingId}
           signingId={signingId}
           sendingId={activeSendId}

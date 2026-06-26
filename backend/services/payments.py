@@ -29,6 +29,10 @@ class WebhookPayloadError(RuntimeError):
     """Raised when a webhook payload or signature is invalid."""
 
 
+class MockPaymentConfirmationError(RuntimeError):
+    """Raised when a local mock payment cannot be confirmed."""
+
+
 @dataclass(frozen=True)
 class CheckoutSessionResult:
     session_id: str
@@ -218,6 +222,46 @@ def process_stripe_webhook_event(db: Session, event) -> WebhookProcessResult:
         event_id=event_id,
         event_type=event_type,
     )
+
+
+def confirm_mock_payment(
+    *,
+    db: Session,
+    payment_id: int,
+    user: models.User,
+    settings: Settings,
+) -> models.Payment:
+    """Confirm a local mock checkout for development before Stripe keys exist."""
+
+    if settings.environment.lower() == "production":
+        raise MockPaymentConfirmationError("Mock payment confirmation is disabled in production.")
+
+    payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if payment is None or payment.user_id != user.id:
+        raise MockPaymentConfirmationError("Paiement introuvable.")
+    if not payment.stripe_checkout_session_id or not payment.stripe_checkout_session_id.startswith("mock_"):
+        raise MockPaymentConfirmationError("Ce paiement n'est pas un checkout mock local.")
+    if payment.status == models.PaymentStatus.succeeded:
+        return payment
+    if payment.status not in {
+        models.PaymentStatus.requires_payment,
+        models.PaymentStatus.processing,
+    }:
+        raise MockPaymentConfirmationError("Ce paiement ne peut pas etre confirme.")
+
+    payment.status = models.PaymentStatus.succeeded
+    payment.paid_at = payment.paid_at or dt.datetime.utcnow()
+    payment.stripe_payment_intent_id = payment.stripe_payment_intent_id or f"mock_pi_{payment.id}"
+    appointment = payment.appointment
+    if appointment and appointment.status == models.AppointmentStatus.awaiting_payment:
+        appointment.status = models.AppointmentStatus.validated
+        db.add(appointment)
+        if appointment.mode == models.AppointmentMode.visio:
+            ensure_teleconsultation_session(db, appointment)
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+    return payment
 
 
 def _event_data_object(event):

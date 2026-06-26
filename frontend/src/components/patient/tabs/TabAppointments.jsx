@@ -61,6 +61,8 @@ export function TabAppointments({
         onSelectAppointmentId={(apptId) => setActiveAppointmentId?.(apptId)}
         activeAppointmentId={activeAppointmentId}
         onViewPrescription={onViewPrescription}
+        onResumePayment={appointments.handleResumePayment}
+        onJoinTeleconsultation={appointments.handleJoinTeleconsultation}
       />
 
       <AppointmentHistory

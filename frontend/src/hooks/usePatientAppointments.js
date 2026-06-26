@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { createAppointment, deleteAppointment, fetchSlots } from '../lib/api.js';
+import {
+  createAppointment,
+  createPreconsultationCheckout,
+  deleteAppointment,
+  fetchSlots,
+} from '../lib/api.js';
+import { FEATURES } from '../config/features.js';
 import { buildDocumentUrl } from '../utils/url.js';
 import { formatDateISO, parseISODateLocal, sortAppointments } from '../utils/date.js';
 
@@ -31,6 +37,7 @@ export function usePatientAppointments({
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingAppointmentId, setEditingAppointmentId] = useState(null);
   const [cancelingId, setCancelingId] = useState(null);
+  const [paymentRedirecting, setPaymentRedirecting] = useState(false);
 
   const appointmentsByType = useMemo(() => {
     const map = new Map();
@@ -225,6 +232,25 @@ export function usePatientAppointments({
         procedure_id: procedureCase.id,
         mode: appointmentType === 'act' ? 'presentiel' : appointmentMode,
       };
+
+      if (
+        FEATURES.PAYMENT_ENABLED &&
+        appointmentType === 'preconsultation' &&
+        !editingAppointmentId
+      ) {
+        setPaymentRedirecting(true);
+        const checkout = await createPreconsultationCheckout(token, {
+          date: payload.date,
+          time: payload.time,
+          procedure_id: payload.procedure_id,
+          mode: payload.mode,
+          idempotency_key: `preconsult-${procedureCase.id}-${payload.date}-${payload.time}`,
+        });
+        setSuccessMessage?.('Redirection vers le paiement de la consultation prealable...');
+        window.location.assign(checkout.checkout_url);
+        return true;
+      }
+
       await createAppointment(token, payload);
       const modeLabel = payload.mode === 'visio' ? 'en visio' : 'en presentiel';
       setSuccessMessage?.(
@@ -239,6 +265,7 @@ export function usePatientAppointments({
       return true;
     } catch (err) {
       setScheduleError(err?.message || 'Impossible de planifier ce rendez-vous.');
+      setPaymentRedirecting(false);
       return false;
     }
   }, [
@@ -317,6 +344,27 @@ export function usePatientAppointments({
     [cancelingId, editingAppointmentId, hasAct, loadProcedureCase, onReloadDashboard, setError, setSuccessMessage, token],
   );
 
+  const handleResumePayment = useCallback((appt) => {
+    if (!appt?.checkout_url) {
+      setScheduleError("Le lien de paiement n'est pas disponible pour ce rendez-vous.");
+      return;
+    }
+    window.location.assign(appt.checkout_url);
+  }, []);
+
+  const handleJoinTeleconsultation = useCallback((appt) => {
+    const apptId = getAppointmentId(appt);
+    if (!apptId || !appt?.teleconsultation_access_token) {
+      setScheduleError("Le lien de teleconsultation n'est pas encore disponible.");
+      return;
+    }
+    const params = new URLSearchParams({
+      role: 'patient',
+      access_token: appt.teleconsultation_access_token,
+    });
+    window.location.href = `/teleconsultation/${apptId}?${params.toString()}`;
+  }, []);
+
   const handleCloseEditModal = () => {
     setEditModalOpen(false);
     setEditingAppointmentId(null);
@@ -366,6 +414,7 @@ export function usePatientAppointments({
     editModalOpen,
     editingAppointmentId,
     cancelingId,
+    paymentRedirecting,
     hasPreconsultation,
     hasAct,
     minSelectableDate,
@@ -381,6 +430,8 @@ export function usePatientAppointments({
     handleCreateAppointment,
     handleEditAppointment,
     handleCancelAppointment,
+    handleResumePayment,
+    handleJoinTeleconsultation,
     handleCloseEditModal,
     handleConfirmEdit,
     getPrescriptionUrls,

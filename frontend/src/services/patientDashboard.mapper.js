@@ -40,41 +40,38 @@ function normalizeTime(value) {
   return String(value);
 }
 
+function mapAppointment(appt) {
+  return {
+    id: appt.id,
+    appointment_id: appt.appointment_id || appt.id,
+    date: normalizeDate(appt.date),
+    time: normalizeTime(appt.time),
+    appointment_type: appt.appointment_type,
+    appointmentType: appt.appointment_type,
+    status: appt.status,
+    mode: appt.mode || null,
+    payment_id: appt.payment_id || null,
+    payment_status: appt.payment_status || null,
+    checkout_url: appt.checkout_url || null,
+    teleconsultation_access_token: appt.teleconsultation_access_token || null,
+    teleconsultation_access_used_at: appt.teleconsultation_access_used_at || null,
+  };
+}
+
 function mapAppointments(dashboard, procedureCase) {
   const upcoming = dashboard?.appointments?.upcoming || [];
   const history = dashboard?.appointments?.history || [];
   if (upcoming.length || history.length) {
     return {
-      upcoming: upcoming.map((appt) => ({
-        id: appt.id,
-        date: normalizeDate(appt.date),
-        time: normalizeTime(appt.time),
-        appointmentType: appt.appointment_type,
-        status: appt.status,
-        mode: appt.mode || null,
-      })),
-      history: history.map((appt) => ({
-        id: appt.id,
-        date: normalizeDate(appt.date),
-        time: normalizeTime(appt.time),
-        appointmentType: appt.appointment_type,
-        status: appt.status,
-        mode: appt.mode || null,
-      })),
+      upcoming: upcoming.map(mapAppointment),
+      history: history.map(mapAppointment),
     };
   }
 
   const appointments = procedureCase?.appointments || [];
 
   return {
-    upcoming: appointments.map((appt) => ({
-      id: appt.id,
-      date: normalizeDate(appt.date),
-      time: normalizeTime(appt.time),
-      appointmentType: appt.appointment_type,
-      status: appt.status,
-      mode: appt.mode || null,
-    })),
+    upcoming: appointments.map(mapAppointment),
     history: [],
   };
 }

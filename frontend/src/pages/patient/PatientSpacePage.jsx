@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import PdfPreviewModal from '../../components/PdfPreviewModal.jsx';
 import Toast from '../../components/Toast.jsx';
 import { PatientJourneyHeader } from '../../components/PatientJourneyHeader.jsx';
@@ -11,6 +11,7 @@ import { LABELS_FR } from '../../constants/labels.fr.js';
 import { FEATURES } from '../../config/features.js';
 import { useDossier } from '../../hooks/useDossier.js';
 import { usePatientJourney } from '../../hooks/usePatientJourney.js';
+import { confirmMockPayment } from '../../lib/api.js';
 import { PatientTabDossierView } from './PatientTabDossier.jsx';
 import { usePatientSpaceController } from './usePatientSpaceController.js';
 
@@ -26,8 +27,11 @@ export function PatientSpacePage({
   user,
   onLogout,
 }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const dossier = useDossier({ token });
   const procedureSelection = 'circumcision';
+  const paymentReturnHandledRef = useRef(false);
   const [fourteenDayModal, setFourteenDayModal] = useState({
     open: false,
     title: 'Règle des 15 jours',
@@ -63,6 +67,55 @@ export function PatientSpacePage({
 
   const [activeTab, setActiveTab] = useState(TABS.file);
   const [pendingPrescriptionId, setPendingPrescriptionId] = useState(null);
+
+  useEffect(() => {
+    if (!token || paymentReturnHandledRef.current) return;
+
+    const params = new URLSearchParams(location.search);
+    const paymentState = params.get('payment');
+    const paymentId = params.get('payment_id');
+    if (!paymentState || !paymentId) return;
+
+    paymentReturnHandledRef.current = true;
+    setActiveTab(TABS.appointments);
+
+    const reloadPatientData = async () => {
+      await controller.procedure.loadProcedureCase?.();
+      await controller.reloadDashboard?.();
+      journey.refetch?.();
+    };
+    const clearPaymentParams = () => navigate('/patient', { replace: true });
+
+    if (paymentState === 'mock') {
+      (async () => {
+        controller.setError?.(null);
+        controller.setSuccessMessage?.(null);
+        try {
+          await confirmMockPayment(token, paymentId);
+          controller.setSuccessMessage?.('Paiement de test confirmé. Votre rendez-vous est validé.');
+          await reloadPatientData();
+        } catch (err) {
+          controller.setError?.(err?.message || 'Impossible de confirmer ce paiement de test.');
+        } finally {
+          clearPaymentParams();
+        }
+      })();
+      return;
+    }
+
+    if (paymentState === 'success') {
+      controller.setSuccessMessage?.(
+        'Paiement confirmé. La validation du rendez-vous peut prendre quelques instants.',
+      );
+      reloadPatientData().finally(clearPaymentParams);
+      return;
+    }
+
+    if (paymentState === 'cancelled') {
+      controller.setError?.('Paiement annulé. Vous pouvez reprendre le paiement depuis votre rendez-vous.');
+      clearPaymentParams();
+    }
+  }, [controller, journey, location.search, navigate, token]);
 
   const handleTabChange = (nextTab) => {
     setActiveTab(nextTab);

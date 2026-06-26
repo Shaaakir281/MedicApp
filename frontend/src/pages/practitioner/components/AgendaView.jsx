@@ -16,6 +16,7 @@ export const AgendaView = ({
   onSendPrescription,
   onSelectPatient,
   onEditPrescription,
+  onJoinTeleconsultation,
   previewingId,
   signingId,
   sendingId,
@@ -51,6 +52,7 @@ export const AgendaView = ({
               onSendPrescription={onSendPrescription}
               onSelectPatient={onSelectPatient}
               onEditPrescription={onEditPrescription}
+              onJoinTeleconsultation={onJoinTeleconsultation}
               previewingId={previewingId}
               signingId={signingId}
               sendingId={sendingId}
