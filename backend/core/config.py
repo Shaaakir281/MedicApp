@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(default=15, alias="ACCESS_TOKEN_EXPIRE_MINUTES", ge=5)
     refresh_token_expire_days: int = Field(default=30, alias="REFRESH_TOKEN_EXPIRE_DAYS", ge=1)
     app_name: str = Field(default="MedicApp", alias="APP_NAME")
+    app_timezone: str = Field(default="Europe/Paris", alias="APP_TIMEZONE")
     app_base_url: str = Field(default="http://localhost:8000", alias="APP_BASE_URL")
     app_base_urls_raw: str | List[str] | None = Field(default=None, alias="APP_BASE_URLS")
     frontend_base_url: str = Field(default="http://localhost:5173", alias="FRONTEND_BASE_URL")
@@ -87,6 +88,7 @@ class Settings(BaseSettings):
         default=False,
         alias="FEATURE_TELECONSULTATION_ENABLED",
     )
+    dev_test_slots_enabled: bool = Field(default=False, alias="DEV_TEST_SLOTS_ENABLED")
     stripe_secret_key: Optional[str] = Field(default=None, alias="STRIPE_SECRET_KEY")
     stripe_webhook_secret: Optional[str] = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")
     stripe_price_preconsult: Optional[str] = Field(default=None, alias="STRIPE_PRICE_PRECONSULT")

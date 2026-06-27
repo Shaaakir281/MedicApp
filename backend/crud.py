@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime
 from typing import Optional, Dict, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, joinedload
@@ -34,17 +35,55 @@ def _normalize_procedure_type(
     return models.ProcedureType(normalized)
 
 
+def _build_dev_test_slots(
+    slot_date: datetime.date,
+    *,
+    now: datetime.datetime | None = None,
+) -> list[str]:
+    """Return near-future slots for local manual testing outside office hours."""
+
+    current = now or datetime.datetime.now()
+    first_slot = current.replace(second=0, microsecond=0) + datetime.timedelta(minutes=5)
+    remainder = first_slot.minute % 5
+    if remainder:
+        first_slot += datetime.timedelta(minutes=5 - remainder)
+
+    slots: list[str] = []
+    for index in range(6):
+        candidate = first_slot + datetime.timedelta(minutes=5 * index)
+        if candidate.date() == slot_date:
+            slots.append(candidate.strftime("%H:%M"))
+    return slots
+
+
+def _local_now() -> datetime.datetime:
+    settings = get_settings()
+    try:
+        return datetime.datetime.now(ZoneInfo(settings.app_timezone)).replace(tzinfo=None)
+    except ZoneInfoNotFoundError:
+        return datetime.datetime.now()
+
+
+def _dev_test_slots_enabled() -> bool:
+    settings = get_settings()
+    return settings.dev_test_slots_enabled and settings.environment.lower() != "production"
+
+
 def get_available_slots(db: Session, date: datetime.date) -> list[str]:
     """Return a list of ISO-time strings representing available slots on a given day.
 
     For demonstration purposes, this returns every hour from 08:00 to 17:00 except
     those already booked in the appointments table.
     """
-    today = datetime.date.today()
+    now = _local_now()
+    today = now.date()
     if date < today:
         return []
 
     all_slots = [f"{hour:02d}:00" for hour in range(8, 18)]
+    if date == today and _dev_test_slots_enabled():
+        all_slots.extend(_build_dev_test_slots(date, now=now))
+        all_slots = sorted(set(all_slots))
     booked_times = (
         db.query(models.Appointment.time)
         .filter(
@@ -57,7 +96,7 @@ def get_available_slots(db: Session, date: datetime.date) -> list[str]:
     available = [slot for slot in all_slots if slot not in booked_set]
 
     if date == today:
-        now_time = datetime.datetime.now().time().replace(second=0, microsecond=0)
+        now_time = now.time().replace(second=0, microsecond=0)
         available = [
             slot for slot in available
             if datetime.datetime.strptime(slot, "%H:%M").time() >= now_time
@@ -81,7 +120,7 @@ def create_appointment(
 ) -> models.Appointment:
     """Create a new appointment if the slot is free. Raises ValueError if invalid."""
     appointment_dt = datetime.datetime.combine(date, time)
-    if appointment_dt < datetime.datetime.now():
+    if appointment_dt < _local_now():
         raise ValueError("Impossible de planifier un rendez-vous dans le passe")
 
     if isinstance(appointment_type, str):

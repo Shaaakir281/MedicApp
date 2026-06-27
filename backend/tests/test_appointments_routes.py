@@ -5,8 +5,10 @@ from datetime import date, datetime, timedelta, time
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+import crud
 import models
 from core import security
+from core.config import reset_settings_cache
 from domain.legal_documents.types import DocumentType, SignerRole
 
 
@@ -42,6 +44,25 @@ def _login_headers(client: TestClient, email: str, password: str = "password123"
     assert response.status_code == 200
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+def test_dev_test_slots_build_near_future_slots() -> None:
+    now = datetime(2026, 6, 27, 20, 38, 30)
+
+    slots = crud._build_dev_test_slots(now.date(), now=now)
+
+    assert slots == ["20:45", "20:50", "20:55", "21:00", "21:05", "21:10"]
+
+
+def test_dev_test_slots_are_disabled_in_production(monkeypatch) -> None:
+    monkeypatch.setenv("DEV_TEST_SLOTS_ENABLED", "true")
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    reset_settings_cache()
+
+    try:
+        assert crud._dev_test_slots_enabled() is False
+    finally:
+        reset_settings_cache()
 
 
 def test_cancel_act_appointment_deletes_fk_dependencies(client: TestClient, db_session: Session) -> None:
