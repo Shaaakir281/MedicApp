@@ -74,7 +74,10 @@ def _create_visio_appointment(
     return appointment
 
 
-def test_patient_access_consumes_one_time_link(client: TestClient, db_session: Session) -> None:
+def test_patient_access_can_be_reused_during_access_window(
+    client: TestClient,
+    db_session: Session,
+) -> None:
     patient = _create_user(db_session, "patient.teleconsult@example.com")
     appointment = _create_visio_appointment(db_session, patient)
 
@@ -103,7 +106,8 @@ def test_patient_access_consumes_one_time_link(client: TestClient, db_session: S
         f"/teleconsultation/{appointment.id}/access?access_token=patient-access-token",
         headers=_auth_headers(patient),
     )
-    assert replay.status_code == 409
+    assert replay.status_code == 200
+    assert replay.json()["room_name"] == f"precons-{appointment.id}-testroom"
 
 
 def test_patient_access_rejects_wrong_patient(client: TestClient, db_session: Session) -> None:

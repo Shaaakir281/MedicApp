@@ -36,8 +36,7 @@ export const AppointmentCard = ({
       appt?.mode === 'visio' &&
       appt?.status === 'validated' &&
       appt?.payment_status === 'succeeded' &&
-      appt?.teleconsultation_access_token &&
-      !appt?.teleconsultation_access_used_at,
+      appt?.teleconsultation_access_token,
   );
 
   return (

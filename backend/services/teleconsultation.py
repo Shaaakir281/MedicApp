@@ -19,7 +19,7 @@ class TeleconsultationAccessError(RuntimeError):
 
 
 class TeleconsultationConflictError(RuntimeError):
-    """Raised when a one-time access link has already been consumed."""
+    """Raised when teleconsultation access is in a conflicting state."""
 
 
 class TeleconsultationConfigurationError(RuntimeError):
@@ -53,8 +53,6 @@ def issue_patient_token(
         raise TeleconsultationNotFoundError("Session de teleconsultation introuvable.")
     if session.access_link_token != access_token:
         raise TeleconsultationAccessError("Lien de teleconsultation invalide.")
-    if session.access_link_used_at is not None:
-        raise TeleconsultationConflictError("Lien de teleconsultation deja utilise.")
     if session.access_link_expires_at and session.access_link_expires_at < dt.datetime.utcnow():
         raise TeleconsultationAccessError("Lien de teleconsultation expire.")
 

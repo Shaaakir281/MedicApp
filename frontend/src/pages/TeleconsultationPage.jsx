@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 
@@ -21,6 +21,102 @@ function loadTeleconsultationSession(requestKey, loader) {
     );
   }
   return sessionRequestCache.get(requestKey);
+}
+
+function LocalDevicePreview() {
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const [status, setStatus] = useState('idle');
+  const [error, setError] = useState(null);
+
+  const stopPreview = useCallback((updateState = true) => {
+    streamRef.current?.getTracks?.().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    if (updateState) {
+      setStatus('idle');
+    }
+  }, []);
+
+  const startPreview = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError("Ce navigateur ne permet pas d'accéder à la caméra.");
+      setStatus('error');
+      return;
+    }
+
+    setStatus('loading');
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: { facingMode: 'user' },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play?.();
+      }
+      setStatus('ready');
+    } catch (err) {
+      setError(
+        err?.name === 'NotAllowedError'
+          ? 'Autorisez la caméra et le micro dans le navigateur pour tester la visio.'
+          : "Impossible d'ouvrir la caméra ou le micro.",
+      );
+      setStatus('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    startPreview();
+    return () => stopPreview(false);
+  }, [startPreview, stopPreview]);
+
+  return (
+    <div className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Test caméra et micro</h2>
+          <p className="text-sm text-slate-500">
+            Prévisualisation locale en attendant la configuration LiveKit.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="btn btn-sm btn-outline"
+            onClick={startPreview}
+            disabled={status === 'loading'}
+          >
+            {status === 'loading' ? 'Activation...' : 'Activer'}
+          </button>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={stopPreview}>
+            Couper
+          </button>
+        </div>
+      </div>
+
+      <div className="aspect-video overflow-hidden rounded-lg bg-slate-950">
+        <video
+          ref={videoRef}
+          className="h-full w-full object-cover"
+          muted
+          playsInline
+          autoPlay
+        />
+      </div>
+
+      {status === 'ready' && (
+        <div className="alert alert-success py-2 text-sm">
+          Caméra et micro accessibles sur ce navigateur.
+        </div>
+      )}
+      {error && <div className="alert alert-warning py-2 text-sm">{error}</div>}
+    </div>
+  );
 }
 
 export default function TeleconsultationPage() {
@@ -145,6 +241,7 @@ export default function TeleconsultationPage() {
             Configurez LiveKit pour remplacer cet écran par la visio réelle.
           </p>
         </div>
+        <LocalDevicePreview />
         <Link to={isPractitioner ? '/praticien' : '/patient'} className="btn btn-outline">
           Retour
         </Link>
