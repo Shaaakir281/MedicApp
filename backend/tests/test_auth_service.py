@@ -71,12 +71,21 @@ def test_authenticate_user_raises_when_password_invalid(db_session: Session) -> 
 def test_issue_and_refresh_tokens(db_session: Session) -> None:
     user = _create_user(db_session, email="token@example.com")
 
-    tokens = auth_service.issue_tokens(user.id)
+    tokens = auth_service.issue_tokens(
+        user.id,
+        access_claims=auth_service.build_user_claims(user),
+    )
     assert tokens.access_token
     assert tokens.refresh_token
+    access_claims = security.decode_token(tokens.access_token)
+    assert access_claims["role"] == models.UserRole.patient.value
+    assert access_claims["email"] == user.email
 
-    new_access_token = auth_service.refresh_access_token(tokens.refresh_token)
+    new_access_token = auth_service.refresh_access_token(tokens.refresh_token, db_session)
     assert new_access_token
+    refreshed_claims = security.decode_token(new_access_token)
+    assert refreshed_claims["role"] == models.UserRole.patient.value
+    assert refreshed_claims["email"] == user.email
 
 
 def test_refresh_access_token_rejects_invalid_token() -> None:

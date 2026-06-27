@@ -44,6 +44,20 @@ class TokenPair:
     refresh_token: str
 
 
+def build_user_claims(user: models.User, extra: dict | None = None) -> dict:
+    """Return stable frontend-safe claims embedded in auth tokens."""
+
+    claims = dict(extra or {})
+    claims.update(
+        {
+            "email": user.email,
+            "role": user.role.value if hasattr(user.role, "value") else user.role,
+            "email_verified": bool(user.email_verified),
+        }
+    )
+    return claims
+
+
 def authenticate_user(db: Session, email: str, password: str) -> models.User:
     """Return the authenticated user or raise ``InvalidCredentialsError``."""
     user = user_repository.get_by_email(db, email)
@@ -113,6 +127,12 @@ def refresh_access_token(refresh_token: str, db: Session | None = None) -> str:
         if user.email and user.email.startswith("deleted+"):
             raise InvalidRefreshTokenError("Account deleted")
     access_claims = {}
+    if db is not None:
+        access_claims.update(build_user_claims(user))
+    else:
+        for key in ("email", "role", "email_verified"):
+            if key in claims:
+                access_claims[key] = claims[key]
     if claims.get("mfa_verified") is True:
         access_claims["mfa_verified"] = True
     return security.create_access_token(str(subject), claims=access_claims or None)

@@ -361,6 +361,23 @@ const Praticien = () => {
     );
   }
 
+  if (user?.role && user.role !== 'praticien') {
+    return (
+      <div className="max-w-xl mx-auto py-10 space-y-4">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 space-y-3">
+          <h1 className="text-xl font-semibold text-amber-950">Session patient active</h1>
+          <p className="text-sm text-amber-900">
+            Vous êtes connecté avec {user.email || 'un compte patient'}. Déconnectez-vous pour
+            ouvrir l'espace praticien avec le compte de démonstration.
+          </p>
+          <button type="button" className="btn btn-primary" onClick={logout}>
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const stats = statsQuery.data;
   return (
     <div className="min-h-screen bg-slate-50/50">

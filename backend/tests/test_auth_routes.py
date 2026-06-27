@@ -73,7 +73,11 @@ def test_login_requires_verified_email(client: TestClient, db_session: Session) 
 
 
 def test_login_and_refresh_success(client: TestClient, db_session: Session) -> None:
-    _create_user(db_session, email="practitioner@example.com")
+    _create_user(
+        db_session,
+        email="practitioner@example.com",
+        role=models.UserRole.praticien,
+    )
 
     response = client.post(
         "/auth/login",
@@ -84,6 +88,9 @@ def test_login_and_refresh_success(client: TestClient, db_session: Session) -> N
     tokens = response.json()
     assert "access_token" in tokens
     assert "refresh_token" in tokens
+    access_claims = security.decode_token(tokens["access_token"])
+    assert access_claims["role"] == models.UserRole.praticien.value
+    assert access_claims["email"] == "practitioner@example.com"
 
     refresh_response = client.post(
         "/auth/refresh",
@@ -93,6 +100,8 @@ def test_login_and_refresh_success(client: TestClient, db_session: Session) -> N
     assert refresh_response.status_code == 200
     new_token = refresh_response.json()
     assert "access_token" in new_token
+    refreshed_claims = security.decode_token(new_token["access_token"])
+    assert refreshed_claims["role"] == models.UserRole.praticien.value
 
 
 def test_login_fails_with_invalid_credentials(client: TestClient) -> None:

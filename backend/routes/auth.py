@@ -289,7 +289,10 @@ def login(
             message="Code envoye." if sms_sent else "Verification MFA requise.",
         )
 
-    tokens = auth_service.issue_tokens(user.id)
+    tokens = auth_service.issue_tokens(
+        user.id,
+        access_claims=auth_service.build_user_claims(user),
+    )
     logger.info(
         json.dumps(
             {
@@ -386,8 +389,8 @@ def verify_mfa_code(
 
     tokens = auth_service.issue_tokens(
         current_user.id,
-        access_claims={"mfa_verified": True},
-        refresh_claims={"mfa_verified": True},
+        access_claims=auth_service.build_user_claims(current_user, {"mfa_verified": True}),
+        refresh_claims=auth_service.build_user_claims(current_user, {"mfa_verified": True}),
     )
     event_tracker.track_security_event(
         "auth_mfa_success",

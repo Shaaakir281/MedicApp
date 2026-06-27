@@ -118,6 +118,8 @@ export function AuthProvider({ children }) {
     const normalizedUser = baseUser
       ? {
           ...baseUser,
+          email: payload.email || baseUser.email || null,
+          role: payload.role || baseUser.role || null,
           email_verified: typeof emailVerified === 'boolean' ? emailVerified : true,
         }
       : null;
@@ -206,7 +208,9 @@ export function AuthProvider({ children }) {
       const currentUser = {
         id: payload.sub ? Number(payload.sub) : null,
         email: payload.email || fallbackEmail || null,
-        email_verified: true,
+        role: payload.role || null,
+        email_verified:
+          typeof payload.email_verified === 'boolean' ? payload.email_verified : true,
       };
       updateSession(buildSession(data.access_token, data.refresh_token, currentUser));
       return currentUser;

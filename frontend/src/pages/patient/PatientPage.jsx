@@ -92,5 +92,22 @@ export default function PatientPage() {
     );
   }
 
+  if (user?.role && user.role !== 'patient') {
+    return (
+      <div className="max-w-xl mx-auto py-10 space-y-4">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 space-y-3">
+          <h1 className="text-xl font-semibold text-amber-950">Session praticien active</h1>
+          <p className="text-sm text-amber-900">
+            Vous êtes connecté avec {user.email || 'un compte praticien'}. Déconnectez-vous pour
+            ouvrir l'espace patient avec un compte patient.
+          </p>
+          <button type="button" className="btn btn-primary" onClick={logout}>
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return <PatientSpacePage token={token} user={user} onLogout={logout} />;
 }

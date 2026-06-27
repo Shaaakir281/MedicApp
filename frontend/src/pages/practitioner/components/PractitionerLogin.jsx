@@ -3,7 +3,6 @@ import { Card, InputField, SectionHeading, Button } from '../../../components/ui
 
 const DEMO_ACCOUNTS = [
   { label: 'Praticien #1', email: 'praticien.demo1@demo.medicapp', password: 'password' },
-  { label: 'Praticien #2', email: 'praticien.demo2@demo.medicapp', password: 'password' },
 ];
 
 export function PractitionerLogin({ onSubmit, loading, error }) {
