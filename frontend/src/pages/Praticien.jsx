@@ -333,11 +333,7 @@ const Praticien = () => {
 
   const handleJoinTeleconsultation = (appointment) => {
     if (!appointment?.appointment_id) return;
-    window.open(
-      `/teleconsultation/${appointment.appointment_id}?role=practitioner`,
-      '_blank',
-      'noopener,noreferrer',
-    );
+    window.location.assign(`/teleconsultation/${appointment.appointment_id}?role=practitioner`);
   };
 
   if (!isAuthenticated) {
