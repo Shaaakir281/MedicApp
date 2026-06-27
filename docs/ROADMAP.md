@@ -1,8 +1,12 @@
 # MedicApp - Roadmap de reprise et finalisation
 
-Derniere mise a jour: 2026-06-18
+Derniere mise a jour: 2026-06-27
 
 Cette roadmap remplace les anciens suivis de sprint comme document de pilotage actif.
+
+> Jalon HDS (2026-06-27) : reunion Microsoft tenue le 25/06, **certificat HDS + documents de conformite Azure recus le 26/06** et archives dans `docs/`. Montage confirme : cabinet titulaire de son compte Azure (responsable de traitement), Fathi prestataire dev/integration. Un **partenaire Microsoft** va contacter Fathi pour valider l'architecture et le parametrage HDS (phase R1/R4). Preparation HDS estimee a **~75-80%** (reste surtout le durcissement reseau). Couts recurrents cadres : voir section "Couts recurrents" plus bas.
+
+> Jalon teleconsultation/paiement (2026-06-27) : le socle local est operationnel. Paiement mock local, reservation `awaiting_payment`, validation du RDV, creation de session LiveKit, lien patient, token praticien, page React `/teleconsultation/:appointmentId` et LiveKit Docker local sont en place. Reste a finaliser : Stripe sandbox/reel, webhook signe, facture Stripe stockee HDS, LiveKit Cloud UE pilote puis self-host HDS prod.
 
 ## Objectif
 
@@ -21,7 +25,7 @@ Remettre MedicApp en service progressivement, confirmer les fonctions deja devel
 | RS | Simplification produit avant pilote | A faire |
 | R4 | Finaliser contenus et conformite | A faire |
 | R5 | Preparer le pilote | A faire |
-| RP | Module de paiement en ligne (Stripe) | A faire (nouveau) |
+| RP | Module de paiement en ligne (Stripe) | En cours - socle local fait, Stripe reel/facture HDS a faire |
 | R6 | Ameliorations post-recette | Backlog |
 
 ## R0 - Documentation
@@ -161,8 +165,11 @@ Objectif: reduire le cout, les frictions et le perimetre avant le pilote, sans s
 - [ ] remplacer le modele fictif d'ordonnance par les exemples PDF reels du cabinet;
 - [ ] generer le compte rendu de consultation prealable a partir du modele fourni;
 - [ ] envoyer le compte rendu au patient/parents par lien securise;
-- [ ] cadrer puis implementer le module de teleconsultation;
-- [ ] raccorder le paiement de la consultation prealable au parcours de teleconsultation.
+- [x] cadrer le module de teleconsultation + paiement (`CADRAGE_TELECONSULTATION_PAIEMENT.md`);
+- [x] implementer le socle local de teleconsultation integree (LiveKit, tokens patient/praticien, page React);
+- [x] raccorder le paiement mock local de la consultation prealable au parcours de teleconsultation;
+- [ ] brancher Stripe sandbox puis production;
+- [ ] stocker la facture Stripe en HDS et l'exposer par lien securise.
 
 Condition de sortie:
 
@@ -181,8 +188,10 @@ Objectif: remplacer les brouillons par des informations validables.
 - [ ] validation de la politique de confidentialite;
 - [ ] validation des durees de conservation;
 - [ ] validation de la procedure de violation;
-- [ ] decision sur les Private Endpoints et l'acces public;
-- [ ] archivage des attestations et contrats HDS.
+- [ ] decision sur les Private Endpoints et l'acces public (durcissement reseau scriptes dans `docs/compliance/INFRASTRUCTURE_HDS.md`, a appliquer avec le partenaire Microsoft);
+- [x] archivage des attestations et contrats HDS (certificat HDS Azure + catalogue compliance recus 26/06, dans `docs/`);
+- [ ] validation de l'architecture et du parametrage HDS par le partenaire Microsoft (contact a venir);
+- [ ] confirmer le rattachement du compte Azure au cabinet (montage cabinet titulaire) et la clause prestataire dans le contrat de dev.
 
 Attention:
 
@@ -229,16 +238,34 @@ Objectif: encaisser en ligne la **consultation prealable** (l'acte lui-meme rest
 ### Taches techniques
 
 - [ ] creer le compte Stripe (seul compte tiers encore manquant);
-- [ ] integrer Stripe au backend (creation de paiement, webhook de confirmation);
-- [ ] declencher le paiement de la consultation prealable dans le parcours patient;
+- [x] ajouter le modele `Payment`, `StripeWebhookEvent`, `TeleconsultationSession` et la migration associee;
+- [x] integrer le paiement local mock au backend pour developper sans compte Stripe;
+- [x] declencher le paiement de la consultation prealable dans le parcours patient;
+- [x] confirmer un paiement mock et valider le RDV;
+- [x] creer la session LiveKit apres paiement valide pour un RDV `visio`;
+- [x] exposer les endpoints token patient/praticien;
+- [x] integrer la salle React LiveKit dans `/teleconsultation/:appointmentId`;
+- [x] ajouter LiveKit local a Docker Compose pour tester une vraie visio en local;
+- [ ] integrer Stripe reel au backend avec cles sandbox;
+- [ ] tester le webhook Stripe signe et idempotent;
 - [ ] recuperer la facture Stripe et la stocker en HDS (chiffree, comme les autres documents);
 - [ ] exposer un lien de telechargement securise dans l'espace patient;
 - [ ] gerer le cas du patient qui paie la consultation puis refuse l'acte (facture disponible sans retour au cabinet);
-- [ ] tests: paiement reussi, paiement echoue, remboursement eventuel, acces a la facture.
+- [ ] tests: paiement Stripe reussi, paiement echoue, remboursement eventuel, acces a la facture.
+
+### Etat local valide le 2026-06-27
+
+- backend: `38 passed`;
+- frontend: `npm run build` OK;
+- LiveKit local: conteneur Docker operationnel sur `ws://localhost:7880`;
+- endpoint teleconsultation praticien: token LiveKit reel (`mock=false`);
+- endpoint teleconsultation patient: token LiveKit reel (`mock=false`) pour la meme salle;
+- correction session praticien: la teleconsultation s'ouvre dans le meme onglet pour conserver l'auth `sessionStorage`;
+- correction auth: les tokens portent `role`, `email`, `email_verified`.
 
 Condition de sortie:
 
-- un paiement de consultation aboutit, la facture est disponible en ligne pour le patient, et l'export Stripe est exploitable par le comptable.
+- un paiement Stripe sandbox de consultation aboutit, la facture est disponible en ligne pour le patient, l'export Stripe est exploitable par le comptable, et patient/praticien rejoignent la meme salle LiveKit.
 
 ## R6 - Backlog
 
@@ -250,6 +277,23 @@ Condition de sortie:
 - revue accessibilite;
 - revue de performance;
 - pentest ou audit externe selon le niveau de mise en production vise.
+
+## Couts recurrents (cadres 2026-06-27)
+
+Deux postes distincts, deux factures distinctes :
+
+| Poste | Montant | Qui paie | Contenu |
+|---|---|---|---|
+| Infrastructure Azure (prod HDS) | ~400 EUR/mois | **Le cabinet** (sur son compte Azure) | App Service, PostgreSQL, Key Vault, stockage, Private Endpoints, sauvegardes, supervision, WAF. Charge d'exploitation du cabinet, **hors facturation Fathi**. Allegeable en phase pilote (Front Door au lieu d'Application Gateway WAF, SKU B-series, reservations 1 an -40%). |
+| Maintenance mensuelle | ~400 EUR HT/mois (1 j) | Le cabinet, **facture par Fathi** | Formule **Standard** : supervision alertes, mises a jour securite, verification sauvegardes + test restauration, revue des logs d'acces/audit HDS, rotation secrets/certificats, support praticien, petits correctifs. |
+
+Regles a inscrire au contrat de maintenance :
+
+- les **nouvelles fonctionnalites** ne sont pas dans le forfait : facturees a part au TJM (400 EUR/j HT) ;
+- perimetre inclus/exclu explicite et delai de reponse indicatif (24-72 h selon gravite) ;
+- contrat de maintenance **distinct** du devis de realisation initial.
+
+Le forfait Standard est le point de depart pour un demarrage a un seul cabinet ; reevaluable apres quelques mois de donnees reelles d'usage.
 
 ## Definition de fin
 

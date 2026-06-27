@@ -1,6 +1,6 @@
 # MedicApp - Ma to-do list (Fathi)
 
-Derniere mise a jour: 2026-06-20 (env local lance ; infra Azure differee au HDS ; Stripe reste a creer)
+Derniere mise a jour: 2026-06-27 (HDS enclenche ; socle teleconsultation + paiement local operationnel ; Stripe reste a creer)
 
 Checklist personnelle pas-a-pas pour reprendre le travail sur la plateforme et preparer le module de paiement. Pour le detail technique de chaque phase, voir `ROADMAP.md` ; pour l'etat verifie, voir `ETAT_PROJET.md`.
 
@@ -12,6 +12,7 @@ L'environnement local tourne (Docker + frontend), sur donnees fictives. On reste
 - [x] depot clone hors OneDrive (`C:\dev\medicapp`) et ouvert dans VS Code ;
 - [x] backend lance avec Docker + migrations appliquees ;
 - [x] frontend lance en local.
+- [x] LiveKit local lance via Docker Compose (`ws://localhost:7880`) pour tester une vraie salle visio.
 
 ## 2. Commencer a travailler sur les modifications
 
@@ -29,9 +30,24 @@ L'environnement local tourne (Docker + frontend), sur donnees fictives. On reste
 - [x] Twilio (SMS) ;
 - [x] OVH ;
 - [x] nom de domaine (achat effectue, en cours de propagation/configuration) ;
-- [x] Azure ;
+- [x] Azure (compte cabinet titulaire HDS + compte perso dev) ;
 - [ ] **Stripe** : creer le compte (seul compte manquant), recuperer les cles API test et production ;
-- [ ] **Contrat HDS Microsoft** : relancer si pas de reponse sous une semaine -- c'est le delai administratif le plus incertain, initier maintenant.
+- [ ] **LiveKit Cloud UE** : a creer/configurer pour le pilote a donnees fictives, apres validation du test local ;
+- [x] **Contrat HDS Microsoft** : reunion tenue 25/06, docs de conformite + certificat HDS recus 26/06 et archives dans `docs/`. Comptes Azure transmis a Microsoft.
+
+## 3bis. Suivi HDS Microsoft (en cours)
+
+- [x] accuse de reception des documents Microsoft (a Chedene) -- ou confirmer qu'il est fait ;
+- [ ] **attendre le contact du partenaire Microsoft** pour le parametrage Azure HDS (mise en prod) ; preparer mes questions avant l'appel ;
+- [ ] avec le partenaire : appliquer le durcissement reseau (Private Endpoints + coupure acces publics, deja scriptes dans `docs/compliance/INFRASTRUCTURE_HDS.md`) ;
+- [ ] verifier que tout est bien deploye en **France Central** et que les services actives sont dans le perimetre certifie ;
+- [ ] securiser au contrat cabinet : clause "cabinet titulaire Azure / Fathi prestataire dev-integration".
+
+## 3ter. Maintenance et couts (a presenter au cabinet)
+
+- [ ] presenter au cabinet les deux couts recurrents : **infra Azure ~400 EUR/mois (paye par le cabinet)** + **maintenance ~400 EUR HT/mois (formule Standard, facturee par moi)** ;
+- [ ] formaliser le **contrat de maintenance distinct** (perimetre inclus/exclu, SLA, evolutions hors forfait au TJM) ;
+- [ ] ajouter l'annexe maintenance au devis.
 
 ## 4. Cote cabinet (a confirmer avec Miriam / le comptable)
 
@@ -53,8 +69,7 @@ L'environnement local tourne (Docker + frontend), sur donnees fictives. On reste
 
 ## 6. Teleconsultation et paiement
 
-Le module de teleconsultation n'est pas encore integre : le champ "visio/presentiel" est une etiquette sur le RDV, sans salle d'appel.
-Le paiement concerne la consultation prealable, pas l'acte.
+Le socle teleconsultation + paiement est maintenant integre et testable en local. Le paiement concerne la consultation prealable, pas l'acte.
 
 Decisions actees (2026-06-20) :
 - flux paiement : **payer pour reserver** (creneau confirme et acces visio delivre seulement apres paiement Stripe reussi) ;
@@ -64,13 +79,15 @@ Decisions actees (2026-06-20) :
 Tarifs (retour cabinet / Miriam, 2026-06-19) : consultation prealable = **50 EUR** (montant Stripe, remplace l'ancien 40 EUR) ; acte de circoncision desormais **tarife par tranche d'age** (grille a fournir par le cabinet). Tarifs non affiches sur la page d'accueil.
 
 - [ ] recuperer aupres du cabinet la grille de tarifs par tranche d'age ;
-- [ ] cadrer la solution de teleconsultation: lien externe rapide ou salle integree ;
-- [ ] si salle integree retenue : chiffrer la complexite HDS et technique ;
-- [ ] integrer Stripe au backend (paiement + webhook de confirmation) ;
-- [ ] declencher le paiement de la consultation prealable dans le parcours ;
+- [x] cadrer la solution de teleconsultation: LiveKit integre dans l'application ;
+- [x] implementer le socle local: paiement mock, RDV valide, session LiveKit, tokens patient/praticien ;
+- [x] declencher le paiement de la consultation prealable dans le parcours ;
+- [x] tester la generation de vrais tokens LiveKit locaux (`mock=false`) ;
+- [ ] faire une recette visio complete a deux navigateurs/profils (Chrome patient + Edge praticien) ;
+- [ ] integrer Stripe reel au backend (cles sandbox + webhook de confirmation signe) ;
 - [ ] recuperer la facture Stripe, la stocker en HDS, exposer un lien de telechargement securise ;
 - [ ] gerer le cas du patient qui paie puis refuse l'acte ;
-- [ ] tester (paiement reussi, echoue, acces facture).
+- [ ] tester (paiement Stripe reussi, echoue, acces facture).
 
 ## 7. Documents metier reels
 
@@ -80,10 +97,10 @@ Tarifs (retour cabinet / Miriam, 2026-06-19) : consultation prealable = **50 EUR
 
 ## Ordre conseille
 
-1. **Relancer le contrat HDS Microsoft** (section 3) -- a faire des maintenant, le delai admin est impredictible ;
-2. **Creer le compte Stripe** (section 3) -- rapide, debloque la phase RP ;
-3. **Envoyer les corrections FAQ et les exemples PDF** (sections 2 et 7) -- debloque les contenus reels ;
-4. **Envoyer la question comptable a Miriam** (section 4) -- en parallele des etapes 2-3 ;
-5. **Mettre en route en local** (section 1) -- prerequis au developpement ;
-6. **Simplifier le parcours pilote** (section 5) -- Yousign et video explicative hors parcours actif ;
-7. **Cadrer teleconsultation + paiement** (section 6) -- une fois Stripe ouvert et env local OK.
+1. **Tester la visio locale a deux profils** (section 6) -- patient Chrome + praticien Edge, camera/micro autorises ;
+2. **Creer le compte Stripe** (section 3) -- recuperer les cles test pour remplacer le mock ;
+3. **Brancher Stripe sandbox + webhook** (section 6) -- puis tester paiement reussi/echec ;
+4. **Suivre le contact du partenaire Microsoft** (section 3bis) -- volet HDS enclenche, preparer mes questions ;
+5. **Envoyer les corrections FAQ et les exemples PDF** (sections 2 et 7) -- debloque les contenus reels ;
+6. **Envoyer la question comptable a Miriam** (section 4) -- valider facture Stripe/export mensuel ;
+7. **Simplifier le parcours pilote** (section 5) -- Yousign et video explicative hors parcours actif.

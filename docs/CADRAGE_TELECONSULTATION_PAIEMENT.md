@@ -9,7 +9,37 @@ consultation préalable en téléconsultation, avec paiement Stripe **payer pour
 
 ---
 
-## 1. Décisions actées
+## Etat d'implementation au 2026-06-27
+
+Le socle local est implemente et pousse sur `main`.
+
+Fait:
+
+- dependances backend/frontend ajoutees (`stripe`, `livekit-api`, `@livekit/components-react`, `livekit-client`, `@livekit/components-styles`);
+- migration `20260625_add_payments_teleconsultation.py`;
+- modeles `Payment`, `StripeWebhookEvent`, `TeleconsultationSession`;
+- creation de preconsultation avec paiement `awaiting_payment`;
+- paiement mock local quand Stripe n'est pas configure;
+- confirmation mock et creation automatique de session LiveKit pour les RDV `visio`;
+- endpoints `/teleconsultation/{appointment_id}/access` et `/teleconsultation/{appointment_id}/token`;
+- page React `/teleconsultation/:appointmentId`;
+- bouton patient et bouton praticien pour rejoindre la salle;
+- Docker Compose LiveKit local (`livekit/livekit-server:latest`, `--dev --bind 0.0.0.0`);
+- correction session patient/praticien: role dans le token JWT, garde-fous d'espace, teleconsultation praticien ouverte dans le meme onglet;
+- tests backend valides (`38 passed`) et build frontend OK.
+
+Reste a faire:
+
+- creer le compte Stripe;
+- renseigner les cles sandbox puis production;
+- tester un Checkout Stripe reel;
+- tester le webhook signe/idempotent en sandbox;
+- recuperer la facture Stripe et la stocker en HDS chiffre;
+- exposer le lien facture securise dans l'espace patient;
+- remplacer LiveKit local par LiveKit Cloud UE pour pilote donnees fictives, puis self-host Azure France Central HDS pour production;
+- completer la recette fonctionnelle a deux navigateurs/profils avec camera/micro.
+
+## 1. Decisions conservees
 
 - **Flux paiement : payer pour réserver.** Le créneau de consultation préalable n'est
   confirmé, et l'accès visio n'est délivré, **qu'après paiement Stripe réussi**.
@@ -33,7 +63,9 @@ consultation préalable en téléconsultation, avec paiement Stripe **payer pour
   `appointment_type` (`general` / `preconsultation` / `act`), `mode` (`visio` / `presentiel`),
   `user_id`, `date`, `time`, `procedure_id`.
 - Il existe déjà un dossier `backend/jobs/` (tâches planifiées) et `backend/services/`.
-- Le champ `mode` est aujourd'hui une simple étiquette : **aucune salle d'appel** n'est gérée.
+- Le champ `mode` etait historiquement une simple etiquette. Depuis le jalon du 2026-06-27,
+  les RDV `visio` valides peuvent creer une `TeleconsultationSession` et rejoindre une salle
+  LiveKit locale.
 
 ## 3. Périmètre du module
 

@@ -33,9 +33,9 @@ La plateforme est **fonctionnellement très avancée**. Le développement se fai
 - Frontend Static Web App : **conservé**
 - Le développement se fait **en local** ; l'infra Azure sera reconstruite (en France Central, durcie HDS) au moment du lot HDS. Procédure dans `REPRISE_PROJET.md`.
 
-### Ce qui n'existe pas encore
-- **Module de paiement Stripe** (phase RP) : paiement de la consultation préalable uniquement, Stripe émet la facture, dépôt HDS + lien sécurisé dans l'espace patient. **Le compte Stripe n'est pas encore créé** (à faire avant d'intégrer).
-- **Module vidéo / téléconsultation** : aujourd'hui le champ "visio/présentiel" est une simple étiquette sur le RDV, sans salle d'appel. **Décision actée (2026-06-20) : LiveKit**, salle intégrée dans l'espace patient, flux **« payer pour réserver »**, **sans enregistrement**. Phasage : **LiveKit Cloud UE** en pilote (données fictives) → **self-host HDS** en production, même SDK. **Le cadrage technique complet est dans `CADRAGE_TELECONSULTATION_PAIEMENT.md` — c'est le brief de référence de ce chantier.**
+### Ce qui reste a finaliser
+- **Stripe reel** (phase RP) : le socle local existe avec paiement mock, mais le compte Stripe n'est pas encore cree. A faire : cles sandbox, Checkout reel, webhook signe/idempotent, facture Stripe, stockage HDS chiffre + lien securise dans l'espace patient.
+- **Teleconsultation production** : le socle local LiveKit est implemente (Docker LiveKit local, tokens patient/praticien, page React). A faire : recette deux navigateurs/profils, LiveKit Cloud UE pour pilote donnees fictives, puis LiveKit self-host Azure France Central HDS pour production.
 
 ### Contrainte HDS
 Le projet vise la conformité **Hébergement de Données de Santé (HDS)**. Le contrat Microsoft HDS est en cours d'obtention. Cela implique : données sur Azure France Central uniquement, Private Endpoints à finaliser, durées de rétention à définir, sous-traitants à contractualiser.
@@ -63,9 +63,9 @@ Le projet vise la conformité **Hébergement de Données de Santé (HDS)**. Le c
 
 ## Ce qu'on fait maintenant
 
-L'environnement **local tourne déjà** (`C:\dev\medicapp`, Docker + frontend). Le chantier prioritaire est le **module téléconsultation + paiement**, en local, sur données fictives, en suivant `CADRAGE_TELECONSULTATION_PAIEMENT.md` (lots 0→5, dans l'ordre).
+L'environnement **local tourne déjà** (`C:\dev\medicapp`, Docker + frontend). Le socle teleconsultation + paiement local est en place : paiement mock, RDV valide, session LiveKit, tokens patient/praticien, page `/teleconsultation/:appointmentId`, LiveKit Docker local.
 
-Avant de coder l'intégration : **créer le compte Stripe** (clés test) et configurer **LiveKit Cloud UE** (clés API) — voir variables d'env du cadrage. Commence par le **Lot 0 (socle : dépendances, variables d'env, feature flag)**, puis le Lot 1.
+La suite prioritaire : tester la visio a deux profils (patient Chrome + praticien Edge), creer le compte Stripe, brancher les cles sandbox, valider le Checkout et le webhook signe, puis traiter la facture Stripe stockee HDS.
 
 Rappel de lancement local si besoin :
 
